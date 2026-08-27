@@ -14,6 +14,8 @@
     "build": "npm run build --workspace @wsr/bi",
     "browser": "playwright test",
     "dev": "vite packages/bi",
+    "docker:build": "docker build --tag wsr-ui-bi:local .",
+    "docker:smoke": "./scripts/docker-smoke.sh",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint .",
