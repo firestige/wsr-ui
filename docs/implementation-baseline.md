@@ -1,6 +1,6 @@
 # Iteration 5 BI Implementation Baseline
 
-> Status: Wave 2 G2b candidate, 2026-08-27. This document freezes routine implementation
+> Status: Wave 2 G2b conformity PASS, 2026-08-27. This document freezes routine implementation
 > parameters under the owner-approved G1 design at superproject commit `7de892a7c02ca8164798c1d61b5b68b88182b99c`.
 
 ## Repository and authority
@@ -120,3 +120,8 @@ Wave 3 owns typed payload derivation. No formula or Evidence response is copied 
 
 Any need for a BI backend, database route, write proxy, registry publication, cross-system contract
 change, future-product abstraction or inferred fact/relationship blocks the current wave.
+
+Wave 2 exit verification passed on 2026-08-27: clean locked install, format, lint, strict TypeScript,
+four unit/token tests, Vite build, dependency/license drift, Playwright keyboard/theme coverage,
+source-built Nginx smoke and runtime-content audit. GitHub Actions run `33057518397` passed both verify
+and Docker jobs for baseline commit `50d75063`.
