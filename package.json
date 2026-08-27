@@ -13,6 +13,8 @@
   "scripts": {
     "build": "npm run build --workspace @wsr/bi",
     "browser": "playwright test",
+    "deps:check": "node scripts/dependency-inventory.mjs --check",
+    "deps:write": "node scripts/dependency-inventory.mjs --write",
     "dev": "vite packages/bi",
     "docker:build": "docker build --tag wsr-ui-bi:local .",
     "docker:smoke": "./scripts/docker-smoke.sh",
