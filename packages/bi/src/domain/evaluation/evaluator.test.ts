@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { CATALOG_DIGEST, METRIC_BINDINGS } from "./catalog-binding";
@@ -19,6 +21,14 @@ const expected = [
   ["operational-usage-availability", 1, "rate", "ratio"],
   ["direct-evidence-basis-rate", 1, "rate", "ratio"],
 ] as const;
+
+const catalogOracle = readFileSync(
+  resolve("packages/bi/src/test/fixtures/metric-catalog-oracle.ndjson"),
+  "utf8",
+)
+  .trim()
+  .split("\n")
+  .map((line) => JSON.parse(line));
 
 function units(
   metricId: string,
@@ -65,6 +75,23 @@ describe("published catalog binding", () => {
         (binding) => binding.inputRefs.length > 0,
       ),
     ).toBe(true);
+  });
+
+  it("matches every exact published golden row", () => {
+    expect(catalogOracle).toHaveLength(14);
+    for (const row of catalogOracle) {
+      const binding = METRIC_BINDINGS[row.metric_id];
+      expect(binding, row.metric_id).toBeDefined();
+      expect(binding).toMatchObject({
+        id: row.metric_id,
+        version: row.version,
+        inputRefs: row.input_refs,
+        minimumSample: row.minimum_sample,
+        kind: row.value_semantics.kind,
+        unit: row.value_semantics.unit,
+        forbiddenInference: row.forbidden_inference,
+      });
+    }
   });
 });
 
