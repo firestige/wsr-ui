@@ -1,0 +1,31 @@
+{
+  "schema": "wsr.bi.mock-fixture-binding@0.1.0",
+  "upstream": {
+    "repository": "https://github.com/firestige/system-contracts",
+    "commit": "b50525f5b1db2c017d71ed307ed25bb1c3a7c783",
+    "contract": "evidence.query@0.1.0"
+  },
+  "derivations": [
+    {
+      "case": "facts-positive",
+      "source": "evidence-query/examples/facts-response-0.1.0.json",
+      "sha256": "bd5ab9e1dbdfa8eb70d7bc3e2e9d6294a418e587264a1c7fc38fd6274c14a94c"
+    },
+    {
+      "case": "traces-recorded-relations",
+      "source": "evidence-query/examples/traces-response-0.1.0.json",
+      "sha256": "0b114f2611f9fc0e15a3baab2ba48fcfc1e6e254cab595d44b926705e6561da9"
+    },
+    {
+      "case": "expiry-before-compatibility",
+      "source": "evidence-query/fixtures/negative/expiry-compatibility-order.json",
+      "sha256": "82c1934672a5ae13a62bbedf7402e332c47cc682d24cd2f2d08f8a7938794f7f"
+    },
+    {
+      "case": "cursor-expired-recovery",
+      "source": "evidence-query/fixtures/recovery/cursor-expired.json",
+      "sha256": "c5cfa89a0ead19ad3fae9354300932f2a79f4168f4387c14fc522a18fb0abc8d"
+    }
+  ],
+  "policy": "Wave2 records provenance only. Wave3 derives typed mock payloads without changing upstream semantics."
+}
