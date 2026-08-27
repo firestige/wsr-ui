@@ -26,7 +26,7 @@ function traceResponse() {
           span_id: "bbbbbbbbbbbbbbbb",
         },
         recorded_at: "2026-01-01T00:00:00.000000Z",
-        truth,
+        truth: { ...truth },
         node: {
           span_id: "bbbbbbbbbbbbbbbb",
           span_name: "chat",
@@ -83,7 +83,7 @@ describe("closed Evidence decoder", () => {
       "invalid truth tuple",
       (value: ReturnType<typeof traceResponse>) => {
         if (value.items[0])
-          value.items[0].truth = { ...truth, availability: "UNAVAILABLE" };
+          Object.assign(value.items[0].truth, { availability: "UNAVAILABLE" });
       },
     ],
     [
