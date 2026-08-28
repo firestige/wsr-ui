@@ -27,11 +27,7 @@ describe("closed visualizer registry", () => {
       "numeric-card@1",
       "badge@1",
       "ratio-bar@1",
-      "gauge@1",
-      "bar@1",
-      "line@1",
       "table@1",
-      "radar@1",
     ]);
     expect(VISUALIZER_REGISTRY["ratio-bar@1"].transforms).toEqual([
       "RATIO_TO_PERCENT",
@@ -47,34 +43,10 @@ describe("closed visualizer registry", () => {
     ]);
   });
 
-  it("does not infer a gauge, line, bar, or radar domain from current values", () => {
-    expect(
-      compatibleVisualizerIds(ratioSlice, {
-        authoritativeDomain: false,
-        orderedDimension: false,
-        sharedNormalizedDomain: false,
-      }),
-    ).not.toEqual(
+  it("does not expose deferred grammar as executable tools", () => {
+    expect(Object.keys(VISUALIZER_REGISTRY)).not.toEqual(
       expect.arrayContaining(["gauge@1", "bar@1", "line@1", "radar@1"]),
     );
-  });
-
-  it("offers bounded domain-based tools only when their descriptors exist", () => {
-    expect(
-      compatibleVisualizerIds(ratioSlice, {
-        authoritativeDomain: true,
-        orderedDimension: true,
-        sharedNormalizedDomain: true,
-      }),
-    ).toEqual([
-      "numeric-card@1",
-      "ratio-bar@1",
-      "gauge@1",
-      "bar@1",
-      "line@1",
-      "table@1",
-      "radar@1",
-    ]);
   });
 
   it("keeps a table fallback when truth withholds the value", () => {

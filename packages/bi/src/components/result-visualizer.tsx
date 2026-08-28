@@ -180,6 +180,17 @@ function RatioBar({ slice }: { slice: MetricSlice }) {
   );
 }
 
+function BooleanBadge({ slice }: { slice: MetricSlice }) {
+  if (slice.value?.kind !== "BOOLEAN") return null;
+  return (
+    <span aria-label="Boolean result" className="status-label" role="status">
+      <span aria-hidden="true">{slice.value.value ? "✓" : "○"}</span>
+      {" "}
+      {slice.value.value ? "True" : "False"}
+    </span>
+  );
+}
+
 export function MetricPanel({
   result,
   visualizer,
@@ -243,7 +254,11 @@ export function MetricPanel({
       onExplain={onExplain}
       focusEvidenceAction={focusEvidenceAction}
       visualization={
-        visualizer === "ratio-bar@1" ? <RatioBar slice={slice} /> : undefined
+        visualizer === "ratio-bar@1" ? (
+          <RatioBar slice={slice} />
+        ) : visualizer === "badge@1" ? (
+          <BooleanBadge slice={slice} />
+        ) : undefined
       }
     />
   ));

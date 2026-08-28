@@ -31,6 +31,27 @@ const result: MetricResult = {
 };
 
 describe("Metric panel visualization", () => {
+  it("renders a boolean badge with text and symbol redundancy", () => {
+    render(
+      <MetricPanel
+        result={{
+          ...result,
+          slices: [
+            {
+              ...ratio,
+              value: { kind: "BOOLEAN", value: true, unit: "boolean" },
+            },
+          ],
+        }}
+        visualizer="badge@1"
+      />,
+    );
+
+    expect(
+      screen.getByRole("status", { name: "Boolean result" }),
+    ).toHaveTextContent("✓ True");
+  });
+
   it("renders a D3 ratio bar with a semantic table fallback", () => {
     render(<MetricPanel result={result} visualizer="ratio-bar@1" />);
 
@@ -144,7 +165,7 @@ describe("Metric panel visualization", () => {
   });
 
   it("fails one incompatible panel closed without inventing a domain", () => {
-    render(<MetricPanel result={result} visualizer="gauge@1" />);
+    render(<MetricPanel result={result} visualizer="badge@1" />);
 
     expect(screen.getByRole("status")).toHaveTextContent(
       "Visualizer binding incompatible",
