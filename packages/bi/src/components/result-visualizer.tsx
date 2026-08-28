@@ -44,7 +44,7 @@ function PanelActions({
 function ResultTable({
   coordinate,
   slices,
-  label = "Fallback result data",
+  label = "Result data",
 }: {
   coordinate: string;
   slices: MetricSlice[];
@@ -62,7 +62,11 @@ function ResultTable({
             <th scope="col">Slice</th>
             <th scope="col">State</th>
             <th scope="col">Exact value</th>
+            <th scope="col">Result population</th>
+            <th scope="col">Measures</th>
             <th scope="col">Coverage</th>
+            <th scope="col">Compatibility</th>
+            <th scope="col">Limitations</th>
             <th scope="col">Provenance</th>
           </tr>
         </thead>
@@ -79,9 +83,35 @@ function ResultTable({
                   : presentExactValue(slice.value).exact}
               </td>
               <td className="numeric-exact">
+                {slice.numerator === undefined ||
+                slice.denominator === undefined
+                  ? "Not published"
+                  : `${slice.numerator} / ${slice.denominator}`}
+                {slice.contributing_count === undefined
+                  ? null
+                  : ` · Contributing: ${slice.contributing_count}`}
+              </td>
+              <td className="numeric-exact">
+                {Object.keys(slice.measures).length === 0
+                  ? "None"
+                  : JSON.stringify(slice.measures)}
+              </td>
+              <td className="numeric-exact">
                 {slice.coverage === null
                   ? "Unavailable"
-                  : `${slice.coverage.numerator} / ${slice.coverage.denominator}`}
+                  : `${slice.coverage.state} · ${slice.coverage.numerator} / ${slice.coverage.denominator} · ${slice.coverage.raw_ratio ?? "not applicable"}${slice.coverage.alert === null ? "" : ` · ${slice.coverage.alert}`}`}
+              </td>
+              <td className="numeric-exact">
+                {Object.keys(slice.compatibility).length === 0
+                  ? "None"
+                  : JSON.stringify(slice.compatibility)}
+              </td>
+              <td>
+                {[
+                  ...slice.exclusions.map((item) => `Excluded: ${item}`),
+                  ...slice.missing_inputs.map((item) => `Missing: ${item}`),
+                  ...(slice.reading === undefined ? [] : [slice.reading]),
+                ].join(" · ") || "None"}
               </td>
               <td className="numeric-exact">
                 {slice.provenance_refs.join(", ") || "None"}
@@ -92,6 +122,17 @@ function ResultTable({
       </table>
     </div>
   );
+}
+
+function ratioInUnitDomain(value: string): boolean {
+  const [numeratorText, denominatorText = "1"] = value.split("/");
+  try {
+    const numerator = BigInt(numeratorText!);
+    const denominator = BigInt(denominatorText);
+    return denominator > 0n && numerator >= 0n && numerator <= denominator;
+  } catch {
+    return false;
+  }
 }
 
 function RatioBar({ slice }: { slice: MetricSlice }) {
@@ -151,7 +192,10 @@ export function MetricPanel({
   const compatible = result.slices.every((slice) =>
     slice.value === undefined
       ? true
-      : compatibleVisualizerIds(slice).includes(visualizer),
+      : compatibleVisualizerIds(slice).includes(visualizer) &&
+        (visualizer !== "ratio-bar@1" ||
+          (slice.value.kind === "RATIO" &&
+            ratioInUnitDomain(slice.value.value))),
   );
   if (!compatible)
     return (
@@ -162,7 +206,11 @@ export function MetricPanel({
           retryable={false}
           title="Visualizer binding incompatible"
         />
-        <ResultTable coordinate={coordinate} slices={result.slices} />
+        <ResultTable
+          coordinate={coordinate}
+          label="Fallback result data"
+          slices={result.slices}
+        />
         <PanelActions onEvidence={onEvidence} onExplain={onExplain} />
       </section>
     );
