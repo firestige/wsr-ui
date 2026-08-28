@@ -280,6 +280,9 @@ export function EvidenceDrilldown({
               traceId,
               spanId,
               side: route.side,
+              metric: route.metric,
+              scope: route.scope,
+              factId: route.factId,
             })
           }
           onScopeChange={(scope) => onNavigate?.({ ...route, scope })}

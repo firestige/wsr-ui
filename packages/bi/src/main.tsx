@@ -20,6 +20,7 @@ createRoot(root).render(
   <RootApp
     evidence={{
       getFactsPage: (filters) => evidenceClient.getPage("facts", filters),
+      getTracesPage: (filters) => evidenceClient.getPage("traces", filters),
     }}
     evolution={evolution}
     relativeUrl={window.location.pathname + window.location.search}

@@ -19,7 +19,7 @@ const structure: RecordedStructureViewModel = {
       depth: 1,
       nodes: [
         { id: "child-a", label: "Writer", state: "PARTIAL" },
-        { id: "child-b", label: "Reviewer", state: "EXPIRED" },
+        { id: "child-b", label: "Reviewer", state: "AVAILABLE" },
       ],
     },
   ],
@@ -46,7 +46,9 @@ describe("recorded-structure foundations", () => {
     expect(
       screen.getAllByText("Partial recorded detail").length,
     ).toBeGreaterThan(0);
-    expect(screen.getByText("Expired recorded detail")).toBeVisible();
+    expect(
+      screen.queryByText("Expired recorded detail"),
+    ).not.toBeInTheDocument();
   });
 
   it("keeps stable supplied order and keyboard selection", async () => {

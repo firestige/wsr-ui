@@ -41,6 +41,9 @@ export type EvaluationRoute =
       traceId: string;
       spanId?: string;
       side: Focus["side"];
+      metric: Focus["metric"];
+      scope: "result" | "related" | "read-set";
+      factId?: string;
     }
   | { tag: "INVALID"; reason: string };
 
@@ -218,17 +221,28 @@ export function parseEvaluationRoute(relativeUrl: string): EvaluationRoute {
       "right_task",
       "span",
       "side",
+      "metric",
+      "scope",
+      "fact",
     ]);
     const selected = selection(params);
-    const side = params.get("side");
+    const routeFocus = selected ? focus(params, selected.allowedSides) : null;
+    const scope = params.get("scope");
+    const factValue = params.get("fact");
+    const factId = factValue === null ? undefined : identifier(factValue);
     const spanValue = params.get("span");
-    const spanId = spanValue === null ? undefined : identifier(spanValue);
+    const spanId =
+      spanValue !== null && /^[a-f0-9]{16}$/.test(spanValue)
+        ? spanValue
+        : undefined;
     if (
       !hasOnlyParameters(params, allowed) ||
       !selected ||
-      !traceId ||
-      traceId.includes("/") ||
-      !selected.allowedSides.includes(side as Focus["side"]) ||
+      traceId === undefined ||
+      !/^[a-f0-9]{32}$/.test(traceId) ||
+      !routeFocus ||
+      !["result", "related", "read-set"].includes(scope ?? "") ||
+      (factValue !== null && factId === undefined) ||
       (spanValue !== null && spanId === undefined)
     )
       return { tag: "INVALID", reason: "INVALID_TRACE_FOCUS" };
@@ -237,7 +251,10 @@ export function parseEvaluationRoute(relativeUrl: string): EvaluationRoute {
       selection: selected.selection,
       traceId,
       spanId,
-      side: side as Focus["side"],
+      side: routeFocus.side,
+      metric: routeFocus.metric,
+      scope: scope as "result" | "related" | "read-set",
+      factId,
     };
   }
   if (url.pathname !== "/evaluate")
@@ -302,7 +319,10 @@ export function serializeEvaluationRoute(route: EvaluationRoute): string {
   }
   if (route.tag === "TRACE") {
     if (route.spanId) params.set("span", route.spanId);
+    params.set("metric", route.metric);
     params.set("side", route.side);
+    params.set("scope", route.scope);
+    if (route.factId) params.set("fact", route.factId);
     return boundedUrl(
       `/evaluate/trace/${encodeURIComponent(route.traceId)}?${params.toString()}`,
     );

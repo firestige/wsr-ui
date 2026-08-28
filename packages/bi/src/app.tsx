@@ -144,7 +144,7 @@ const structure: RecordedStructureViewModel = {
     },
   ],
   links: [{ sourceId: "writer", targetId: "reviewer", state: "AVAILABLE" }],
-  orphans: [{ id: "orphan", label: "Missing endpoint", state: "EXPIRED" }],
+  orphans: [{ id: "orphan", label: "Missing endpoint", state: "PARTIAL" }],
 };
 
 function FactualPreview({ slice }: { slice: MetricSlice }) {
