@@ -907,7 +907,6 @@
   .metric-actions,
   .scope-tabs,
   .motion-control,
-  .link-control,
   .action-control {
     display: none !important;
   }

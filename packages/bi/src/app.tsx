@@ -1,4 +1,4 @@
-import { line } from "d3";
+import { scaleLinear } from "d3";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { MetricExplanationView, ReceiptView } from "./components/details";
@@ -46,15 +46,6 @@ function useReducedMotion() {
   return reduced;
 }
 
-const trendPoints: ReadonlyArray<readonly [number, number]> = [
-  [8, 57],
-  [46, 45],
-  [84, 51],
-  [122, 29],
-  [160, 35],
-  [198, 18],
-];
-
 const truthStates: TruthState[] = [
   "AVAILABLE",
   "LOWER_BOUND",
@@ -95,7 +86,7 @@ const coverages: Coverage[] = [
   },
 ];
 
-const previewSlice: MetricSlice = {
+export const previewSlice: MetricSlice = {
   slice_key: {},
   state: "AVAILABLE",
   value: { kind: "RATIO", value: "3/4", unit: "ratio" },
@@ -127,7 +118,12 @@ const truthSlices = truthStates.map((state): MetricSlice => {
     reading: hasValue
       ? "Authoritative Metric Result value."
       : "Value is withheld; inspect the reason or change the selection.",
-    coverage: state === "NOT_APPLICABLE" ? coverages[0]! : coverages[1]!,
+    coverage:
+      state === "AVAILABLE" || state === "LOWER_BOUND"
+        ? coverages[3]!
+        : state === "NOT_APPLICABLE"
+          ? coverages[0]!
+          : coverages[1]!,
   };
 });
 
@@ -166,7 +162,7 @@ const structure: RecordedStructureViewModel = {
   orphans: [{ id: "orphan", label: "Missing endpoint", state: "EXPIRED" }],
 };
 
-const receipt: ResolvedEvaluationContext = {
+export const previewReceipt: ResolvedEvaluationContext = {
   context_version: 1,
   selection: { selection_version: 1, task_ids: ["task-preview"] },
   as_of: "2026-08-28T01:00:00.000000Z",
@@ -183,60 +179,71 @@ const receipt: ResolvedEvaluationContext = {
   catalog: {
     catalog_id: "agentops.evaluation.metric-catalog",
     version: "2.0.0",
-    semantic_digest: "a".repeat(64),
+    semantic_digest:
+      "851692f9d4a549d21f3c741470737eabb0d40b5f03cf10ffae76e1892023741e",
     observation_profile: "1.0.0",
   },
-  evidence_bindings: [],
+  evidence_bindings: [
+    {
+      route: "/v1/evidence/tasks",
+      canonical_filter: {
+        as_of: "2026-08-28T01:00:00.000000Z",
+        task_id: "task-preview",
+      },
+      contract_revision: "1.0.0",
+      observation_profile: "2.0.0",
+      read_model_revision: "2.0.0",
+      route_snapshot: "task-snapshot-preview",
+      completion_state: "COMPLETE",
+    },
+  ],
   input_refs: [],
   workflow_resolutions: [],
   population_state: "OPEN",
 };
 
-function FactualPreview() {
-  const path = useMemo(
-    () =>
-      line<readonly [number, number]>()
-        .x(([x]) => x)
-        .y(([, y]) => y)(trendPoints),
-    [],
+function FactualPreview({ slice }: { slice: MetricSlice }) {
+  const numerator = BigInt(slice.numerator ?? "0");
+  const denominator = BigInt(slice.denominator ?? "0");
+  const displayBasisPoints =
+    denominator === 0n ? 0 : Number((numerator * 10_000n) / denominator);
+  const displayPercent = (displayBasisPoints / 100).toFixed(2);
+  const barEnd = useMemo(
+    () => scaleLinear().domain([0, 10_000]).range([8, 198])(displayBasisPoints),
+    [displayBasisPoints],
   );
   return (
     <div className="visual-with-fallback">
       <svg
-        aria-label="Factual trend preview"
+        aria-label="Factual ratio preview"
         className="visual-preview text-data-series-1"
         role="img"
         viewBox="0 0 206 70"
       >
-        <path className="stroke-border-default" d="M8 62 H198" fill="none" />
-        <path className="stroke-current" d={path ?? undefined} fill="none" />
-        {trendPoints.map(([x, y]) => (
-          <circle
-            className="fill-current"
-            cx={x}
-            cy={y}
-            key={`${x}-${y}`}
-            r="2.5"
-          />
-        ))}
+        <path className="stroke-border-default" d="M8 35 H198" fill="none" />
+        <rect
+          className="fill-current"
+          height="18"
+          width={barEnd - 8}
+          x="8"
+          y="26"
+        />
       </svg>
       <table className="visual-data-table">
-        <caption>Factual trend data</caption>
+        <caption>Factual ratio data</caption>
         <thead>
           <tr>
-            <th scope="col">Point</th>
-            <th scope="col">X</th>
-            <th scope="col">Y</th>
+            <th scope="col">Numerator</th>
+            <th scope="col">Denominator</th>
+            <th scope="col">Display percent</th>
           </tr>
         </thead>
         <tbody>
-          {trendPoints.map(([x, y], index) => (
-            <tr key={`${x}-${y}`}>
-              <th scope="row">{index + 1}</th>
-              <td>{x}</td>
-              <td>{y}</td>
-            </tr>
-          ))}
+          <tr>
+            <td>{slice.numerator}</td>
+            <td>{slice.denominator}</td>
+            <td>{displayPercent}%</td>
+          </tr>
         </tbody>
       </table>
     </div>
@@ -369,7 +376,7 @@ export function App() {
           <MetricResultFrame
             content={{ tag: "RESULT", slice: previewSlice }}
             coordinate="terminal-outcome-rate-preview@2.0.0"
-            visualization={<FactualPreview />}
+            visualization={<FactualPreview slice={previewSlice} />}
           />
           <article className="panel-card">
             <EvidenceLifecycleLabel traceState="PARTIAL" />
@@ -462,7 +469,7 @@ export function App() {
         }
       >
         {inspector === "receipt" ? (
-          <ReceiptView receipt={receipt} side="single" />
+          <ReceiptView receipt={previewReceipt} side="single" />
         ) : (
           <MetricExplanationView
             definition="Share of eligible Deliveries with a terminal outcome."

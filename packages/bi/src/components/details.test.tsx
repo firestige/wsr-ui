@@ -37,19 +37,35 @@ const receipt: ResolvedEvaluationContext = {
   catalog: {
     catalog_id: "agentops.evaluation.metric-catalog",
     version: "2.0.0",
-    semantic_digest: "a".repeat(64),
+    semantic_digest:
+      "851692f9d4a549d21f3c741470737eabb0d40b5f03cf10ffae76e1892023741e",
     observation_profile: "1.0.0",
   },
   evidence_bindings: [
     {
       route: "/v1/evidence/tasks",
-      canonical_filter: { task_id: "task-a" },
+      canonical_filter: {
+        as_of: "2026-08-28T01:00:00.000000Z",
+        task_id: "task-a",
+      },
       contract_revision: "1.0.0",
       observation_profile: "2.0.0",
       read_model_revision: "2.0.0",
       route_snapshot: "task-snapshot-a",
       completion_state: "PARTIAL",
       error_state: "UPSTREAM_PARTIAL",
+    },
+    {
+      route: "/v1/evidence/tasks",
+      canonical_filter: {
+        as_of: "2026-08-28T01:00:00.000000Z",
+        task_id: "task-b",
+      },
+      contract_revision: "1.0.0",
+      observation_profile: "2.0.0",
+      read_model_revision: "2.0.0",
+      route_snapshot: "task-snapshot-b",
+      completion_state: "COMPLETE",
     },
   ],
   input_refs: [
@@ -64,18 +80,18 @@ const receipt: ResolvedEvaluationContext = {
       source_identity: "source-a",
       package_name: "checkout",
       exact_package_version: "3.0.0",
-      package_digest: "f".repeat(64),
+      package_digest: `sha256:${"f".repeat(64)}`,
       workflow_id: "workflow-checkout",
       workflow_version: "3.0.0",
       snapshot_id: "snapshot-checkout",
-      snapshot_digest: "1".repeat(64),
+      snapshot_digest: `sha256:${"1".repeat(64)}`,
       state: "AVAILABLE",
       matched_source_id: "github-primary",
       matched_source_index: 0,
       matched_repository: "example/checkout",
-      validated_archive_digest: "2".repeat(64),
-      validated_package_digest: "3".repeat(64),
-      validated_snapshot_digest: "4".repeat(64),
+      validated_archive_digest: `sha256:${"2".repeat(64)}`,
+      validated_package_digest: `sha256:${"f".repeat(64)}`,
+      validated_snapshot_digest: `sha256:${"1".repeat(64)}`,
       attempts: [
         {
           source_id: "mirror",
@@ -127,7 +143,11 @@ describe("inspector detail content", () => {
     expect(screen.getByText("example/checkout")).toBeVisible();
     expect(screen.getByText("NOT_FOUND")).toBeVisible();
     expect(screen.getByText("Package was not present")).toBeVisible();
-    expect(screen.getAllByText("a".repeat(64)).length).toBeGreaterThan(0);
+    expect(
+      screen.getAllByText(
+        "851692f9d4a549d21f3c741470737eabb0d40b5f03cf10ffae76e1892023741e",
+      ).length,
+    ).toBeGreaterThan(0);
     expect(screen.getByText("fact-a")).toBeVisible();
     expect(screen.getByText(/response audit record/i)).toBeVisible();
     expect(screen.getByText(/not proof of causation/i)).toBeVisible();
