@@ -13,19 +13,27 @@ function PanelActions({
   onExplain,
   onEvidence,
 }: {
-  onExplain?: () => void;
-  onEvidence?: () => void;
+  onExplain?: (trigger: HTMLButtonElement) => void;
+  onEvidence?: (trigger: HTMLButtonElement) => void;
 }) {
   if (onExplain === undefined && onEvidence === undefined) return null;
   return (
     <footer className="metric-actions">
       {onExplain === undefined ? null : (
-        <button className="action-control" onClick={onExplain} type="button">
+        <button
+          className="action-control"
+          onClick={(event) => onExplain(event.currentTarget)}
+          type="button"
+        >
           Metric explanation
         </button>
       )}
       {onEvidence === undefined ? null : (
-        <button className="action-control" onClick={onEvidence} type="button">
+        <button
+          className="action-control"
+          onClick={(event) => onEvidence(event.currentTarget)}
+          type="button"
+        >
           View evidence
         </button>
       )}
@@ -134,8 +142,8 @@ export function MetricPanel({
 }: {
   result: MetricResult;
   visualizer: VisualizerId;
-  onExplain?: () => void;
-  onEvidence?: () => void;
+  onExplain?: (trigger: HTMLButtonElement) => void;
+  onEvidence?: (trigger: HTMLButtonElement) => void;
 }) {
   const coordinate = `${result.metric_id}@${result.metric_version}`;
   const compatible = result.slices.every((slice) =>

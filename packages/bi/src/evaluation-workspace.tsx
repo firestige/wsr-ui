@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { ReceiptView } from "./components/details";
+import { MetricExplanationView, ReceiptView } from "./components/details";
 import { CompareResultFrame } from "./components/compare-result";
 import { OwnedInspector } from "./components/inspector";
 import { MetricPanel } from "./components/result-visualizer";
 import { ScopedError } from "./components/status";
+import { METRIC_COPY } from "./domain/catalog/metric-copy";
 import { PRESET_LAYOUTS, type DashboardLayout } from "./domain/layout/layout";
 import type { EvaluationRoute } from "./domain/navigation/evaluation-route";
 import type {
@@ -51,9 +52,14 @@ function errorPresentation(error: EvolutionResult & { ok: false }): {
 function SingleResults({
   response,
   layout,
+  onExplain,
 }: {
   response: SingleResponse;
   layout: DashboardLayout;
+  onExplain: (
+    coordinate: keyof typeof METRIC_COPY,
+    trigger: HTMLButtonElement,
+  ) => void;
 }) {
   return (
     <section aria-label="Metric Results" className="evaluation-results">
@@ -77,7 +83,13 @@ function SingleResults({
                 title="Metric Result missing"
               />
             ) : (
-              <MetricPanel result={result} visualizer={panel.visualizer} />
+              <MetricPanel
+                onExplain={(trigger) =>
+                  onExplain(panel.metric_coordinate, trigger)
+                }
+                result={result}
+                visualizer={panel.visualizer}
+              />
             )}
           </section>
         );
@@ -160,10 +172,14 @@ export function EvaluationWorkspace({
   evolution: EvolutionPort;
 }) {
   const [state, setState] = useState<WorkspaceState>({ tag: "LOADING" });
-  const [receiptOpen, setReceiptOpen] = useState(false);
+  const [detail, setDetail] = useState<
+    | { kind: "receipt" }
+    | { kind: "explanation"; coordinate: keyof typeof METRIC_COPY }
+    | null
+  >(null);
   const [presetId, setPresetId] =
     useState<keyof typeof PRESET_LAYOUTS>("default-overview@1");
-  const receiptButton = useRef<HTMLButtonElement>(null);
+  const detailInvoker = useRef<HTMLButtonElement>(null);
 
   const run = useCallback(async () => {
     if (route.tag !== "SINGLE" && route.tag !== "COMPARE") return;
@@ -220,8 +236,10 @@ export function EvaluationWorkspace({
           {receipt === undefined ? null : (
             <button
               className="action-control"
-              onClick={() => setReceiptOpen(true)}
-              ref={receiptButton}
+              onClick={(event) => {
+                detailInvoker.current = event.currentTarget;
+                setDetail({ kind: "receipt" });
+              }}
               type="button"
             >
               View receipt
@@ -264,6 +282,10 @@ export function EvaluationWorkspace({
         ) : state.response.mode === "SINGLE" ? (
           <SingleResults
             layout={PRESET_LAYOUTS[presetId]}
+            onExplain={(coordinate, trigger) => {
+              detailInvoker.current = trigger;
+              setDetail({ kind: "explanation", coordinate });
+            }}
             response={state.response}
           />
         ) : (
@@ -271,16 +293,27 @@ export function EvaluationWorkspace({
         )}
       </div>
 
-      {receipt === undefined ? null : (
+      {receipt === undefined || detail === null ? null : (
         <OwnedInspector
-          invokerRef={receiptButton}
-          kind="receipt"
+          invokerRef={detailInvoker}
+          kind={detail.kind}
           modal
-          onClose={() => setReceiptOpen(false)}
-          open={receiptOpen}
-          title="Evaluation receipt"
+          onClose={() => setDetail(null)}
+          open
+          title={
+            detail.kind === "receipt"
+              ? "Evaluation receipt"
+              : "Metric explanation"
+          }
         >
-          <ReceiptView receipt={receipt} side="single" />
+          {detail.kind === "receipt" ? (
+            <ReceiptView receipt={receipt} side="single" />
+          ) : (
+            <MetricExplanationView
+              {...METRIC_COPY[detail.coordinate]}
+              metricCoordinate={detail.coordinate}
+            />
+          )}
         </OwnedInspector>
       )}
     </main>

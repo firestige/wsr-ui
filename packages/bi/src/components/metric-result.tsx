@@ -82,8 +82,8 @@ export function MetricResultFrame({
   coordinate: string;
   content: MetricFrameContent;
   visualization?: ReactNode;
-  onExplain?: () => void;
-  onEvidence?: () => void;
+  onExplain?: (trigger: HTMLButtonElement) => void;
+  onEvidence?: (trigger: HTMLButtonElement) => void;
   onRecover?: () => void;
   recoveryLabel?: string;
 }) {
@@ -137,7 +137,7 @@ export function MetricResultFrame({
             {onExplain === undefined ? null : (
               <button
                 className="action-control"
-                onClick={onExplain}
+                onClick={(event) => onExplain(event.currentTarget)}
                 type="button"
               >
                 Metric explanation
@@ -146,7 +146,7 @@ export function MetricResultFrame({
             {onEvidence === undefined ? null : (
               <button
                 className="action-control"
-                onClick={onEvidence}
+                onClick={(event) => onEvidence(event.currentTarget)}
                 type="button"
               >
                 View evidence

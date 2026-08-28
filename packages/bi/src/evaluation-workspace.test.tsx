@@ -160,6 +160,34 @@ describe("Evaluation workspace", () => {
     expect(screen.getByText("Preview task")).toBeVisible();
   });
 
+  it("opens Catalog-backed metric explanation and restores its trigger", async () => {
+    const user = userEvent.setup();
+    render(
+      <EvaluationWorkspace
+        evolution={{
+          computeSingle: vi.fn(async () => ({
+            ok: true as const,
+            value: singleResponse(),
+          })),
+          computeCompare: vi.fn(),
+        }}
+        route={{ tag: "SINGLE", taskIds: ["task-preview"] }}
+      />,
+    );
+
+    const trigger = (
+      await screen.findAllByRole("button", {
+        name: "Metric explanation",
+      })
+    )[0]!;
+    await user.click(trigger);
+    expect(
+      screen.getByRole("dialog", { name: "Metric explanation" }),
+    ).toHaveTextContent("Do not infer template, reviewer, or writer causality");
+    await user.keyboard("{Escape}");
+    expect(trigger).toHaveFocus();
+  });
+
   it("keeps a failed request scoped and retryable", async () => {
     const computeSingle = vi
       .fn()
