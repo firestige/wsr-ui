@@ -54,7 +54,8 @@ test("single deep link restores authoritative truth, coverage, and receipt", asy
   await expect(
     page.locator(".status-label", { hasText: "Lower bound" }),
   ).toBeVisible();
-  await expect(page.getByText("Unavailable")).toBeVisible();
+  await expect(page.getByText("Coverage unavailable")).toBeVisible();
+  await expect(page.locator('[data-state="UNAVAILABLE"]')).toBeVisible();
   await expect(
     page.locator(".status-label", { hasText: "Expired" }),
   ).toBeVisible();
