@@ -196,6 +196,15 @@ describe("closed Evidence decoder", () => {
       ok: false,
     });
 
+    const unorderedFields = factResponse();
+    unorderedFields.items[0]!.fields = [
+      { field: "agentops.task.id", value: "task-a" },
+      { field: "agentops.delivery.id", value: "delivery-a" },
+    ] as never;
+    expect(decodeEvidencePage("facts", unorderedFields, 100)).toMatchObject({
+      ok: false,
+    });
+
     const unordered = factResponse();
     unordered.items = [
       { ...unordered.items[0]!, id: "fact-b" },

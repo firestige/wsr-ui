@@ -25,6 +25,26 @@ const tracePattern = /^[a-f0-9]{32}$/;
 const spanPattern = /^[a-f0-9]{16}$/;
 const unsignedNanoPattern = /^(?:0|[1-9][0-9]{0,19})$/;
 const utf8Encoder = new TextEncoder();
+const profileFieldOrder = new Map(
+  `agentops.delivery.id agentops.task.id agentops.workflow.id agentops.workflow.version agentops.implementation.id agentops.runtime.id agentops.manifest.digest agentops.workflow.family agentops.event.id agentops.delivery.outcome agentops.summary.state agentops.review.id agentops.review.lens agentops.review.scope agentops.review.severity agentops.review.total agentops.review.observed.count agentops.finding.id agentops.finding.status agentops.source.review.id agentops.fix.id agentops.fix.finding.id agentops.recheck.id agentops.recheck.review.id agentops.recheck.finding.id agentops.recheck.fix.id agentops.iteration.id agentops.artifact.id agentops.artifact.digest agentops.role.id agentops.role.lineage.id agentops.parent.role.id agentops.writer.role.id agentops.reviewer.role.id agentops.recheck.role.id agentops.writer.invocation.id agentops.reviewer.invocation.id agentops.recheck.invocation.id agentops.intervention.kind agentops.observed.loop.count agentops.observed.intervention.count agentops.usage.kind agentops.usage.unit agentops.usage.source agentops.usage.source.id agentops.usage.value agentops.sampling.decision agentops.sampling.probability agentops.family.schema agentops.finding.summary agentops.finding.scope.id agentops.finding.target.kind agentops.finding.target.id agentops.finding.target.artifact.id agentops.delivery.elapsed_time_ms agentops.delivery.stage.reached agentops.model.id agentops.test.passed agentops.test.failed agentops.test.skipped agentops.test.duration.seconds agentops.coverage.dimension agentops.coverage.covered agentops.coverage.total agentops.coverage.scope agentops.coverage.tool.id agentops.coverage.format agentops.fresh_reader.result agentops.fresh_reader.finding.count agentops.verification.id agentops.verification.result agentops.verification.check.passed agentops.verification.check.failed`
+    .split(" ")
+    .map((name, index) => [name, index] as const),
+);
+const standardFields = new Set([
+  "error.type",
+  "gen_ai.agent.id",
+  "gen_ai.agent.name",
+  "gen_ai.agent.version",
+  "gen_ai.operation.name",
+  "gen_ai.provider.name",
+  "gen_ai.request.model",
+  "gen_ai.response.model",
+  "gen_ai.tool.call.id",
+  "gen_ai.tool.name",
+  "gen_ai.tool.type",
+  "gen_ai.usage.input_tokens",
+  "gen_ai.usage.output_tokens",
+]);
 
 function bytewiseCompare(left: string, right: string): number {
   const leftBytes = utf8Encoder.encode(left);
@@ -81,6 +101,69 @@ function uniqueFields(value: unknown): value is FieldValue[] {
     value.every(field) &&
     new Set(value.map((item) => item.field)).size === value.length
   );
+}
+
+function orderedFields(value: unknown): value is FieldValue[] {
+  if (!uniqueFields(value)) return false;
+  const order = (name: string) => profileFieldOrder.get(name) ?? 1_000;
+  if (
+    value.some(
+      (item) =>
+        !profileFieldOrder.has(item.field) && !standardFields.has(item.field),
+    )
+  )
+    return false;
+  return value.every((item, index) => {
+    const previous = value[index - 1];
+    if (previous === undefined) return true;
+    const difference = order(previous.field) - order(item.field);
+    return (
+      difference < 0 ||
+      (difference === 0 && bytewiseCompare(previous.field, item.field) < 0)
+    );
+  });
+}
+
+function orderedDimensions(
+  kind: string,
+  eventName: unknown,
+  dimensions: unknown,
+): dimensions is FieldValue[] {
+  if (!uniqueFields(dimensions)) return false;
+  const expected =
+    kind === "MODEL_ATTRIBUTION"
+      ? [
+          "gen_ai.provider.name",
+          "agentops.model.id",
+          "agentops.role.id",
+          "agentops.runtime.id",
+        ]
+      : eventName === "usage"
+        ? [
+            "agentops.usage.kind",
+            "agentops.usage.unit",
+            "agentops.usage.source",
+            "agentops.usage.source.id",
+          ]
+        : eventName === "implementation.summary"
+          ? [
+              "agentops.coverage.dimension",
+              "agentops.coverage.scope",
+              "agentops.coverage.tool.id",
+              "agentops.coverage.format",
+            ]
+          : eventName === "test.summary"
+            ? ["agentops.artifact.id", "agentops.artifact.digest"]
+            : eventName === "review.summary" || kind === "FINDING_ASSERTION"
+              ? ["agentops.review.lens", "agentops.review.scope"]
+              : [];
+  let cursor = -1;
+  return dimensions.every((item) => {
+    const index = expected.indexOf(item.field, cursor + 1);
+    if (index < 0) return false;
+    cursor = index;
+    return true;
+  });
 }
 
 function source(value: unknown) {
@@ -246,10 +329,14 @@ function fact(value: unknown) {
     compatibility.completeness === value.truth.completeness &&
     Array.isArray(compatibility.dimensions) &&
     compatibility.dimensions.length <= 16 &&
-    uniqueFields(compatibility.dimensions) &&
+    orderedDimensions(
+      value.kind as string,
+      compatibility.event_name,
+      compatibility.dimensions,
+    ) &&
     Array.isArray(value.fields) &&
     value.fields.length <= 73 &&
-    uniqueFields(value.fields) &&
+    orderedFields(value.fields) &&
     Array.isArray(value.relationships) &&
     value.relationships.length <= 16 &&
     value.relationships.every(relationship)
@@ -320,7 +407,7 @@ function traceItem(value: unknown) {
       (node.trace_state === null || boundedText(node.trace_state, 0, 512)) &&
       Array.isArray(node.fields) &&
       node.fields.length <= 73 &&
-      uniqueFields(node.fields)
+      orderedFields(node.fields)
     );
   }
   const edge = value.edge;
