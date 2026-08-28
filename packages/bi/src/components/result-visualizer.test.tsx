@@ -63,6 +63,29 @@ describe("Metric panel visualization", () => {
     expect(screen.queryByText(/^0$/)).toBeNull();
   });
 
+  it("preserves a bound panel when its current Result has a data hole", () => {
+    render(
+      <MetricPanel
+        result={{
+          ...result,
+          slices: [
+            {
+              ...ratio,
+              state: "UNAVAILABLE",
+              value: undefined,
+              withholding_reason: "MISSING_INPUT",
+            },
+          ],
+        }}
+        visualizer="ratio-bar@1"
+      />,
+    );
+
+    expect(screen.getByText("Unavailable")).toBeVisible();
+    expect(screen.queryByText("Visualizer binding incompatible")).toBeNull();
+    expect(screen.queryByRole("img", { name: /ratio bar/i })).toBeNull();
+  });
+
   it("fails one incompatible panel closed without inventing a domain", () => {
     render(<MetricPanel result={result} visualizer="gauge@1" />);
 
