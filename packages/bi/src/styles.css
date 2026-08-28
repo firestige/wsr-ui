@@ -135,6 +135,7 @@
   --shape-panel: 0.75rem;
   --shape-control: 0.5rem;
   --shape-pill: 999px;
+  --selection-marker-size: 0.25rem;
   --layout-content: 78rem;
   --type-display-size: clamp(1.75rem, 4vw, 2.5rem);
   --type-heading-size: 1rem;
@@ -419,6 +420,115 @@
   color: var(--content-primary);
   font: inherit;
   font-weight: 650;
+}
+
+@utility metric-frame {
+  display: grid;
+  gap: var(--space-grid);
+  min-width: 0;
+  padding: var(--space-page);
+  border: 1px solid var(--border-default);
+  border-radius: var(--shape-panel);
+  background: var(--surface-panel);
+  box-shadow: var(--elevation-panel);
+}
+
+@utility metric-frame-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: start;
+  justify-content: space-between;
+  gap: var(--space-cluster);
+}
+
+@utility metric-coordinate {
+  overflow-wrap: anywhere;
+}
+
+@utility metric-value {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-cluster);
+}
+
+@utility metric-number {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: var(--type-numeric-size);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+@utility metric-unit {
+  color: var(--content-secondary);
+  font-size: var(--type-body-size);
+}
+
+@utility metric-measures {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr));
+  gap: var(--space-cluster);
+  margin: 0;
+}
+
+@utility metric-measures {
+  & div {
+    display: grid;
+    gap: var(--space-tight);
+  }
+
+  & dt {
+    color: var(--content-muted);
+    font-size: var(--type-label-size);
+  }
+
+  & dd {
+    margin: 0;
+  }
+}
+
+@utility metric-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-cluster);
+}
+
+@utility loading-state {
+  min-height: var(--density-row);
+  color: var(--content-secondary);
+  font-size: var(--type-body-size);
+}
+
+@utility metric-navigator {
+  & ul {
+    display: grid;
+    gap: var(--space-tight);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+}
+
+@utility metric-nav-item {
+  display: grid;
+  gap: var(--space-tight);
+  width: 100%;
+  min-height: var(--density-row);
+  padding: var(--space-cluster);
+  border: 1px solid var(--border-default);
+  border-radius: var(--shape-control);
+  background: var(--surface-panel);
+  color: var(--content-secondary);
+  font: inherit;
+  text-align: start;
+
+  &[aria-current="true"] {
+    border-color: var(--interaction-accent);
+    background: var(--interaction-selection);
+    color: var(--content-primary);
+    box-shadow: inset var(--selection-marker-size) 0 0 var(--interaction-accent);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
