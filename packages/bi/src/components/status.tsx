@@ -54,15 +54,22 @@ const coverageLabels: Record<Coverage["state"], string> = {
   FULL: "Full coverage",
 };
 
+const coveragePresentation: Record<
+  Coverage["state"],
+  { marker: string; tone: string }
+> = {
+  NO_POPULATION: { marker: "○", tone: "unavailable" },
+  NO_COVERAGE: { marker: "○", tone: "attention" },
+  PARTIAL: { marker: "△", tone: "attention" },
+  FULL: { marker: "●", tone: "available" },
+};
+
 export function CoverageLabel({ coverage }: { coverage: Coverage }) {
-  const attention =
-    coverage.state === "PARTIAL" || coverage.alert === "LOW_COVERAGE";
+  const presentation = coveragePresentation[coverage.state];
   return (
     <div className="coverage-label" data-coverage={coverage.state}>
-      <span
-        className={`status-label status-${attention ? "attention" : "available"}`}
-      >
-        <span aria-hidden="true">{attention ? "△" : "●"}</span>
+      <span className={`status-label status-${presentation.tone}`}>
+        <span aria-hidden="true">{presentation.marker}</span>
         {coverageLabels[coverage.state]}
       </span>
       <span className="numeric-exact">

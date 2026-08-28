@@ -51,6 +51,9 @@ describe("semantic status components", () => {
     );
 
     expect(screen.getByText("No applicable population")).toBeVisible();
+    expect(screen.getByText("No applicable population")).toHaveClass(
+      "status-unavailable",
+    );
     expect(screen.getByText("0 / 0")).toBeVisible();
     expect(screen.queryByText(/0%/)).not.toBeInTheDocument();
   });

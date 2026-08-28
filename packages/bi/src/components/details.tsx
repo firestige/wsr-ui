@@ -67,18 +67,21 @@ function TaskPopulation({
     <section>
       <h3 className="text-heading">Task population</h3>
       <ul className="detail-rows">
-        {population.map((task) => (
-          <li key={task.task_id}>
-            <strong>{task.display_name ?? task.task_id}</strong>
-            {task.display_name === undefined ? null : (
-              <code className="text-code">{task.task_id}</code>
-            )}
-            <span>{task.memberships.length} Delivery memberships</span>
-            {task.exclusions.length === 0 ? null : (
-              <span>Exclusions: {task.exclusions.join(", ")}</span>
-            )}
-          </li>
-        ))}
+        {population.map((task) => {
+          const displayName = task.display_name?.trim();
+          return (
+            <li key={task.task_id}>
+              <strong>{displayName || task.task_id}</strong>
+              {displayName ? (
+                <code className="text-code">{task.task_id}</code>
+              ) : null}
+              <span>{task.memberships.length} Delivery memberships</span>
+              {task.exclusions.length === 0 ? null : (
+                <span>Exclusions: {task.exclusions.join(", ")}</span>
+              )}
+            </li>
+          );
+        })}
       </ul>
     </section>
   );

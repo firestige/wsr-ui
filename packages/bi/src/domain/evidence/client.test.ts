@@ -312,16 +312,14 @@ describe("bounded Evidence transport", () => {
 
   it("rejects HTTP success carrying an error envelope", async () => {
     const client = new EvidenceClient({
-      fetcher: vi
-        .fn<typeof fetch>()
-        .mockResolvedValue(
-          new Response(
-            JSON.stringify({
-              error: { code: "QUERY_UNAVAILABLE", message: "later" },
-            }),
-            { status: 200, headers: { "content-type": "application/json" } },
-          ),
+      fetcher: vi.fn<typeof fetch>().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            error: { code: "QUERY_UNAVAILABLE", message: "later" },
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
         ),
+      ),
     });
 
     await expect(
@@ -342,13 +340,11 @@ describe("bounded Evidence transport", () => {
       cancel,
     });
     const client = new EvidenceClient({
-      fetcher: vi
-        .fn<typeof fetch>()
-        .mockResolvedValue(
-          new Response(stream, {
-            headers: { "content-type": "application/json" },
-          }),
-        ),
+      fetcher: vi.fn<typeof fetch>().mockResolvedValue(
+        new Response(stream, {
+          headers: { "content-type": "application/json" },
+        }),
+      ),
       maximumBodyBytes: 10,
     });
 
