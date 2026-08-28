@@ -40,6 +40,26 @@ describe("evaluation route identity", () => {
     );
   });
 
+  it("canonicalizes UI-origin selections and rejects serialized over-budget URLs", () => {
+    expect(
+      serializeEvaluationRoute({
+        tag: "SINGLE",
+        taskIds: ["task-z", "task-a"],
+      }),
+    ).toBe("/evaluate?v=1&task=task-a&task=task-z");
+    const long = Array.from(
+      { length: 24 },
+      (_, index) => `task-${index}-${"/".repeat(116)}`,
+    );
+    expect(() =>
+      serializeEvaluationRoute({
+        tag: "COMPARE",
+        leftTaskIds: long,
+        rightTaskIds: long.map((value) => value.replace("task-", "other-")),
+      }),
+    ).toThrow("URL_BOUND_EXCEEDED");
+  });
+
   it("keeps an empty evaluate route as the explicit selection state", () => {
     expect(parseEvaluationRoute("/evaluate")).toEqual({ tag: "SELECT" });
   });

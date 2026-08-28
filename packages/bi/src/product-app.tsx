@@ -72,6 +72,7 @@ function TaskSelector({
   const [single, setSingle] = useState<string[]>([]);
   const [before, setBefore] = useState<string[]>([]);
   const [after, setAfter] = useState<string[]>([]);
+  const [selectionError, setSelectionError] = useState<string | undefined>();
 
   useEffect(() => {
     let active = true;
@@ -113,15 +114,23 @@ function TaskSelector({
           className="task-selector"
           onSubmit={(event) => {
             event.preventDefault();
-            onSelect(
+            const next: EvaluationRoute =
               mode === "single"
                 ? { tag: "SINGLE", taskIds: single }
                 : {
                     tag: "COMPARE",
                     leftTaskIds: before,
                     rightTaskIds: after,
-                  },
-            );
+                  };
+            try {
+              serializeEvaluationRoute(next);
+              setSelectionError(undefined);
+              onSelect(next);
+            } catch (error) {
+              setSelectionError(
+                error instanceof Error ? error.message : "Invalid selection",
+              );
+            }
           }}
         >
           <fieldset className="mode-selector">
@@ -191,6 +200,11 @@ function TaskSelector({
             </div>
           )}
           <p className="status-reading">24 Task limit per side.</p>
+          {selectionError === undefined ? null : (
+            <p className="status-banner status-error" role="alert">
+              Selection cannot open: {selectionError}
+            </p>
+          )}
           <button
             className="action-control"
             disabled={
