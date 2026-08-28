@@ -12,7 +12,7 @@ import {
   type EvolutionPort,
 } from "./evaluation-workspace";
 
-interface TaskPort {
+export interface TaskPort {
   getPage(filters: { limit?: number; cursor?: string }): Promise<TaskResult>;
 }
 
