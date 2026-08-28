@@ -5,7 +5,7 @@ import {
   type VisualizerId,
 } from "../visualization/registry";
 
-type PanelSize = "SMALL" | "MEDIUM" | "WIDE";
+export type PanelSize = "SMALL" | "MEDIUM" | "WIDE";
 type PresentationTransform =
   | "DISPLAY_ROUNDING"
   | "RATIO_TO_PERCENT"
@@ -25,6 +25,33 @@ export interface DashboardLayout {
   layout_version: 1;
   name: string;
   panels: LayoutPanel[];
+}
+
+const channelBinding: Record<string, string> = {
+  domain: "ratio-domain",
+  "published-result": "slices",
+};
+
+export function bindLayoutPanel(
+  panelId: string,
+  metricCoordinate: (typeof CATALOG_COORDINATES)[number],
+  visualizer: VisualizerId,
+  size: PanelSize,
+): LayoutPanel {
+  const visualizerContract = VISUALIZER_REGISTRY[visualizer];
+  return {
+    panel_id: panelId,
+    metric_coordinate: metricCoordinate,
+    visualizer,
+    size,
+    channels: Object.fromEntries(
+      visualizerContract.channels.map((channel) => [
+        channel,
+        channelBinding[channel] ?? channel,
+      ]),
+    ),
+    transforms: [...visualizerContract.transforms],
+  };
 }
 
 type LayoutResult =
