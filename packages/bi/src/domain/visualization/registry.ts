@@ -1,6 +1,6 @@
 import type { ExactValue, MetricSlice } from "../evolution/types";
 
-type VisualizerId =
+export type VisualizerId =
   | "numeric-card@1"
   | "badge@1"
   | "ratio-bar@1"
