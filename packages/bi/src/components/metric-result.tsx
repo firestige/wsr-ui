@@ -162,6 +162,8 @@ export function MetricResultFrame({
 export interface MetricNavigatorItem {
   coordinate: string;
   resultState: TruthState;
+  beforeState?: TruthState;
+  afterState?: TruthState;
   deltaState?: "AVAILABLE" | "WITHHELD" | "SIDE_UNRESOLVED";
 }
 
@@ -192,10 +194,21 @@ export function MetricNavigator({
               type="button"
             >
               <span className="metric-coordinate">{item.coordinate}</span>
-              <span>Result: {humanize(item.resultState)}</span>
-              {mode === "compare" && item.deltaState !== undefined ? (
-                <span>Delta: {humanize(item.deltaState)}</span>
-              ) : null}
+              {mode === "single" ? (
+                <span>Result: {humanize(item.resultState)}</span>
+              ) : (
+                <>
+                  <span>
+                    Before: {humanize(item.beforeState ?? "UNRESOLVED")}
+                  </span>
+                  <span>
+                    After: {humanize(item.afterState ?? "UNRESOLVED")}
+                  </span>
+                  {item.deltaState === undefined ? null : (
+                    <span>Delta: {humanize(item.deltaState)}</span>
+                  )}
+                </>
+              )}
             </button>
           </li>
         ))}

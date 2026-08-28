@@ -180,6 +180,10 @@ function CompareResults({
             (after === undefined ? undefined : findSlice(after, delta))
               ?.state ??
             "UNAVAILABLE",
+          beforeState:
+            before === undefined ? undefined : findSlice(before, delta)?.state,
+          afterState:
+            after === undefined ? undefined : findSlice(after, delta)?.state,
           deltaState: delta.state,
         }))}
         mode="compare"

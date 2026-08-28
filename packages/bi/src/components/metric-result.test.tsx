@@ -192,6 +192,8 @@ describe("Metric Result foundations", () => {
           {
             coordinate: "metric-a@2.0.0",
             resultState: "AVAILABLE",
+            beforeState: "AVAILABLE",
+            afterState: "LOWER_BOUND",
             deltaState: "AVAILABLE",
           },
           {
@@ -210,6 +212,8 @@ describe("Metric Result foundations", () => {
       screen.getByRole("button", { name: /metric-a@2.0.0/ }),
     ).toHaveAttribute("aria-current", "true");
     expect(screen.getByText("Delta: side unresolved")).toBeVisible();
+    expect(screen.getByText("Before: available")).toBeVisible();
+    expect(screen.getByText("After: lower bound")).toBeVisible();
     expect(screen.queryByText(/winner|rank/i)).toBeNull();
     await user.click(screen.getByRole("button", { name: /metric-b@2.0.0/ }));
     expect(select).toHaveBeenCalledWith("metric-b@2.0.0");
