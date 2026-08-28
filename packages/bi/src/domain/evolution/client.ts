@@ -1012,11 +1012,14 @@ export class EvolutionClient {
   async computeSingle(taskIds: readonly string[]): Promise<EvolutionResult> {
     const selected = makeSelection(taskIds);
     if (!selected.ok) return selected;
-    return this.#post({
-      api_version: 1,
-      mode: "SINGLE",
-      selection: selected.value,
-    });
+    return this.#post(
+      {
+        api_version: 1,
+        mode: "SINGLE",
+        selection: selected.value,
+      },
+      { mode: "SINGLE", selection: selected.value },
+    );
   }
 
   async computeCompare(
@@ -1027,15 +1030,30 @@ export class EvolutionClient {
     if (!left.ok) return left;
     const right = makeSelection(rightTaskIds);
     if (!right.ok) return right;
-    return this.#post({
-      api_version: 1,
-      mode: "COMPARE",
-      left: left.value,
-      right: right.value,
-    });
+    return this.#post(
+      {
+        api_version: 1,
+        mode: "COMPARE",
+        left: left.value,
+        right: right.value,
+      },
+      { mode: "COMPARE", left: left.value, right: right.value },
+    );
   }
 
-  async #post(body: object): Promise<EvolutionResult> {
+  async #post(
+    body: object,
+    expected:
+      | {
+          mode: "SINGLE";
+          selection: { selection_version: 1; task_ids: string[] };
+        }
+      | {
+          mode: "COMPARE";
+          left: { selection_version: 1; task_ids: string[] };
+          right: { selection_version: 1; task_ids: string[] };
+        },
+  ): Promise<EvolutionResult> {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.#timeoutMs);
     try {
@@ -1091,6 +1109,47 @@ export class EvolutionClient {
         return incompatible(
           "Evolution HTTP status and response envelope disagree",
         );
+      if (result.ok) {
+        const sameSelection = (
+          actual: { selection_version: 1; task_ids: string[] },
+          requested: { selection_version: 1; task_ids: string[] },
+        ) =>
+          actual.selection_version === requested.selection_version &&
+          actual.task_ids.length === requested.task_ids.length &&
+          actual.task_ids.every(
+            (taskId, index) => taskId === requested.task_ids[index],
+          );
+        if (
+          expected.mode === "SINGLE" &&
+          (result.value.mode !== "SINGLE" ||
+            !sameSelection(
+              result.value.result.receipt.selection,
+              expected.selection,
+            ))
+        )
+          return incompatible("Evolution receipt does not match selection");
+        if (expected.mode === "COMPARE") {
+          if (result.value.mode !== "COMPARE")
+            return incompatible(
+              "Evolution response mode does not match request",
+            );
+          if (
+            (result.value.left.tag === "SIDE_RESULT" &&
+              !sameSelection(
+                result.value.left.receipt.selection,
+                expected.left,
+              )) ||
+            (result.value.right.tag === "SIDE_RESULT" &&
+              !sameSelection(
+                result.value.right.receipt.selection,
+                expected.right,
+              ))
+          )
+            return incompatible(
+              "Evolution compare receipt does not match side selection",
+            );
+        }
+      }
       return result;
     } catch (error) {
       return {

@@ -6,20 +6,19 @@ import {
   decodeComputeResponse,
 } from "./client";
 
-function receipt(taskId: string) {
+function receipt(taskIdentity: string | string[]) {
+  const taskIds = Array.isArray(taskIdentity) ? taskIdentity : [taskIdentity];
   return {
     context_version: 1,
-    selection: { selection_version: 1, task_ids: [taskId] },
+    selection: { selection_version: 1, task_ids: taskIds },
     as_of: "2026-08-28T01:00:00.000000Z",
     resolved_at: "2026-08-28T01:00:01.000000Z",
-    task_population: [
-      {
-        task_id: taskId,
-        memberships: [],
-        cohort_coordinates: {},
-        exclusions: ["UNDEFINED_TASK_MEMBERSHIP"],
-      },
-    ],
+    task_population: taskIds.map((taskId) => ({
+      task_id: taskId,
+      memberships: [],
+      cohort_coordinates: {},
+      exclusions: ["UNDEFINED_TASK_MEMBERSHIP"],
+    })),
     catalog: {
       catalog_id: "agentops.evaluation.metric-catalog",
       version: "2.0.0",
@@ -27,20 +26,18 @@ function receipt(taskId: string) {
         "851692f9d4a549d21f3c741470737eabb0d40b5f03cf10ffae76e1892023741e",
       observation_profile: "1.0.0",
     },
-    evidence_bindings: [
-      {
-        route: "/v1/evidence/tasks",
-        canonical_filter: {
-          as_of: "2026-08-28T01:00:00.000000Z",
-          task_id: taskId,
-        },
-        contract_revision: "1.0.0",
-        observation_profile: "2.0.0",
-        read_model_revision: "2.0.0",
-        route_snapshot: "task-snapshot-1",
-        completion_state: "COMPLETE",
+    evidence_bindings: taskIds.map((taskId) => ({
+      route: "/v1/evidence/tasks",
+      canonical_filter: {
+        as_of: "2026-08-28T01:00:00.000000Z",
+        task_id: taskId,
       },
-    ],
+      contract_revision: "1.0.0",
+      observation_profile: "2.0.0",
+      read_model_revision: "2.0.0",
+      route_snapshot: "task-snapshot-1",
+      completion_state: "COMPLETE",
+    })),
     input_refs: [],
     workflow_resolutions: [],
     population_state: "OPEN",
@@ -73,7 +70,7 @@ function metricResults() {
   }));
 }
 
-function singleResponse(taskId = "task-a") {
+function singleResponse(taskId: string | string[] = "task-a") {
   return {
     api_version: 1,
     mode: "SINGLE",
@@ -432,7 +429,7 @@ describe("closed Evolution decoder", () => {
 describe("bounded Evolution transport", () => {
   it("canonicalizes Task IDs and submits a same-origin credential-free request", async () => {
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
-      new Response(JSON.stringify(singleResponse()), {
+      new Response(JSON.stringify(singleResponse(["task-a", "task-z"])), {
         headers: { "content-type": "application/json" },
       }),
     );
@@ -461,7 +458,7 @@ describe("bounded Evolution transport", () => {
 
   it("uses UTF-8 bytewise Task ordering rather than locale collation", async () => {
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
-      new Response(JSON.stringify(singleResponse("task-Z")), {
+      new Response(JSON.stringify(singleResponse(["task-Z", "task-a"])), {
         headers: { "content-type": "application/json" },
       }),
     );
@@ -499,6 +496,53 @@ describe("bounded Evolution transport", () => {
       error: { kind: "INVALID_SELECTION" },
     });
     expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it("rejects a valid receipt for a different requested selection", async () => {
+    const client = new EvolutionClient({
+      fetcher: vi.fn<typeof fetch>().mockResolvedValue(
+        new Response(JSON.stringify(singleResponse("task-other")), {
+          headers: { "content-type": "application/json" },
+        }),
+      ),
+    });
+
+    await expect(client.computeSingle(["task-a"])).resolves.toMatchObject({
+      ok: false,
+      error: { kind: "INCOMPATIBLE" },
+    });
+  });
+
+  it("rejects swapped compare receipts", async () => {
+    const left = singleResponse("task-right").result;
+    const right = singleResponse("task-left").result;
+    const response = {
+      api_version: 1,
+      mode: "COMPARE",
+      status: "FULL_COMPARE",
+      left,
+      right,
+      deltas: CATALOG_COORDINATES.map((metric_coordinate) => ({
+        metric_coordinate,
+        slice_key: {},
+        state: "WITHHELD",
+        withholding_reason: "MISSING_INPUT",
+      })),
+    };
+    const client = new EvolutionClient({
+      fetcher: vi.fn<typeof fetch>().mockResolvedValue(
+        new Response(JSON.stringify(response), {
+          headers: { "content-type": "application/json" },
+        }),
+      ),
+    });
+
+    await expect(
+      client.computeCompare(["task-left"], ["task-right"]),
+    ).resolves.toMatchObject({
+      ok: false,
+      error: { kind: "INCOMPATIBLE" },
+    });
   });
 
   it("maps the published top-level Evolution error without inventing Metric Results", async () => {
