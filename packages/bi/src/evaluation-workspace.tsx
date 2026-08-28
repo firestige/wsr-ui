@@ -49,6 +49,23 @@ type WorkspaceState =
 const LOCAL_LAYOUT_KEY = "wsr.bi.dashboard-layout@1";
 type LayoutChoice = keyof typeof PRESET_LAYOUTS | "local@1";
 
+function useDesktopInspector(): boolean {
+  const query = "(min-width: 75rem)";
+  const [desktop, setDesktop] = useState(() =>
+    typeof window.matchMedia === "function"
+      ? window.matchMedia(query).matches
+      : false,
+  );
+  useEffect(() => {
+    if (typeof window.matchMedia !== "function") return;
+    const media = window.matchMedia(query);
+    const update = () => setDesktop(media.matches);
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
+  return desktop;
+}
+
 function storedLayout(): DashboardLayout | undefined {
   try {
     const stored = window.localStorage.getItem(LOCAL_LAYOUT_KEY);
@@ -323,6 +340,7 @@ export function EvaluationWorkspace({
   });
   const detailInvoker = useRef<HTMLButtonElement>(null);
   const requestGeneration = useRef(0);
+  const desktopInspector = useDesktopInspector();
 
   const run = useCallback(
     async (preserveCompare = false) => {
@@ -575,7 +593,7 @@ export function EvaluationWorkspace({
         <OwnedInspector
           invokerRef={detailInvoker}
           kind={detail.kind}
-          modal
+          modal={!desktopInspector}
           onClose={() => setDetail(null)}
           open
           title={
