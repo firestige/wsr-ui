@@ -25,13 +25,6 @@ function viewModel(
   selectedId?: string,
 ): RecordedStructureViewModel {
   const visibleGroups = loaded.structure.depthGroups.slice(0, visibleDepths);
-  const visibleEndpoints = new Set(
-    visibleGroups.flatMap((group) =>
-      group.nodes.map((node) =>
-        endpointId(node.endpoint.trace_id, node.endpoint.span_id),
-      ),
-    ),
-  );
   return {
     depthGroups: visibleGroups.map((group) => ({
       depth: group.depth,
@@ -42,17 +35,11 @@ function viewModel(
         state: "AVAILABLE" as const,
       })),
     })),
-    parentEdges: loaded.structure.parentEdges
-      .map((edge) => ({
-        id: edge.id,
-        sourceId: endpointId(edge.from.trace_id, edge.from.span_id),
-        targetId: endpointId(edge.to.trace_id, edge.to.span_id),
-      }))
-      .filter(
-        (edge) =>
-          visibleEndpoints.has(edge.sourceId) &&
-          visibleEndpoints.has(edge.targetId),
-      ),
+    parentEdges: loaded.structure.parentEdges.map((edge) => ({
+      id: edge.id,
+      sourceId: endpointId(edge.from.trace_id, edge.from.span_id),
+      targetId: endpointId(edge.to.trace_id, edge.to.span_id),
+    })),
     links: loaded.structure.links.map((link) => ({
       id: link.id,
       sourceId: endpointId(link.from.trace_id, link.from.span_id),

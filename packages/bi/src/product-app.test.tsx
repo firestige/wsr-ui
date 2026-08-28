@@ -75,6 +75,24 @@ describe("BI product route", () => {
           },
           edge: null,
         },
+        {
+          id: "parent-missing",
+          trace_id: traceId,
+          kind: "PARENT_EDGE",
+          source: { kind: "SPAN", trace_id: traceId, span_id: spanId },
+          recorded_at: "2026-08-28T10:00:00Z",
+          truth: {
+            completeness: "FINAL",
+            availability: "AVAILABLE",
+            expiry: "ACTIVE",
+            expires_at: null,
+          },
+          node: null,
+          edge: {
+            from: { trace_id: traceId, span_id: spanId },
+            to: { trace_id: traceId, span_id: "c".repeat(16) },
+          },
+        },
       ],
     };
     render(
@@ -96,10 +114,18 @@ describe("BI product route", () => {
     ).toBeVisible();
     expect(screen.getByText("Mode: Still")).toBeVisible();
     expect(screen.getByText(/known data hole/i)).toBeVisible();
-    expect(screen.getByText("Available recorded detail")).toBeVisible();
+    expect(
+      screen.getAllByText("Unresolved recorded endpoint"),
+    ).not.toHaveLength(0);
     expect(
       screen.queryByText("Partial recorded detail"),
     ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Recorded parent relation/ }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole("button", { name: /Missing endpoint/ }),
+    ).toBeVisible();
     expect(
       screen.getByRole("button", { name: "Back to Evidence" }),
     ).toBeVisible();
