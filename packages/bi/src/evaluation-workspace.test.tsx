@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
@@ -262,6 +262,88 @@ describe("Evaluation workspace", () => {
       ["task-before"],
       ["task-after"],
     );
+  });
+
+  it("exposes each compare receipt and side-specific Evidence identity", async () => {
+    const onNavigate = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <EvaluationWorkspace
+        evolution={{
+          computeSingle: vi.fn(),
+          computeCompare: vi.fn(async () => ({
+            ok: true as const,
+            value: compareResponse(),
+          })),
+        }}
+        onNavigate={onNavigate}
+        route={{
+          tag: "COMPARE",
+          leftTaskIds: ["task-before"],
+          rightTaskIds: ["task-after"],
+        }}
+      />,
+    );
+
+    expect(
+      await screen.findByRole("button", { name: "View Before receipt" }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole("button", { name: "View After receipt" }),
+    ).toBeVisible();
+    const before = screen.getAllByRole("region", { name: "Before result" })[0]!;
+    await user.click(
+      within(before).getByRole("button", { name: "View evidence" }),
+    );
+    expect(onNavigate).toHaveBeenCalledWith({
+      tag: "EVIDENCE",
+      selection: {
+        tag: "COMPARE",
+        leftTaskIds: ["task-before"],
+        rightTaskIds: ["task-after"],
+      },
+      metric: "role-template-rework-rate@2.0.0",
+      side: "left",
+      scope: "result",
+    });
+  });
+
+  it("navigates an exact compare metric without ranking it", async () => {
+    const onNavigate = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <EvaluationWorkspace
+        evolution={{
+          computeSingle: vi.fn(),
+          computeCompare: vi.fn(async () => ({
+            ok: true as const,
+            value: compareResponse(),
+          })),
+        }}
+        onNavigate={onNavigate}
+        route={{
+          tag: "COMPARE",
+          leftTaskIds: ["task-before"],
+          rightTaskIds: ["task-after"],
+        }}
+      />,
+    );
+
+    await user.click(
+      await screen.findByRole("button", {
+        name: /delivery-cycle-time-ms@2.0.0/,
+      }),
+    );
+    expect(onNavigate).toHaveBeenCalledWith({
+      tag: "COMPARE",
+      leftTaskIds: ["task-before"],
+      rightTaskIds: ["task-after"],
+      focus: {
+        metric: "delivery-cycle-time-ms@2.0.0",
+        side: "left",
+      },
+    });
+    expect(screen.queryByText(/winner|rank/i)).toBeNull();
   });
 
   it("retains a successful compare side when the other side fails", async () => {

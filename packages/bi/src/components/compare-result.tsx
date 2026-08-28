@@ -13,12 +13,16 @@ function CompareSide({
   slice,
   error,
   onRetry,
+  onExplain,
+  onEvidence,
 }: {
   label: "Before" | "After";
   coordinate: string;
   slice?: MetricSlice;
   error?: SideError;
   onRetry?: () => void;
+  onExplain?: (trigger: HTMLButtonElement) => void;
+  onEvidence?: (trigger: HTMLButtonElement) => void;
 }) {
   return (
     <section aria-label={`${label} result`} className="compare-side">
@@ -27,6 +31,8 @@ function CompareSide({
         <MetricResultFrame
           content={{ tag: "RESULT", slice }}
           coordinate={coordinate}
+          onEvidence={onEvidence}
+          onExplain={onExplain}
         />
       ) : error !== undefined ? (
         <ScopedError
@@ -84,6 +90,8 @@ export function CompareResultFrame({
   afterError,
   delta,
   onRetryFailedSide,
+  onExplain,
+  onEvidence,
 }: {
   coordinate: string;
   before?: MetricSlice;
@@ -92,6 +100,8 @@ export function CompareResultFrame({
   afterError?: SideError;
   delta: DeltaEntry;
   onRetryFailedSide?: () => void;
+  onExplain?: (side: "left" | "right", trigger: HTMLButtonElement) => void;
+  onEvidence?: (side: "left" | "right", trigger: HTMLButtonElement) => void;
 }) {
   return (
     <article aria-label={`Compare ${coordinate}`} className="compare-result">
@@ -99,6 +109,16 @@ export function CompareResultFrame({
         coordinate={coordinate}
         error={beforeError}
         label="Before"
+        onEvidence={
+          onEvidence === undefined
+            ? undefined
+            : (trigger) => onEvidence("left", trigger)
+        }
+        onExplain={
+          onExplain === undefined
+            ? undefined
+            : (trigger) => onExplain("left", trigger)
+        }
         onRetry={beforeError === undefined ? undefined : onRetryFailedSide}
         slice={before}
       />
@@ -106,6 +126,16 @@ export function CompareResultFrame({
         coordinate={coordinate}
         error={afterError}
         label="After"
+        onEvidence={
+          onEvidence === undefined
+            ? undefined
+            : (trigger) => onEvidence("right", trigger)
+        }
+        onExplain={
+          onExplain === undefined
+            ? undefined
+            : (trigger) => onExplain("right", trigger)
+        }
         onRetry={afterError === undefined ? undefined : onRetryFailedSide}
         slice={after}
       />
