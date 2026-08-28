@@ -660,7 +660,10 @@ function validFilters(
       ([, value]) =>
         typeof value !== "string" ||
         value.length === 0 ||
-        /[\x00-\x1f,*%\\]/.test(value),
+        Array.from(value).some(
+          (character) =>
+            character.charCodeAt(0) <= 31 || ",*%\\".includes(character),
+        ),
     )
   )
     return false;

@@ -135,3 +135,10 @@ test("platform reduced motion forces the Still preview", async ({ page }) => {
     page.getByText(/Reduced motion keeps the complete structure still/i),
   ).toBeVisible();
 });
+
+test("print retains exact Trace provenance identity", async ({ page }) => {
+  await page.emulateMedia({ media: "print" });
+  await page.goto("/preview");
+
+  await expect(page.getByText("trace-preview / span-preview")).toBeVisible();
+});
