@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   DEFAULT_MOTION_MODE,
@@ -17,40 +17,58 @@ import {
 
 type TraceRoute = Extract<EvaluationRoute, { tag: "TRACE" }>;
 
-const detailState = (state: "AVAILABLE" | "PARTIAL") => state;
+const endpointId = (traceId: string, spanId: string) => `${traceId}:${spanId}`;
 
 function viewModel(
   loaded: Extract<LoadedTrace, { ok: true; state: "AVAILABLE" | "PARTIAL" }>,
   visibleDepths: number,
   selectedId?: string,
 ): RecordedStructureViewModel {
-  const state = detailState(loaded.state);
+  const visibleGroups = loaded.structure.depthGroups.slice(0, visibleDepths);
+  const visibleEndpoints = new Set(
+    visibleGroups.flatMap((group) =>
+      group.nodes.map((node) =>
+        endpointId(node.endpoint.trace_id, node.endpoint.span_id),
+      ),
+    ),
+  );
   return {
-    depthGroups: loaded.structure.depthGroups
-      .slice(0, visibleDepths)
-      .map((group) => ({
-        depth: group.depth,
-        nodes: group.nodes.map((node) => ({
-          id: node.id,
-          label: node.label,
-          state,
-        })),
+    depthGroups: visibleGroups.map((group) => ({
+      depth: group.depth,
+      nodes: group.nodes.map((node) => ({
+        id: node.id,
+        endpointId: endpointId(node.endpoint.trace_id, node.endpoint.span_id),
+        label: node.label,
+        state: "AVAILABLE" as const,
       })),
+    })),
+    parentEdges: loaded.structure.parentEdges
+      .map((edge) => ({
+        id: edge.id,
+        sourceId: endpointId(edge.from.trace_id, edge.from.span_id),
+        targetId: endpointId(edge.to.trace_id, edge.to.span_id),
+      }))
+      .filter(
+        (edge) =>
+          visibleEndpoints.has(edge.sourceId) &&
+          visibleEndpoints.has(edge.targetId),
+      ),
     links: loaded.structure.links.map((link) => ({
-      sourceId: link.from.span_id,
-      targetId: link.to.span_id,
-      state,
+      id: link.id,
+      sourceId: endpointId(link.from.trace_id, link.from.span_id),
+      targetId: endpointId(link.to.trace_id, link.to.span_id),
+      state: "AVAILABLE" as const,
     })),
     orphans: [
       ...loaded.structure.unresolvedNodes.map((node) => ({
         id: node.id,
         label: `${node.label} — unresolved parent`,
-        state,
+        state: "UNRESOLVED" as const,
       })),
       ...loaded.structure.orphans.map((orphan) => ({
         id: orphan.id,
         label: `Missing endpoint ${orphan.endpoint.span_id}`,
-        state,
+        state: "UNRESOLVED" as const,
       })),
     ],
     selectedId,
@@ -71,9 +89,12 @@ export function TraceDrilldown({
   const [visibleDepths, setVisibleDepths] = useState(Number.MAX_SAFE_INTEGER);
   const [selectedId, setSelectedId] = useState(route.spanId);
   const [reducedMotion, setReducedMotion] = useState(false);
+  const loadGeneration = useRef(0);
   const load = useCallback(async () => {
+    const generation = ++loadGeneration.current;
     setResult(undefined);
-    setResult(await loadRecordedTrace(evidence, route.traceId));
+    const next = await loadRecordedTrace(evidence, route.traceId);
+    if (loadGeneration.current === generation) setResult(next);
   }, [evidence, route.traceId]);
 
   useEffect(() => {
@@ -89,6 +110,13 @@ export function TraceDrilldown({
     return () => query.removeEventListener("change", update);
   }, []);
   useEffect(() => {
+    if (reducedMotion && mode === "LIVE") {
+      const timer = window.setTimeout(() => {
+        setVisibleDepths(Number.MAX_SAFE_INTEGER);
+        setMode("STILL");
+      }, 0);
+      return () => window.clearTimeout(timer);
+    }
     if (mode !== "LIVE" || result?.ok !== true || result.state === "ABSENT")
       return;
     const total = result.structure.depthGroups.length;
@@ -101,7 +129,7 @@ export function TraceDrilldown({
       250,
     );
     return () => window.clearTimeout(timer);
-  }, [mode, result, visibleDepths]);
+  }, [mode, reducedMotion, result, visibleDepths]);
 
   const model = useMemo(
     () =>
@@ -156,6 +184,13 @@ export function TraceDrilldown({
             <div className="status-error" role="alert">
               Invalid recorded parent structure:{" "}
               {result.structure.errors.join("; ")}
+            </div>
+          ) : null}
+          {result.state === "PARTIAL" ? (
+            <div className="status-partial" role="status">
+              Partial recorded structure — Evidence reports a known data hole.
+              Present records remain available; unresolved endpoints stay
+              unclassified.
             </div>
           ) : null}
           <MotionControl

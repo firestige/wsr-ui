@@ -136,6 +136,15 @@ test("recorded Trace keeps siblings together and Live traversal stops", async ({
     page.getByText("LINK — independent recorded relation"),
   ).toBeVisible();
   await expect(
+    page.getByRole("img", { name: "Recorded parent structure graph" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: /Recorded parent relation/ }).first(),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: /Independent LINK/ }),
+  ).toBeVisible();
+  await expect(
     page.getByRole("group", { name: "Orphan endpoints" }),
   ).toContainText("9999999999999999");
   await expect(page.getByText("Mode: Still")).toBeVisible();
@@ -154,6 +163,42 @@ test("reduced motion keeps recorded Trace Still", async ({ page }) => {
   await expect(
     page.getByText(/Reduced motion keeps the complete structure still/),
   ).toBeVisible();
+});
+
+test("switching to reduced motion stops an active traversal", async ({
+  page,
+}) => {
+  await page.goto(
+    `/evaluate/trace/${traceId}?v=1&task=task-browser&metric=delivery-cycle-time-ms%402.0.0&side=single&scope=result`,
+  );
+  await page.getByRole("button", { name: "Start Live reading" }).click();
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await expect(page.getByText("Mode: Still")).toBeVisible();
+  await expect(
+    page.getByRole("group", { name: "Recorded depth 1" }),
+  ).toBeVisible();
+});
+
+test("physically deleted Delivery returns not found without Trace detail", async ({
+  page,
+}) => {
+  await page.route("**/v1/evidence/traces**", async (route) => {
+    await route.fulfill({
+      json: {
+        ...tracePage,
+        items: [],
+        trace_state: "ABSENT",
+        trace_summaries: [],
+      },
+    });
+  });
+  await page.goto(
+    `/evaluate/trace/${traceId}?v=1&task=task-browser&metric=delivery-cycle-time-ms%402.0.0&side=single&scope=result`,
+  );
+  await expect(
+    page.getByRole("heading", { name: "Recorded Trace not found" }),
+  ).toBeVisible();
+  await expect(page.getByRole("button", { name: /Root/ })).toHaveCount(0);
 });
 
 test("recorded Trace remains operable without horizontal overflow on narrow screens", async ({
