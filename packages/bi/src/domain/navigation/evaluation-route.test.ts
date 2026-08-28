@@ -82,8 +82,10 @@ describe("evaluation route identity", () => {
   });
 
   it("round-trips a Trace deep-link without assigning causal order", () => {
+    const trace = "a".repeat(32);
+    const span = "b".repeat(16);
     const parsed = parseEvaluationRoute(
-      "/evaluate/trace/trace-1?v=1&mode=compare&left_task=task-a&right_task=task-b&span=span-2&side=left",
+      `/evaluate/trace/${trace}?v=1&mode=compare&left_task=task-a&right_task=task-b&span=${span}&metric=delivery-cycle-time-ms%402.0.0&side=left&scope=related&fact=fact-1`,
     );
     expect(parsed).toEqual({
       tag: "TRACE",
@@ -92,12 +94,15 @@ describe("evaluation route identity", () => {
         leftTaskIds: ["task-a"],
         rightTaskIds: ["task-b"],
       },
-      traceId: "trace-1",
-      spanId: "span-2",
+      traceId: trace,
+      spanId: span,
       side: "left",
+      metric: "delivery-cycle-time-ms@2.0.0",
+      scope: "related",
+      factId: "fact-1",
     });
     expect(serializeEvaluationRoute(parsed)).toBe(
-      "/evaluate/trace/trace-1?v=1&mode=compare&left_task=task-a&right_task=task-b&span=span-2&side=left",
+      `/evaluate/trace/${trace}?v=1&mode=compare&left_task=task-a&right_task=task-b&span=${span}&metric=delivery-cycle-time-ms%402.0.0&side=left&scope=related&fact=fact-1`,
     );
   });
 

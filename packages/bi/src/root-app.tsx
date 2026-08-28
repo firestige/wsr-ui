@@ -1,7 +1,10 @@
 import { App as PreviewApp } from "./app";
-import type { EvidenceFactsPort } from "./evidence-drilldown";
 import type { EvolutionPort } from "./evaluation-workspace";
-import { ProductApp, type TaskPort } from "./product-app";
+import {
+  ProductApp,
+  type EvidenceProductPort,
+  type TaskPort,
+} from "./product-app";
 
 export function RootApp({
   relativeUrl,
@@ -11,7 +14,7 @@ export function RootApp({
 }: {
   relativeUrl: string;
   evolution: EvolutionPort;
-  evidence: EvidenceFactsPort;
+  evidence: EvidenceProductPort;
   tasks: TaskPort;
 }) {
   const pathname = new URL(relativeUrl, "http://bi.local").pathname;

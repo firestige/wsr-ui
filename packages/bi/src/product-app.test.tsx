@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { EvolutionResult } from "./domain/evolution/types";
 import type { TaskPage, TaskResult } from "./domain/evidence/task-client";
+import type { TracesPage } from "./domain/evidence/types";
 import { ProductApp } from "./product-app";
 
 const taskPage: TaskPage = {
@@ -37,6 +38,68 @@ const taskPage: TaskPage = {
 afterEach(() => window.history.replaceState(null, "", "/preview"));
 
 describe("BI product route", () => {
+  it("loads the complete recorded Trace route in Still mode", async () => {
+    const traceId = "a".repeat(32);
+    const spanId = "b".repeat(16);
+    const tracePage: TracesPage = {
+      contract: { name: "evidence.query", revision: "0.1.0" },
+      observation_profile: "1.0.0",
+      read_model_revision: "1.0.0",
+      snapshot: "trace-snapshot",
+      next_cursor: null,
+      trace_state: "AVAILABLE",
+      trace_summaries: [{ trace_id: traceId, state: "AVAILABLE" }],
+      items: [
+        {
+          id: `node-${spanId}`,
+          trace_id: traceId,
+          kind: "NODE",
+          source: { kind: "SPAN", trace_id: traceId, span_id: spanId },
+          recorded_at: "2026-08-28T10:00:00Z",
+          truth: {
+            completeness: "FINAL",
+            availability: "AVAILABLE",
+            expiry: "ACTIVE",
+            expires_at: null,
+          },
+          node: {
+            span_id: spanId,
+            span_name: "Root invocation",
+            span_kind: "INTERNAL",
+            start_time_unix_nano: "100",
+            end_time_unix_nano: "200",
+            span_status: "OK",
+            span_flags: 1,
+            trace_state: null,
+            fields: [],
+          },
+          edge: null,
+        },
+      ],
+    };
+    render(
+      <ProductApp
+        evidence={{
+          getFactsPage: vi.fn(),
+          getTracesPage: vi
+            .fn()
+            .mockResolvedValue({ ok: true, value: tracePage }),
+        }}
+        evolution={{ computeSingle: vi.fn(), computeCompare: vi.fn() }}
+        initialRelativeUrl={`/evaluate/trace/${traceId}?v=1&task=task-a&span=${spanId}&metric=delivery-cycle-time-ms%402.0.0&side=single&scope=result`}
+        tasks={{ getPage: vi.fn() }}
+      />,
+    );
+
+    expect(
+      await screen.findByRole("button", { name: /Root invocation/ }),
+    ).toBeVisible();
+    expect(screen.getByText("Mode: Still")).toBeVisible();
+    expect(
+      screen.getByRole("button", { name: "Back to Evidence" }),
+    ).toBeVisible();
+  });
+
   it("places the main-content skip link first in keyboard order", async () => {
     const user = userEvent.setup();
     render(

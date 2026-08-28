@@ -19,6 +19,10 @@ import {
   EvaluationWorkspace,
   type EvolutionPort,
 } from "./evaluation-workspace";
+import type { TracePagePort } from "./domain/trace/load-recorded-trace";
+import { TraceDrilldown } from "./trace-drilldown";
+
+export type EvidenceProductPort = EvidenceFactsPort & Partial<TracePagePort>;
 
 export interface TaskPort {
   getPage(filters: { limit?: number; cursor?: string }): Promise<TaskResult>;
@@ -313,7 +317,7 @@ export function ProductApp({
   initialRelativeUrl = window.location.pathname + window.location.search,
 }: {
   evolution: EvolutionPort;
-  evidence: EvidenceFactsPort;
+  evidence: EvidenceProductPort;
   tasks: TaskPort;
   initialRelativeUrl?: string;
 }) {
@@ -411,12 +415,23 @@ export function ProductApp({
           route={route}
         />
       ) : route.tag === "TRACE" ? (
-        <main className="evaluation-shell" id="main-content" tabIndex={-1}>
-          <h1 className="text-title">Recorded Trace</h1>
-          <p aria-live="polite" className="loading-state" role="status">
-            Resolving evaluation context…
-          </p>
-        </main>
+        evidence.getTracesPage === undefined ? (
+          <main className="evaluation-shell" id="main-content" tabIndex={-1}>
+            <ScopedError
+              announce="assertive"
+              detail="Trace query port is not configured"
+              onRetry={() => navigate({ tag: "SELECT" })}
+              retryable
+              title="Recorded Trace unavailable"
+            />
+          </main>
+        ) : (
+          <TraceDrilldown
+            evidence={evidence as TracePagePort}
+            onNavigate={navigate}
+            route={route}
+          />
+        )
       ) : (
         <EvaluationWorkspace
           evolution={evolution}

@@ -1,6 +1,6 @@
 import { useId } from "react";
 
-export type RecordedDetailState = "AVAILABLE" | "PARTIAL" | "EXPIRED";
+export type RecordedDetailState = "AVAILABLE" | "PARTIAL";
 
 export interface RecordedNodeView {
   id: string;
@@ -22,7 +22,6 @@ export interface RecordedStructureViewModel {
 const detailStateLabels: Record<RecordedDetailState, string> = {
   AVAILABLE: "Available recorded detail",
   PARTIAL: "Partial recorded detail",
-  EXPIRED: "Expired recorded detail",
 };
 
 function NodeButton({
