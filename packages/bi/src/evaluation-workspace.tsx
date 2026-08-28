@@ -290,14 +290,17 @@ export function EvaluationWorkspace({
       : { choice: "local@1", local };
   });
   const detailInvoker = useRef<HTMLButtonElement>(null);
+  const requestGeneration = useRef(0);
 
   const run = useCallback(async () => {
     if (route.tag !== "SINGLE" && route.tag !== "COMPARE") return;
+    const generation = ++requestGeneration.current;
     setState({ tag: "LOADING" });
     const result =
       route.tag === "SINGLE"
         ? await evolution.computeSingle(route.taskIds)
         : await evolution.computeCompare(route.leftTaskIds, route.rightTaskIds);
+    if (generation !== requestGeneration.current) return;
     setState(
       result.ok
         ? { tag: "RESULT", response: result.value }
@@ -307,7 +310,10 @@ export function EvaluationWorkspace({
 
   useEffect(() => {
     const timer = window.setTimeout(() => void run(), 0);
-    return () => window.clearTimeout(timer);
+    return () => {
+      window.clearTimeout(timer);
+      requestGeneration.current += 1;
+    };
   }, [run]);
 
   if (route.tag === "SELECT")

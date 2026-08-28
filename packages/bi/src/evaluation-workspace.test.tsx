@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -13,7 +13,7 @@ import { previewReceipt, previewSlice } from "./preview-fixtures";
 
 afterEach(() => window.localStorage.clear());
 
-function singleResponse(): SingleResponse {
+function singleResponse(ratio = "1/3"): SingleResponse {
   const unavailable = {
     ...previewSlice,
     state: "UNAVAILABLE" as const,
@@ -40,7 +40,7 @@ function singleResponse(): SingleResponse {
           index === 0
             ? {
                 ...previewSlice,
-                value: { kind: "RATIO", value: "1/3", unit: "ratio" },
+                value: { kind: "RATIO", value: ratio, unit: "ratio" },
                 coverage: {
                   numerator: "2",
                   denominator: "3",
@@ -319,6 +319,42 @@ describe("Evaluation workspace", () => {
     await user.click(screen.getByRole("button", { name: "Retry" }));
     expect((await screen.findAllByText("33.33%"))[0]).toBeVisible();
     expect(computeSingle).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not let an older route request overwrite the current result", async () => {
+    let resolveOld: ((result: EvolutionResult) => void) | undefined;
+    const oldRequest = new Promise<EvolutionResult>((resolve) => {
+      resolveOld = resolve;
+    });
+    const computeSingle = vi.fn((taskIds: readonly string[]) =>
+      taskIds[0] === "task-old"
+        ? oldRequest
+        : Promise.resolve({ ok: true as const, value: singleResponse("2/3") }),
+    );
+    const evolution = { computeSingle, computeCompare: vi.fn() };
+    const { rerender } = render(
+      <EvaluationWorkspace
+        evolution={evolution}
+        route={{ tag: "SINGLE", taskIds: ["task-old"] }}
+      />,
+    );
+    await vi.waitFor(() => expect(computeSingle).toHaveBeenCalledOnce());
+
+    rerender(
+      <EvaluationWorkspace
+        evolution={evolution}
+        route={{ tag: "SINGLE", taskIds: ["task-current"] }}
+      />,
+    );
+    expect((await screen.findAllByText("66.67%"))[0]).toBeVisible();
+    await act(async () => {
+      resolveOld?.({ ok: true, value: singleResponse("1/3") });
+      await oldRequest;
+    });
+    await vi.waitFor(() => expect(computeSingle).toHaveBeenCalledTimes(2));
+
+    expect(screen.queryByText("33.33%")).toBeNull();
+    expect(screen.getAllByText("66.67%")[0]).toBeVisible();
   });
 
   it("renders full compare from Evolution sides and Deltas", async () => {
