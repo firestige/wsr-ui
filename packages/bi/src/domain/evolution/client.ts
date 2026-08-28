@@ -298,3 +298,303 @@ function metricSlice(value: unknown): value is MetricSlice {
     value.state === "AVAILABLE" || value.state === "LOWER_BOUND";
   return published
     ? exactValue(value.value) && value.withholding_reason === undefined
+    : value.value === undefined && typeof value.withholding_reason === "string";
+}
+
+function metricResult(value: unknown): value is MetricResult {
+  if (!(
+    record(value) &&
+    closed(value, ["metric_id", "metric_version", "slices"]) &&
+    typeof value.metric_id === "string" &&
+    value.metric_version === "2.0.0" &&
+    Array.isArray(value.slices) &&
+    value.slices.length > 0 &&
+    value.slices.every(metricSlice)
+  ))
+    return false;
+  const keys = value.slices.map((item) => canonicalMap(item.slice_key));
+  return (
+    new Set(keys).size === keys.length &&
+    (!keys.includes("{}") || keys.length === 1) &&
+    keys.every(
+      (item, index, all) =>
+        index === 0 || bytewiseCompare(all[index - 1]!, item) < 0,
+    )
+  );
+}
+
+function membership(value: unknown): boolean {
+  return (
+    record(value) &&
+    closed(value, [
+      "delivery_id",
+      "manifest_digest",
+      "accepted_digest",
+      "profile_version",
+      "source_identity",
+      "recorded_at",
+    ]) &&
+    typeof value.delivery_id === "string" &&
+    value.delivery_id.length <= 256 &&
+    typeof value.manifest_digest === "string" &&
+    digestPattern.test(value.manifest_digest) &&
+    typeof value.accepted_digest === "string" &&
+    digestPattern.test(value.accepted_digest) &&
+    value.profile_version === "2.0.0" &&
+    typeof value.source_identity === "string" &&
+    value.source_identity.length <= 512 &&
+    typeof value.recorded_at === "string" &&
+    timestampPattern.test(value.recorded_at)
+  );
+}
+
+function taskPopulation(value: unknown): boolean {
+  if (!(
+    record(value) &&
+    closed(
+      value,
+      ["task_id", "memberships", "cohort_coordinates", "exclusions"],
+      ["display_name", "terminal_reading"],
+    ) &&
+    typeof value.task_id === "string" &&
+    taskIdPattern.test(value.task_id) &&
+    (value.display_name === undefined ||
+      (typeof value.display_name === "string" &&
+        value.display_name.length >= 1 &&
+        value.display_name.length <= 160)) &&
+    Array.isArray(value.memberships) &&
+    value.memberships.every(membership) &&
+    stringMap(value.cohort_coordinates) &&
+    strings(value.exclusions) &&
+    (value.terminal_reading === undefined ||
+      typeof value.terminal_reading === "string")
+  ))
+    return false;
+  const deliveryIds = value.memberships.map(
+    (item) => (item as { delivery_id: string }).delivery_id,
+  );
+  return (
+    new Set(deliveryIds).size === deliveryIds.length &&
+    deliveryIds.every(
+      (item, index, all) =>
+        index === 0 || bytewiseCompare(all[index - 1]!, item) < 0,
+    ) &&
+    (deliveryIds.length > 0 ||
+      value.exclusions.includes("UNDEFINED_TASK_MEMBERSHIP"))
+  );
+}
+
+function evidenceBinding(value: unknown): boolean {
+  if (
+    !record(value) ||
+    !closed(
+      value,
+      [
+        "route",
+        "canonical_filter",
+        "contract_revision",
+        "observation_profile",
+        "read_model_revision",
+        "route_snapshot",
+        "completion_state",
+      ],
+      ["error_state"],
+    )
+  )
+    return false;
+  if (
+    !oneOf(value.route, [
+      "/v1/evidence/tasks",
+      "/v1/evidence/facts",
+      "/v1/evidence/traces",
+    ] as const) ||
+    !stringMap(value.canonical_filter)
+  )
+    return false;
+  const coordinates =
+    value.route === "/v1/evidence/tasks"
+      ? ["1.0.0", "2.0.0", "2.0.0"]
+      : ["0.1.0", "1.0.0", "1.0.0"];
+  if (
+    value.contract_revision !== coordinates[0] ||
+    value.observation_profile !== coordinates[1] ||
+    value.read_model_revision !== coordinates[2]
+  )
+    return false;
+  if (
+    typeof value.route_snapshot !== "string" ||
+    value.route_snapshot.length === 0 ||
+    !oneOf(value.completion_state, ["COMPLETE", "PARTIAL", "EXPIRED"] as const)
+  )
+    return false;
+  return value.completion_state === "COMPLETE"
+    ? value.error_state === undefined
+    : typeof value.error_state === "string";
+}
+
+function inputReference(value: unknown): boolean {
+  return (
+    record(value) &&
+    closed(value, ["kind", "identity", "provenance_ref"]) &&
+    oneOf(value.kind, ["TASK_MEMBERSHIP", "FACT", "TRACE_NODE"] as const) &&
+    typeof value.identity === "string" &&
+    typeof value.provenance_ref === "string"
+  );
+}
+
+function resolutionAttempt(value: unknown): boolean {
+  if (!(
+    record(value) &&
+    closed(
+      value,
+      ["code"],
+      ["source_id", "source_index", "message", "omitted_count"],
+    ) &&
+    oneOf(value.code, [
+      "NOT_FOUND",
+      "SOURCE_UNAVAILABLE",
+      "INVALID_DESCRIPTOR",
+      "CHECKSUM_MISMATCH",
+      "INVALID_ARCHIVE",
+      "INVALID_WORKFLOW",
+      "PACKAGE_DIGEST_MISMATCH",
+      "SNAPSHOT_DIGEST_MISMATCH",
+      "ROLE_BINDING_MISMATCH",
+      "DEADLINE_EXCEEDED",
+      "ATTEMPTS_TRUNCATED",
+    ] as const) &&
+    (value.source_id === undefined || typeof value.source_id === "string") &&
+    (value.source_index === undefined ||
+      (unsigned(value.source_index) && value.source_index <= 7)) &&
+    (value.message === undefined ||
+      (typeof value.message === "string" && value.message.length <= 160)) &&
+    (value.omitted_count === undefined || unsigned(value.omitted_count))
+  ))
+    return false;
+  const resolverLevel =
+    value.code === "DEADLINE_EXCEEDED" || value.code === "ATTEMPTS_TRUNCATED";
+  const hasSource =
+    value.source_id !== undefined || value.source_index !== undefined;
+  return (
+    resolverLevel !== hasSource &&
+    (value.code === "ATTEMPTS_TRUNCATED") ===
+      (value.omitted_count !== undefined) &&
+    (value.code !== "ATTEMPTS_TRUNCATED" || value.omitted_count === 2)
+  );
+}
+
+function workflowResolution(value: unknown): boolean {
+  const required = [
+    "manifest_digest",
+    "manifest_projection_digest",
+    "accepted_digest",
+    "profile_version",
+    "source_identity",
+    "package_name",
+    "exact_package_version",
+    "package_digest",
+    "workflow_id",
+    "workflow_version",
+    "snapshot_id",
+    "snapshot_digest",
+    "state",
+    "attempts",
+  ];
+  const optional = [
+    "matched_source_id",
+    "matched_source_index",
+    "matched_repository",
+    "validated_archive_digest",
+    "validated_package_digest",
+    "validated_snapshot_digest",
+  ];
+  if (!record(value) || !closed(value, required, optional)) return false;
+  if (!(
+    [
+      value.manifest_digest,
+      value.manifest_projection_digest,
+      value.accepted_digest,
+    ].every((item) => typeof item === "string" && digestPattern.test(item)) &&
+    value.profile_version === "2.0.0" &&
+    [
+      value.source_identity,
+      value.package_name,
+      value.exact_package_version,
+      value.workflow_id,
+      value.workflow_version,
+      value.snapshot_id,
+    ].every((item) => typeof item === "string" && item.length > 0) &&
+    typeof value.package_digest === "string" &&
+    prefixedDigestPattern.test(value.package_digest) &&
+    typeof value.snapshot_digest === "string" &&
+    prefixedDigestPattern.test(value.snapshot_digest) &&
+    oneOf(value.state, [
+      "AVAILABLE",
+      "NOT_FOUND",
+      "UNAVAILABLE",
+      "INCOMPATIBLE",
+    ] as const) &&
+    Array.isArray(value.attempts) &&
+    value.attempts.length <= 8 &&
+    value.attempts.every(resolutionAttempt)
+  ))
+    return false;
+  const matched = [
+    value.matched_source_id,
+    value.matched_source_index,
+    value.matched_repository,
+    value.validated_archive_digest,
+    value.validated_package_digest,
+    value.validated_snapshot_digest,
+  ];
+  if (
+    (value.matched_source_id !== undefined &&
+      (typeof value.matched_source_id !== "string" ||
+        value.matched_source_id.length < 1 ||
+        value.matched_source_id.length > 128)) ||
+    (value.matched_source_index !== undefined &&
+      (!unsigned(value.matched_source_index) ||
+        value.matched_source_index > 7)) ||
+    (value.matched_repository !== undefined &&
+      (typeof value.matched_repository !== "string" ||
+        value.matched_repository.length < 3 ||
+        value.matched_repository.length > 201)) ||
+    ![
+      value.validated_archive_digest,
+      value.validated_package_digest,
+      value.validated_snapshot_digest,
+    ].every(
+      (item) =>
+        item === undefined ||
+        (typeof item === "string" && prefixedDigestPattern.test(item)),
+    )
+  )
+    return false;
+  return value.state === "AVAILABLE"
+    ? matched.every((item) => item !== undefined) &&
+        value.validated_package_digest === value.package_digest &&
+        value.validated_snapshot_digest === value.snapshot_digest
+    : matched.every((item) => item === undefined);
+}
+
+function receipt(value: unknown): value is ResolvedEvaluationContext {
+  if (
+    !record(value) ||
+    !closed(value, [
+      "context_version",
+      "selection",
+      "as_of",
+      "resolved_at",
+      "task_population",
+      "catalog",
+      "evidence_bindings",
+      "input_refs",
+      "workflow_resolutions",
+      "population_state",
+    ])
+  )
+    return false;
+  if (
+    value.context_version !== 1 ||
+    !selection(value.selection) ||
+    typeof value.as_of !== "string" ||
