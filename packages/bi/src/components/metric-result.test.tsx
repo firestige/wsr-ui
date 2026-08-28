@@ -71,6 +71,24 @@ describe("Metric Result foundations", () => {
     expect(screen.queryByText(/^0$/)).not.toBeInTheDocument();
   });
 
+  it("shows a two-decimal ratio presentation while preserving exact text", () => {
+    render(
+      <MetricResultFrame
+        content={{
+          tag: "RESULT",
+          slice: {
+            ...availableSlice,
+            value: { kind: "RATIO", value: "1/3", unit: "ratio" },
+          },
+        }}
+        coordinate="ratio@2.0.0"
+      />,
+    );
+
+    expect(screen.getByText("33.33%")).toBeVisible();
+    expect(screen.getByText("Exact value: 1/3 ratio")).toBeInTheDocument();
+  });
+
   it("offers an explicit recovery path for a withheld result", async () => {
     const user = userEvent.setup();
     const recover = vi.fn();

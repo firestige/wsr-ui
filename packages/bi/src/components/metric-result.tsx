@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 
 import type { MetricSlice, TruthState } from "../domain/evolution/types";
+import { presentExactValue } from "../domain/visualization/presentation";
 import { CoverageLabel, MetricTruthLabel, ScopedError } from "./status";
 
 type MetricFrameContent =
@@ -10,14 +11,16 @@ type MetricFrameContent =
 
 function ExactMetricValue({ slice }: { slice: MetricSlice }) {
   if (slice.value === undefined) return null;
+  const presented = presentExactValue(slice.value);
+  const unitSuffix = ` ${slice.value.unit}`;
+  const displayValue = presented.display.endsWith(unitSuffix)
+    ? presented.display.slice(0, -unitSuffix.length)
+    : presented.display;
   return (
     <div className="metric-value">
-      <span className="metric-number">
-        {typeof slice.value.value === "boolean"
-          ? String(slice.value.value)
-          : slice.value.value}
-      </span>
+      <span className="metric-number">{displayValue}</span>
       <span className="metric-unit">{slice.value.unit}</span>
+      <span className="numeric-exact">Exact value: {presented.exact}</span>
     </div>
   );
 }
