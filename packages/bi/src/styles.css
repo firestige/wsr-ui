@@ -167,8 +167,8 @@
   --space-cluster: 0.5rem;
   --space-control: 0.375rem;
   --space-tight: 0.25rem;
-  --density-row: 2.25rem;
-  --density-control: 2rem;
+  --density-row: 2.75rem;
+  --density-control: 2.75rem;
 }
 
 @theme inline {
@@ -305,28 +305,6 @@
   text-transform: none;
 }
 
-@utility truth-badge {
-  display: inline-flex;
-  align-items: center;
-  width: fit-content;
-  padding: var(--space-tight) var(--space-cluster);
-  border-radius: var(--shape-pill);
-  font-size: var(--type-label-size);
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-@utility truth-available {
-  background: var(--status-available-surface);
-  color: var(--status-available);
-}
-
-@utility truth-partial {
-  background: var(--status-attention-surface);
-  color: var(--status-attention);
-}
-
 @utility visual-preview {
   width: 100%;
   height: var(--layout-visual-preview-height);
@@ -457,6 +435,11 @@
   color: var(--content-primary);
   font: inherit;
   font-weight: 650;
+
+  &:disabled {
+    color: var(--interaction-disabled);
+    cursor: not-allowed;
+  }
 }
 
 @utility metric-frame {
@@ -704,6 +687,11 @@
   color: var(--content-secondary);
   font: inherit;
 
+  &:disabled {
+    color: var(--interaction-disabled);
+    cursor: not-allowed;
+  }
+
   &[aria-current="page"] {
     border-color: var(--interaction-accent);
     background: var(--interaction-selection);
@@ -896,10 +884,6 @@
     --focus-ring: Highlight;
     --interaction-selection: Highlight;
   }
-
-  .truth-badge {
-    border: 1px solid currentColor;
-  }
 }
 
 @media print {
@@ -917,5 +901,14 @@
     --border-strong: CanvasText;
     --elevation-panel: none;
     --elevation-overlay: none;
+  }
+
+  .control-label,
+  .metric-actions,
+  .scope-tabs,
+  .motion-control,
+  .link-control,
+  .action-control {
+    display: none !important;
   }
 }
