@@ -21,10 +21,93 @@ const taskPage = {
   next_cursor: null,
 };
 
+const traceId = "a".repeat(32);
+const spans = ["1".repeat(16), "2".repeat(16), "3".repeat(16)];
+const traceTruth = {
+  completeness: null,
+  availability: "AVAILABLE",
+  expiry: "ACTIVE",
+  expires_at: null,
+};
+const traceSource = (span_id: string) => ({
+  kind: "SPAN",
+  trace_id: traceId,
+  span_id,
+});
+const endpoint = (span_id: string, id = traceId) => ({ trace_id: id, span_id });
+const tracePage = {
+  contract: { name: "evidence.query", revision: "0.1.0" },
+  observation_profile: "1.0.0",
+  read_model_revision: "1.0.0",
+  snapshot: "browser-trace-snapshot",
+  next_cursor: null,
+  trace_state: "AVAILABLE",
+  trace_summaries: [{ trace_id: traceId, state: "AVAILABLE" }],
+  items: [
+    ...spans.map((span_id, index) => ({
+      id: `node-${index + 1}`,
+      trace_id: traceId,
+      kind: "NODE",
+      source: traceSource(span_id),
+      recorded_at: `2026-08-28T10:00:0${9 - index}.000000Z`,
+      truth: traceTruth,
+      node: {
+        span_id,
+        span_name: ["Root", "Writer", "Reviewer"][index],
+        span_kind: "INTERNAL",
+        start_time_unix_nano: "999",
+        end_time_unix_nano: "1000",
+        span_status: "OK",
+        span_flags: 0,
+        trace_state: null,
+        fields: [],
+      },
+      edge: null,
+    })),
+    {
+      id: "parent-1",
+      trace_id: traceId,
+      kind: "PARENT_EDGE",
+      source: traceSource(spans[1]!),
+      recorded_at: "2026-08-28T10:00:02.000000Z",
+      truth: traceTruth,
+      node: null,
+      edge: { from: endpoint(spans[1]!), to: endpoint(spans[0]!) },
+    },
+    {
+      id: "parent-2",
+      trace_id: traceId,
+      kind: "PARENT_EDGE",
+      source: traceSource(spans[2]!),
+      recorded_at: "2026-08-28T10:00:01.000000Z",
+      truth: traceTruth,
+      node: null,
+      edge: { from: endpoint(spans[2]!), to: endpoint(spans[0]!) },
+    },
+    {
+      id: "link-1",
+      trace_id: traceId,
+      kind: "LINK",
+      source: traceSource(spans[1]!),
+      recorded_at: "2026-08-28T10:00:00.000000Z",
+      truth: traceTruth,
+      node: null,
+      edge: {
+        from: endpoint(spans[1]!),
+        to: endpoint("9".repeat(16), "b".repeat(32)),
+      },
+    },
+  ],
+};
+
 test.beforeEach(async ({ page }) => {
   await page.route("**/*", async (route) => {
     if (route.request().url().includes("/v1/evidence/tasks")) {
       await route.fulfill({ json: taskPage });
+      return;
+    }
+    if (route.request().url().includes("/v1/evidence/traces")) {
+      await route.fulfill({ json: tracePage });
       return;
     }
     if (
@@ -37,6 +120,40 @@ test.beforeEach(async ({ page }) => {
     }
     await route.continue();
   });
+});
+
+test("recorded Trace keeps siblings together and Live traversal stops", async ({
+  page,
+}) => {
+  await page.goto(
+    `/evaluate/trace/${traceId}?v=1&task=task-browser&span=${spans[1]}&metric=delivery-cycle-time-ms%402.0.0&side=single&scope=result`,
+  );
+
+  const siblings = page.getByRole("group", { name: "Recorded depth 1" });
+  await expect(siblings).toContainText("Writer");
+  await expect(siblings).toContainText("Reviewer");
+  await expect(
+    page.getByText("LINK — independent recorded relation"),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("group", { name: "Orphan endpoints" }),
+  ).toContainText("9999999999999999");
+  await expect(page.getByText("Mode: Still")).toBeVisible();
+  await page.getByRole("button", { name: "Start Live reading" }).click();
+  await expect(page.getByText("Mode: COMPLETE")).toBeVisible();
+});
+
+test("reduced motion keeps recorded Trace Still", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto(
+    `/evaluate/trace/${traceId}?v=1&task=task-browser&metric=delivery-cycle-time-ms%402.0.0&side=single&scope=result`,
+  );
+  await expect(
+    page.getByRole("button", { name: "Start Live reading" }),
+  ).toBeDisabled();
+  await expect(
+    page.getByText(/Reduced motion keeps the complete structure still/),
+  ).toBeVisible();
 });
 
 test("single deep link restores authoritative truth, coverage, and receipt", async ({
