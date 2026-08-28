@@ -53,6 +53,16 @@ server {
         proxy_pass http://${EVIDENCE_UPSTREAM};
     }
 
+    location = /api {
+        default_type application/json;
+        return 404 '{"error":{"code":"ROUTE_NOT_FOUND","message":"route is not available"}}';
+    }
+
+    location = /v1/evidence {
+        default_type application/json;
+        return 404 '{"error":{"code":"ROUTE_NOT_FOUND","message":"route is not available"}}';
+    }
+
     location /api/ {
         default_type application/json;
         return 404 '{"error":{"code":"ROUTE_NOT_FOUND","message":"route is not available"}}';
