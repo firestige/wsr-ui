@@ -215,7 +215,10 @@ function CompareResults({
       : response.right.tag === "SIDE_ERROR"
         ? response.right
         : undefined;
-  const failedLabel = response.left.tag === "SIDE_ERROR" ? "Before" : "After";
+  const beforeError =
+    response.left.tag === "SIDE_ERROR" ? response.left : undefined;
+  const afterError =
+    response.right.tag === "SIDE_ERROR" ? response.right : undefined;
   return (
     <section aria-label="Compared Metric Results" className="compare-results">
       <MetricNavigator
@@ -239,15 +242,6 @@ function CompareResults({
         }
         selectedCoordinate={selectedCoordinate}
       />
-      {failed === undefined ? null : (
-        <ScopedError
-          announce="assertive"
-          detail={`${failed.code}: ${failed.detail}`}
-          onRetry={onRetry}
-          retryable={failed.retryable && !retrying}
-          title={`${failedLabel} unavailable`}
-        />
-      )}
       {retrying ? (
         <p aria-live="polite" className="loading-state" role="status">
           Retrying comparison… The resolved side remains visible.
@@ -261,10 +255,12 @@ function CompareResults({
           title="Comparison retry failed"
         />
       )}
-      {response.deltas.map((delta) => (
+      {response.deltas.map((delta, index) => (
         <CompareResultFrame
           after={after === undefined ? undefined : findSlice(after, delta)}
+          afterError={afterError}
           before={before === undefined ? undefined : findSlice(before, delta)}
+          beforeError={beforeError}
           coordinate={delta.metric_coordinate}
           delta={delta}
           key={`${delta.metric_coordinate}:${sliceKey(delta.slice_key)}`}
@@ -281,6 +277,10 @@ function CompareResults({
               trigger,
             )
           }
+          onRetryFailedSide={
+            failed === undefined || retrying ? undefined : onRetry
+          }
+          ownsFailedSide={index === 0}
         />
       ))}
     </section>
