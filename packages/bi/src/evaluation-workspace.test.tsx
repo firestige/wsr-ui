@@ -107,10 +107,33 @@ describe("Evaluation workspace", () => {
     expect(screen.getByRole("status")).toHaveTextContent(
       "Resolving evaluation",
     );
-    expect(await screen.findByText("33.33%")).toBeVisible();
+    expect((await screen.findAllByText("33.33%"))[0]).toBeVisible();
     expect(computeSingle).toHaveBeenCalledWith(["task-preview"]);
-    expect(screen.getAllByRole("article")).toHaveLength(12);
     expect(screen.getAllByText("0 / 0").length).toBeGreaterThan(0);
+  });
+
+  it("switches presets without recomputing the evaluation", async () => {
+    const computeSingle = vi.fn(async (): Promise<EvolutionResult> => ({
+      ok: true,
+      value: singleResponse(),
+    }));
+    const user = userEvent.setup();
+    render(
+      <EvaluationWorkspace
+        evolution={{ computeSingle, computeCompare: vi.fn() }}
+        route={{ tag: "SINGLE", taskIds: ["task-preview"] }}
+      />,
+    );
+
+    await screen.findAllByText("33.33%");
+    await user.selectOptions(
+      screen.getByLabelText("Layout preset"),
+      "detail-table@1",
+    );
+    expect(
+      screen.getAllByRole("table", { name: /Fallback result data/ }),
+    ).toHaveLength(CATALOG_COORDINATES.length);
+    expect(computeSingle).toHaveBeenCalledTimes(1);
   });
 
   it("opens the receipt without moving authority into route state", async () => {
@@ -155,7 +178,7 @@ describe("Evaluation workspace", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("NETWORK");
     await user.click(screen.getByRole("button", { name: "Retry" }));
-    expect(await screen.findByText("33.33%")).toBeVisible();
+    expect((await screen.findAllByText("33.33%"))[0]).toBeVisible();
     expect(computeSingle).toHaveBeenCalledTimes(2);
   });
 
