@@ -156,6 +156,21 @@ test("reduced motion keeps recorded Trace Still", async ({ page }) => {
   ).toBeVisible();
 });
 
+test("recorded Trace remains operable without horizontal overflow on narrow screens", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(
+    `/evaluate/trace/${traceId}?v=1&task=task-browser&metric=delivery-cycle-time-ms%402.0.0&side=single&scope=result`,
+  );
+  await expect(
+    page.getByRole("group", { name: "Recorded depth 1" }),
+  ).toContainText("Reviewer");
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth),
+  ).toBeLessThanOrEqual(390);
+});
+
 test("single deep link restores authoritative truth, coverage, and receipt", async ({
   page,
 }) => {
