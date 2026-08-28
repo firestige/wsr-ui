@@ -216,7 +216,8 @@ export function EvidenceDrilldown({
       ? "PARTIAL"
       : selectedFacts.length === 0 && references.length === 0
         ? "EMPTY"
-        : selectedFacts.every((fact) => fact.truth.expiry === "EXPIRED")
+        : selectedFacts.length > 0 &&
+            selectedFacts.every((fact) => fact.truth.expiry === "EXPIRED")
           ? "EXPIRED"
           : "READY";
     if (generation !== requestGeneration.current) return;

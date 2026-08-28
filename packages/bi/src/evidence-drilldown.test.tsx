@@ -160,6 +160,7 @@ describe("Evidence drill-down", () => {
       screen.getByText("Identity retained; detail not loaded by Facts query"),
     ).toBeVisible();
     expect(screen.queryByText("No Evidence in this scope")).toBeNull();
+    expect(screen.queryByText("Evidence detail expired")).toBeNull();
   });
 
   it("does not let an older drill-down request replace the current route", async () => {
