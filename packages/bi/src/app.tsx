@@ -138,7 +138,7 @@ const structure: RecordedStructureViewModel = {
     {
       depth: 1,
       nodes: [
-        { id: "writer", label: "Writer", state: "PARTIAL" },
+        { id: "writer", label: "Writer", state: "AVAILABLE" },
         { id: "reviewer", label: "Reviewer", state: "AVAILABLE" },
       ],
     },

@@ -79,14 +79,20 @@ export function TraceDrilldown({
   const loadGeneration = useRef(0);
   const load = useCallback(async () => {
     const generation = ++loadGeneration.current;
+    setMode(DEFAULT_MOTION_MODE);
+    setVisibleDepths(Number.MAX_SAFE_INTEGER);
+    setSelectedId(route.spanId);
     setResult(undefined);
     const next = await loadRecordedTrace(evidence, route.traceId);
     if (loadGeneration.current === generation) setResult(next);
-  }, [evidence, route.traceId]);
+  }, [evidence, route.spanId, route.traceId]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => void load(), 0);
-    return () => window.clearTimeout(timer);
+    return () => {
+      window.clearTimeout(timer);
+      loadGeneration.current += 1;
+    };
   }, [load]);
   useEffect(() => {
     if (window.matchMedia === undefined) return;

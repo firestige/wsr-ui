@@ -1,7 +1,7 @@
 import { scalePoint } from "d3";
 import { useId } from "react";
 
-export type RecordedDetailState = "AVAILABLE" | "PARTIAL" | "UNRESOLVED";
+export type RecordedDetailState = "AVAILABLE" | "UNRESOLVED";
 
 export interface RecordedNodeView {
   id: string;
@@ -26,7 +26,6 @@ export interface RecordedStructureViewModel {
 
 const detailStateLabels: Record<RecordedDetailState, string> = {
   AVAILABLE: "Available recorded detail",
-  PARTIAL: "Partial recorded detail",
   UNRESOLVED: "Unresolved recorded endpoint",
 };
 
