@@ -70,6 +70,61 @@ describe("BI product route", () => {
     expect(computeSingle).toHaveBeenCalledWith(["task-a"]);
   });
 
+  it("loads bounded Task pages and searches name or exact ID", async () => {
+    const getPage = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        value: { ...taskPage, items: [taskPage.items[0]], next_cursor: "next" },
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        value: { ...taskPage, items: [taskPage.items[1]], next_cursor: null },
+      });
+    const user = userEvent.setup();
+    render(
+      <ProductApp
+        evidence={{ getFactsPage: vi.fn() }}
+        evolution={{ computeSingle: vi.fn(), computeCompare: vi.fn() }}
+        initialRelativeUrl="/evaluate"
+        tasks={{ getPage }}
+      />,
+    );
+
+    expect(await screen.findByText("Baseline run")).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "Load more Tasks" }));
+    expect(await screen.findByText("task-b")).toBeVisible();
+    expect(getPage).toHaveBeenLastCalledWith({ limit: 100, cursor: "next" });
+    await user.type(screen.getByLabelText("Search Tasks"), "Baseline");
+    expect(screen.getByText("Baseline run")).toBeVisible();
+    expect(screen.queryByText("task-b")).toBeNull();
+  });
+
+  it("retries a failed Task discovery without losing the route", async () => {
+    window.history.replaceState(null, "", "/evaluate");
+    const getPage = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: false,
+        error: { kind: "ERROR", reason: "NETWORK" },
+      })
+      .mockResolvedValueOnce({ ok: true, value: taskPage });
+    const user = userEvent.setup();
+    render(
+      <ProductApp
+        evidence={{ getFactsPage: vi.fn() }}
+        evolution={{ computeSingle: vi.fn(), computeCompare: vi.fn() }}
+        initialRelativeUrl="/evaluate"
+        tasks={{ getPage }}
+      />,
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("NETWORK");
+    await user.click(screen.getByRole("button", { name: "Retry" }));
+    expect(await screen.findByText("Baseline run")).toBeVisible();
+    expect(window.location.pathname).toBe("/evaluate");
+  });
+
   it("builds independent left and right compare selections", async () => {
     const computeCompare = vi.fn(async (): Promise<EvolutionResult> => ({
       ok: false,
