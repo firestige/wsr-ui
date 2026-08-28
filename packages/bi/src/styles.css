@@ -320,6 +320,13 @@
   margin-inline: auto;
 }
 
+@utility compare-results {
+  display: grid;
+  gap: var(--space-section);
+  max-width: var(--layout-content);
+  margin-inline: auto;
+}
+
 @utility skip-link {
   position: fixed;
   inset-block-start: var(--space-tight);

@@ -3,7 +3,11 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 import { CATALOG_COORDINATES } from "./domain/evolution/client";
-import type { EvolutionResult, SingleResponse } from "./domain/evolution/types";
+import type {
+  CompareResponse,
+  EvolutionResult,
+  SingleResponse,
+} from "./domain/evolution/types";
 import { EvaluationWorkspace } from "./evaluation-workspace";
 import { previewReceipt, previewSlice } from "./preview-fixtures";
 
@@ -47,6 +51,43 @@ function singleResponse(): SingleResponse {
         ],
       })),
     },
+  };
+}
+
+function compareResponse(partial = false): CompareResponse {
+  const left = singleResponse().result;
+  const right = partial
+    ? ({
+        tag: "SIDE_ERROR",
+        code: "QUERY_UNAVAILABLE",
+        retryable: true,
+        detail: "Evidence unavailable",
+      } as const)
+    : singleResponse().result;
+  return {
+    api_version: 1,
+    mode: "COMPARE",
+    status: partial ? "PARTIAL_COMPARE" : "FULL_COMPARE",
+    left,
+    right,
+    deltas: CATALOG_COORDINATES.map((metric_coordinate, index) =>
+      partial
+        ? { metric_coordinate, slice_key: {}, state: "SIDE_UNRESOLVED" }
+        : index === 0
+          ? {
+              metric_coordinate,
+              slice_key: {},
+              state: "AVAILABLE",
+              value: { kind: "RATIO", value: "1/3", unit: "ratio" },
+              direction: "INCREASE",
+            }
+          : {
+              metric_coordinate,
+              slice_key: {},
+              state: "WITHHELD",
+              withholding_reason: "MISSING_INPUT",
+            },
+    ),
   };
 }
 
@@ -116,5 +157,55 @@ describe("Evaluation workspace", () => {
     await user.click(screen.getByRole("button", { name: "Retry" }));
     expect(await screen.findByText("33.33%")).toBeVisible();
     expect(computeSingle).toHaveBeenCalledTimes(2);
+  });
+
+  it("renders full compare from Evolution sides and Deltas", async () => {
+    const computeCompare = vi.fn(async () => ({
+      ok: true as const,
+      value: compareResponse(),
+    }));
+    render(
+      <EvaluationWorkspace
+        evolution={{ computeSingle: vi.fn(), computeCompare }}
+        route={{
+          tag: "COMPARE",
+          leftTaskIds: ["task-before"],
+          rightTaskIds: ["task-after"],
+        }}
+      />,
+    );
+
+    expect(await screen.findAllByText("Before")).toHaveLength(12);
+    expect(screen.getAllByText("After")).toHaveLength(12);
+    expect(screen.getAllByText("Delta")).toHaveLength(12);
+    expect(computeCompare).toHaveBeenCalledWith(
+      ["task-before"],
+      ["task-after"],
+    );
+  });
+
+  it("retains a successful compare side when the other side fails", async () => {
+    const computeCompare = vi.fn(async () => ({
+      ok: true as const,
+      value: compareResponse(true),
+    }));
+    render(
+      <EvaluationWorkspace
+        evolution={{ computeSingle: vi.fn(), computeCompare }}
+        route={{
+          tag: "COMPARE",
+          leftTaskIds: ["task-before"],
+          rightTaskIds: ["task-after"],
+        }}
+      />,
+    );
+
+    expect(await screen.findAllByText("Available")).not.toHaveLength(0);
+    expect(screen.getAllByRole("alert")[0]).toHaveTextContent(
+      "After unavailable",
+    );
+    expect(
+      screen.getAllByText("Delta unavailable until both sides resolve"),
+    ).toHaveLength(12);
   });
 });
