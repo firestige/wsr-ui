@@ -102,6 +102,37 @@ describe("BI product route", () => {
     expect(computeCompare).toHaveBeenCalledWith(["task-a"], ["task-b"]);
   });
 
+  it("enforces the documented 24 Task per-side bound before navigation", async () => {
+    const manyTasks: TaskPage = {
+      ...taskPage,
+      items: Array.from({ length: 25 }, (_, index) => ({
+        task_id: `task-${String(index).padStart(2, "0")}`,
+        display_name: null,
+        provenance: {
+          accepted_digest: index.toString(16).padStart(64, "0"),
+          profile_version: "2.0.0" as const,
+          source: { kind: "EVENT" as const, event_id: `event-${index}` },
+        },
+      })),
+    };
+    const user = userEvent.setup();
+    render(
+      <ProductApp
+        evidence={{ getFactsPage: vi.fn() }}
+        evolution={{ computeSingle: vi.fn(), computeCompare: vi.fn() }}
+        initialRelativeUrl="/evaluate"
+        tasks={{
+          getPage: vi.fn(async () => ({ ok: true as const, value: manyTasks })),
+        }}
+      />,
+    );
+
+    const choices = await screen.findAllByRole("checkbox");
+    for (const choice of choices.slice(0, 24)) await user.click(choice);
+    expect(choices[24]).toBeDisabled();
+    expect(screen.getByText(/24 Task limit per side/)).toBeVisible();
+  });
+
   it("fails closed without querying services for an invalid deep link", () => {
     const getPage = vi.fn();
     const computeSingle = vi.fn();

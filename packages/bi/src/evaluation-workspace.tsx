@@ -60,6 +60,7 @@ function SingleResults({
   layout,
   onExplain,
   onEvidence,
+  focusedCoordinate,
 }: {
   response: SingleResponse;
   layout: DashboardLayout;
@@ -71,6 +72,7 @@ function SingleResults({
     coordinate: keyof typeof METRIC_COPY,
     trigger: HTMLButtonElement,
   ) => void;
+  focusedCoordinate?: string;
 }) {
   return (
     <section aria-label="Metric Results" className="evaluation-results">
@@ -82,6 +84,9 @@ function SingleResults({
         );
         return (
           <section
+            aria-current={
+              focusedCoordinate === panel.metric_coordinate ? "true" : undefined
+            }
             className="dashboard-panel"
             data-size={panel.size}
             key={panel.panel_id}
@@ -269,12 +274,21 @@ export function EvaluationWorkspace({
     return <p className="empty-state">Choose one or more Tasks to evaluate.</p>;
   if (route.tag === "INVALID")
     return (
-      <ScopedError
-        announce="assertive"
-        detail={route.reason}
-        retryable={false}
-        title="Invalid evaluation link"
-      />
+      <main className="evaluation-shell">
+        <ScopedError
+          announce="assertive"
+          detail={route.reason}
+          retryable={false}
+          title="Invalid evaluation link"
+        />
+        <button
+          className="action-control"
+          onClick={() => onNavigate?.({ tag: "SELECT" })}
+          type="button"
+        >
+          Re-select Tasks
+        </button>
+      </main>
     );
 
   const receipts =
@@ -373,6 +387,7 @@ export function EvaluationWorkspace({
           />
         ) : state.response.mode === "SINGLE" ? (
           <SingleResults
+            focusedCoordinate={route.focus?.metric}
             layout={PRESET_LAYOUTS[presetId]}
             onEvidence={(coordinate) => {
               if (route.tag === "SINGLE")
