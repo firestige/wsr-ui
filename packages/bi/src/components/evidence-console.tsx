@@ -12,7 +12,7 @@ export interface EvidenceConsoleRow {
   trace?: {
     traceId: string;
     spanId?: string;
-    state: "AVAILABLE" | "PARTIAL" | "EXPIRED";
+    state?: "AVAILABLE" | "PARTIAL" | "EXPIRED";
   };
 }
 
@@ -40,10 +40,12 @@ const scopeNotes: Record<EvidenceScope, string> = {
 function EvidenceTable({
   scope,
   rows,
+  focusedFactId,
   onOpenTrace,
 }: {
   scope: EvidenceScope;
   rows: EvidenceConsoleRow[];
+  focusedFactId?: string;
   onOpenTrace?: (traceId: string, spanId?: string) => void;
 }) {
   const caption = scopes.find((item) => item.id === scope)!.label;
@@ -61,7 +63,10 @@ function EvidenceTable({
         </thead>
         <tbody>
           {rows.map((row) => (
-            <tr key={row.factId}>
+            <tr
+              aria-current={focusedFactId === row.factId ? "true" : undefined}
+              key={row.factId}
+            >
               <td>
                 <code className="text-code">{row.factId}</code>
                 <span>{row.factClass}</span>
@@ -82,7 +87,11 @@ function EvidenceTable({
                   "No Trace reference"
                 ) : (
                   <>
-                    <EvidenceLifecycleLabel traceState={row.trace.state} />
+                    {row.trace.state === undefined ? (
+                      <span>Trace lifecycle not loaded</span>
+                    ) : (
+                      <EvidenceLifecycleLabel traceState={row.trace.state} />
+                    )}
                     {onOpenTrace === undefined ? (
                       <code className="text-code">
                         {row.trace.traceId}
@@ -119,12 +128,14 @@ export function EvidenceConsoleFoundation({
   scope,
   state,
   rows,
+  focusedFactId,
   onScopeChange,
   onOpenTrace,
 }: {
   scope: EvidenceScope;
   state: ConsoleState;
   rows: EvidenceConsoleRow[];
+  focusedFactId?: string;
   onScopeChange?: (scope: EvidenceScope) => void;
   onOpenTrace?: (traceId: string, spanId?: string) => void;
 }) {
@@ -182,6 +193,7 @@ export function EvidenceConsoleFoundation({
           ) : null}
           {rows.length === 0 ? null : (
             <EvidenceTable
+              focusedFactId={focusedFactId}
               onOpenTrace={onOpenTrace}
               rows={rows}
               scope={scope}
