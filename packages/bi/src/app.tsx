@@ -32,6 +32,19 @@ type Density = "comfortable" | "compact";
 type InspectorKind = "explanation" | "receipt";
 type EvidencePreviewState = "READY" | "EMPTY" | "PARTIAL" | "EXPIRED";
 
+function useReducedMotion() {
+  const [reduced, setReduced] = useState(false);
+  useEffect(() => {
+    if (typeof window.matchMedia !== "function") return;
+    const media = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const update = () => setReduced(media.matches);
+    update();
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
+  return reduced;
+}
+
 const trendPoints: ReadonlyArray<readonly [number, number]> = [
   [8, 57],
   [46, 45],
@@ -221,6 +234,7 @@ export function App() {
   const [evidenceState, setEvidenceState] =
     useState<EvidencePreviewState>("READY");
   const [motion, setMotion] = useState<MotionMode>("STILL");
+  const reducedMotion = useReducedMotion();
   const explanationButton = useRef<HTMLButtonElement>(null);
   const receiptButton = useRef<HTMLButtonElement>(null);
 
@@ -376,7 +390,7 @@ export function App() {
             onReset={() => setMotion("STILL")}
             onStart={() => setMotion("LIVE")}
             onStop={() => setMotion("STILL")}
-            reducedMotion={false}
+            reducedMotion={reducedMotion}
           />
         </section>
       </div>
