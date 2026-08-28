@@ -16,6 +16,13 @@ export interface EvidenceConsoleRow {
   };
 }
 
+export interface EvidenceReferenceRow {
+  kind: "FACT" | "TRACE_NODE" | "TASK_MEMBERSHIP" | "PUBLISHED_PROVENANCE";
+  identity: string;
+  provenance: string;
+  loadedAsFact: boolean;
+}
+
 type ConsoleState =
   | { tag: "LOADING" }
   | { tag: "READY" }
@@ -31,11 +38,46 @@ const scopes: ReadonlyArray<{ id: EvidenceScope; label: string }> = [
 ];
 
 const scopeNotes: Record<EvidenceScope, string> = {
-  result: "Exact provenance identities cited by this Metric Result.",
+  result:
+    "Exact provenance identities cited by this Metric Result; non-Fact detail may remain unresolved.",
   related:
     "Related Facts match the context but are not claimed as calculation contributors.",
-  "read-set": "The complete bounded Evidence population bound by this receipt.",
+  "read-set":
+    "Every bounded identity recorded by this receipt; this view only hydrates matching Fact rows.",
 };
+
+function ReferenceTable({ rows }: { rows: EvidenceReferenceRow[] }) {
+  if (rows.length === 0) return null;
+  return (
+    <div className="table-scroll">
+      <table aria-label="Receipt identities" className="evidence-table">
+        <caption>Receipt identities</caption>
+        <thead>
+          <tr>
+            <th scope="col">Kind</th>
+            <th scope="col">Identity</th>
+            <th scope="col">Provenance</th>
+            <th scope="col">Detail state</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={`${row.kind}:${row.identity}:${row.provenance}`}>
+              <td>{row.kind}</td>
+              <td className="text-code">{row.identity}</td>
+              <td className="text-code">{row.provenance}</td>
+              <td>
+                {row.loadedAsFact
+                  ? "Loaded as Fact row"
+                  : "Identity retained; detail not loaded by Facts query"}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
 
 function EvidenceTable({
   scope,
@@ -128,6 +170,7 @@ export function EvidenceConsoleFoundation({
   scope,
   state,
   rows,
+  references = [],
   focusedFactId,
   onScopeChange,
   onOpenTrace,
@@ -135,6 +178,7 @@ export function EvidenceConsoleFoundation({
   scope: EvidenceScope;
   state: ConsoleState;
   rows: EvidenceConsoleRow[];
+  references?: EvidenceReferenceRow[];
   focusedFactId?: string;
   onScopeChange?: (scope: EvidenceScope) => void;
   onOpenTrace?: (traceId: string, spanId?: string) => void;
@@ -199,6 +243,7 @@ export function EvidenceConsoleFoundation({
               scope={scope}
             />
           )}
+          <ReferenceTable rows={references} />
         </>
       )}
     </section>

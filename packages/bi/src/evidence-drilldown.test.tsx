@@ -112,7 +112,54 @@ describe("Evidence drill-down", () => {
       delivery_id: "delivery-a",
       limit: 200,
     });
-    expect(screen.getByText(digest)).toBeVisible();
+    expect(screen.getAllByText(digest)[0]).toBeVisible();
+  });
+
+  it("keeps non-Fact result lineage visible when a Facts query cannot hydrate it", async () => {
+    const value = response();
+    value.result.receipt = {
+      ...value.result.receipt,
+      input_refs: [
+        {
+          kind: "TRACE_NODE",
+          identity: "trace-a/span-a",
+          provenance_ref: "trace-provenance-a",
+        },
+      ],
+    };
+    value.result.metric_results[0]!.slices[0] = {
+      ...value.result.metric_results[0]!.slices[0]!,
+      provenance_refs: ["trace-provenance-a"],
+    };
+    render(
+      <EvidenceDrilldown
+        evidence={{
+          getFactsPage: vi.fn(async () => ({
+            ok: true as const,
+            value: { ...facts, items: [] },
+          })),
+        }}
+        evolution={{
+          computeSingle: vi.fn(async () => ({ ok: true as const, value })),
+          computeCompare: vi.fn(),
+        }}
+        route={{
+          tag: "EVIDENCE",
+          selection: { tag: "SINGLE", taskIds: ["task-preview"] },
+          metric: "delivery-cycle-time-ms@2.0.0",
+          side: "single",
+          scope: "result",
+        }}
+      />,
+    );
+
+    expect(await screen.findByText("TRACE_NODE")).toBeVisible();
+    expect(screen.getByText("trace-a/span-a")).toBeVisible();
+    expect(screen.getByText("trace-provenance-a")).toBeVisible();
+    expect(
+      screen.getByText("Identity retained; detail not loaded by Facts query"),
+    ).toBeVisible();
+    expect(screen.queryByText("No Evidence in this scope")).toBeNull();
   });
 
   it("does not let an older drill-down request replace the current route", async () => {

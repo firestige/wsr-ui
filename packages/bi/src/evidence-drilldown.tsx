@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
   EvidenceConsoleFoundation,
+  type EvidenceReferenceRow,
   type EvidenceConsoleRow,
 } from "./components/evidence-console";
 import { ScopedError } from "./components/status";
@@ -27,6 +28,7 @@ type State =
   | {
       tag: "RESULT";
       rows: EvidenceConsoleRow[];
+      references: EvidenceReferenceRow[];
       truth: "READY" | "EMPTY" | "PARTIAL" | "EXPIRED";
     }
   | { tag: "ERROR"; detail: string };
@@ -159,6 +161,9 @@ export function EvidenceDrilldown({
     );
     const returnedFacts = pages.flatMap((page) => page.items);
     const allFacts = returnedFacts.slice(0, MAX_ROWS);
+    const returnedIdentities = new Set(
+      allFacts.flatMap((fact) => [fact.id, fact.provenance.accepted_digest]),
+    );
     const selectedFacts = allFacts.filter((fact) => {
       const exact = [fact.id, fact.provenance.accepted_digest];
       if (route.scope === "result")
@@ -167,6 +172,41 @@ export function EvidenceDrilldown({
         return exact.some((identity) => readSetRefs.has(identity));
       return !exact.some((identity) => resultRefs.has(identity));
     });
+    const references: EvidenceReferenceRow[] =
+      route.scope === "related"
+        ? []
+        : resolved.receipt.input_refs
+            .filter(
+              (reference) =>
+                route.scope === "read-set" ||
+                resultRefs.has(reference.identity) ||
+                resultRefs.has(reference.provenance_ref),
+            )
+            .map((reference) => ({
+              kind: reference.kind,
+              identity: reference.identity,
+              provenance: reference.provenance_ref,
+              loadedAsFact:
+                reference.kind === "FACT" &&
+                (returnedIdentities.has(reference.identity) ||
+                  returnedIdentities.has(reference.provenance_ref)),
+            }));
+    if (route.scope === "result") {
+      const represented = new Set(
+        references.flatMap((reference) => [
+          reference.identity,
+          reference.provenance,
+        ]),
+      );
+      for (const provenance of resultRefs)
+        if (!represented.has(provenance))
+          references.push({
+            kind: "PUBLISHED_PROVENANCE",
+            identity: provenance,
+            provenance,
+            loadedAsFact: returnedIdentities.has(provenance),
+          });
+    }
     const incomplete =
       failed !== "" ||
       pages.some((page) => page.next_cursor !== null) ||
@@ -174,13 +214,18 @@ export function EvidenceDrilldown({
       returnedFacts.length > MAX_ROWS;
     const truth = incomplete
       ? "PARTIAL"
-      : selectedFacts.length === 0
+      : selectedFacts.length === 0 && references.length === 0
         ? "EMPTY"
         : selectedFacts.every((fact) => fact.truth.expiry === "EXPIRED")
           ? "EXPIRED"
           : "READY";
     if (generation !== requestGeneration.current) return;
-    setState({ tag: "RESULT", rows: selectedFacts.map(row), truth });
+    setState({
+      tag: "RESULT",
+      rows: selectedFacts.map(row),
+      references,
+      truth,
+    });
   }, [evidence, evolution, route]);
 
   useEffect(() => {
@@ -236,6 +281,7 @@ export function EvidenceDrilldown({
           }
           onScopeChange={(scope) => onNavigate?.({ ...route, scope })}
           rows={state.tag === "RESULT" ? state.rows : []}
+          references={state.tag === "RESULT" ? state.references : []}
           scope={route.scope}
           state={
             state.tag === "LOADING" ? { tag: "LOADING" } : { tag: state.truth }
