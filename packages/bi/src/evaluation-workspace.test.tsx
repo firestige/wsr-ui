@@ -508,6 +508,11 @@ describe("Evaluation workspace", () => {
     expect(screen.getAllByRole("alert")[0]).toHaveTextContent(
       "After unavailable",
     );
+    expect(screen.getAllByRole("alert")).toHaveLength(1);
+    expect(screen.queryByText("No matching slice on this side.")).toBeNull();
+    expect(
+      screen.getAllByText("After side unresolved: QUERY_UNAVAILABLE"),
+    ).toHaveLength(11);
     expect(
       screen.getAllByText("Delta unavailable until both sides resolve"),
     ).toHaveLength(12);

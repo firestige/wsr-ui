@@ -12,6 +12,7 @@ function CompareSide({
   coordinate,
   slice,
   error,
+  ownsError,
   onRetry,
   onExplain,
   onEvidence,
@@ -20,6 +21,7 @@ function CompareSide({
   coordinate: string;
   slice?: MetricSlice;
   error?: SideError;
+  ownsError: boolean;
   onRetry?: () => void;
   onExplain?: (trigger: HTMLButtonElement) => void;
   onEvidence?: (trigger: HTMLButtonElement) => void;
@@ -34,7 +36,7 @@ function CompareSide({
           onEvidence={onEvidence}
           onExplain={onExplain}
         />
-      ) : error !== undefined ? (
+      ) : error !== undefined && ownsError ? (
         <ScopedError
           announce="assertive"
           detail={`${error.code}: ${error.detail}`}
@@ -42,6 +44,10 @@ function CompareSide({
           retryable={error.retryable}
           title={`${label} unavailable`}
         />
+      ) : error !== undefined ? (
+        <p className="status-reading">
+          {label} side unresolved: {error.code}
+        </p>
       ) : (
         <p className="empty-state">No matching slice on this side.</p>
       )}
@@ -90,6 +96,7 @@ export function CompareResultFrame({
   afterError,
   delta,
   onRetryFailedSide,
+  ownsFailedSide = true,
   onExplain,
   onEvidence,
 }: {
@@ -100,6 +107,7 @@ export function CompareResultFrame({
   afterError?: SideError;
   delta: DeltaEntry;
   onRetryFailedSide?: () => void;
+  ownsFailedSide?: boolean;
   onExplain?: (side: "left" | "right", trigger: HTMLButtonElement) => void;
   onEvidence?: (side: "left" | "right", trigger: HTMLButtonElement) => void;
 }) {
@@ -109,6 +117,7 @@ export function CompareResultFrame({
         coordinate={coordinate}
         error={beforeError}
         label="Before"
+        ownsError={ownsFailedSide}
         onEvidence={
           onEvidence === undefined
             ? undefined
@@ -126,6 +135,7 @@ export function CompareResultFrame({
         coordinate={coordinate}
         error={afterError}
         label="After"
+        ownsError={ownsFailedSide}
         onEvidence={
           onEvidence === undefined
             ? undefined
