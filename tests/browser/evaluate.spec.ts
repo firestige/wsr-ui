@@ -64,9 +64,11 @@ test("single deep link restores authoritative truth, coverage, and receipt", asy
   const receipt = page.getByRole("button", { name: "View receipt" });
   await receipt.focus();
   await page.keyboard.press("Enter");
-  await expect(
-    page.getByRole("dialog", { name: "Evaluation receipt" }),
-  ).toContainText("task-browser");
+  const receiptInspector = page.getByRole("dialog", {
+    name: "Evaluation receipt",
+  });
+  await expect(receiptInspector).toContainText("task-browser");
+  await expect(receiptInspector).not.toHaveAttribute("aria-modal");
   await page.keyboard.press("Escape");
   await expect(receipt).toBeFocused();
 
