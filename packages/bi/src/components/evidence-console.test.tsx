@@ -37,7 +37,9 @@ describe("Evidence Console foundation", () => {
       "aria-selected",
       "true",
     );
-    expect(screen.getByText(/not claimed as calculation contributors/i)).toBeVisible();
+    expect(
+      screen.getByText(/not claimed as calculation contributors/i),
+    ).toBeVisible();
     await user.click(screen.getByRole("tab", { name: "Resolved read set" }));
     expect(change).toHaveBeenCalledWith("read-set");
   });
@@ -65,7 +67,9 @@ describe("Evidence Console foundation", () => {
       />,
     );
 
-    expect(screen.getByRole("table", { name: "Result evidence Facts" })).toBeVisible();
+    expect(
+      screen.getByRole("table", { name: "Result evidence Facts" }),
+    ).toBeVisible();
     expect(screen.getByText("fact-a")).toBeVisible();
     expect(screen.getByText("accepted:event-a")).toBeVisible();
     expect(screen.getByText("Completeness: final")).toBeVisible();
@@ -101,9 +105,8 @@ describe("Evidence Console foundation", () => {
     );
     await user.click(screen.getByRole("button", { name: "Retry" }));
     expect(retry).toHaveBeenCalledOnce();
-    expect(screen.getByRole("tab", { name: "Resolved read set" })).toHaveAttribute(
-      "aria-selected",
-      "true",
-    );
+    expect(
+      screen.getByRole("tab", { name: "Resolved read set" }),
+    ).toHaveAttribute("aria-selected", "true");
   });
 });

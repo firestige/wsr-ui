@@ -142,6 +142,7 @@
   --layout-content: 78rem;
   --layout-inspector: 36rem;
   --layout-table-cell-min: 10rem;
+  --layout-recorded-node-min: 12rem;
   --type-display-size: clamp(1.75rem, 4vw, 2.5rem);
   --type-heading-size: 1rem;
   --type-body-size: 0.9375rem;
@@ -733,6 +734,95 @@
   text-align: start;
   text-decoration: underline;
   text-underline-offset: var(--space-tight);
+}
+
+@utility recorded-structure {
+  display: grid;
+  gap: var(--space-section);
+}
+
+@utility recorded-depths {
+  display: grid;
+  gap: var(--space-grid);
+}
+
+@utility recorded-group {
+  display: grid;
+  gap: var(--space-cluster);
+}
+
+@utility recorded-siblings {
+  display: grid;
+  grid-template-columns: repeat(
+    auto-fit,
+    minmax(min(100%, var(--layout-recorded-node-min)), 1fr)
+  );
+  gap: var(--space-cluster);
+}
+
+@utility recorded-node {
+  display: grid;
+  gap: var(--space-tight);
+  min-width: 0;
+  min-height: var(--density-row);
+  padding: var(--space-cluster);
+  border: 1px solid var(--border-default);
+  border-radius: var(--shape-control);
+  background: var(--surface-panel);
+  color: var(--content-primary);
+  font: inherit;
+  text-align: start;
+
+  &[aria-current="true"] {
+    border-color: var(--interaction-accent);
+    background: var(--interaction-selection);
+  }
+}
+
+@utility recorded-state {
+  font-size: var(--type-label-size);
+  font-weight: 650;
+}
+
+@utility recorded-available {
+  color: var(--status-available);
+}
+
+@utility recorded-partial {
+  color: var(--status-attention);
+}
+
+@utility recorded-expired {
+  color: var(--status-expired);
+}
+
+@utility recorded-links {
+  padding: var(--space-cluster);
+  border: 1px dashed var(--compare-delta-neutral);
+  border-radius: var(--shape-control);
+
+  & ul {
+    display: grid;
+    gap: var(--space-tight);
+    padding: 0;
+    list-style: none;
+  }
+}
+
+@utility orphan-lane {
+  display: grid;
+  gap: var(--space-cluster);
+  padding: var(--space-cluster);
+  border-inline-start: var(--selection-marker-size) double
+    var(--status-attention);
+  background: var(--surface-inset);
+}
+
+@utility motion-control {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-cluster);
 }
 
 @media (prefers-reduced-motion: reduce) {

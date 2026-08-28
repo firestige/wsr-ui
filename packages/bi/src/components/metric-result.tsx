@@ -1,9 +1,6 @@
 import type { ReactNode } from "react";
 
-import type {
-  MetricSlice,
-  TruthState,
-} from "../domain/evolution/types";
+import type { MetricSlice, TruthState } from "../domain/evolution/types";
 import { CoverageLabel, MetricTruthLabel, ScopedError } from "./status";
 
 type MetricFrameContent =
@@ -101,12 +98,20 @@ export function MetricResultFrame({
           )}
           <footer className="metric-actions">
             {onExplain === undefined ? null : (
-              <button className="action-control" onClick={onExplain} type="button">
+              <button
+                className="action-control"
+                onClick={onExplain}
+                type="button"
+              >
                 Metric explanation
               </button>
             )}
             {onEvidence === undefined ? null : (
-              <button className="action-control" onClick={onEvidence} type="button">
+              <button
+                className="action-control"
+                onClick={onEvidence}
+                type="button"
+              >
                 View evidence
               </button>
             )}
@@ -123,8 +128,7 @@ export interface MetricNavigatorItem {
   deltaState?: "AVAILABLE" | "WITHHELD" | "SIDE_UNRESOLVED";
 }
 
-const humanize = (value: string) =>
-  value.toLowerCase().replaceAll("_", " ");
+const humanize = (value: string) => value.toLowerCase().replaceAll("_", " ");
 
 export function MetricNavigator({
   items,
