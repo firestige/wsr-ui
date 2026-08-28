@@ -25,6 +25,11 @@ export interface EvolutionPort {
   ): Promise<EvolutionResult>;
 }
 
+export type WorkspaceRoute = Extract<
+  EvaluationRoute,
+  { tag: "SELECT" | "SINGLE" | "COMPARE" | "INVALID" }
+>;
+
 type WorkspaceState =
   | { tag: "LOADING" }
   | { tag: "RESULT"; response: SingleResponse | CompareResponse }
@@ -168,7 +173,7 @@ export function EvaluationWorkspace({
   route,
   evolution,
 }: {
-  route: EvaluationRoute;
+  route: WorkspaceRoute;
   evolution: EvolutionPort;
 }) {
   const [state, setState] = useState<WorkspaceState>({ tag: "LOADING" });
@@ -196,7 +201,8 @@ export function EvaluationWorkspace({
   }, [evolution, route]);
 
   useEffect(() => {
-    void run();
+    const timer = window.setTimeout(() => void run(), 0);
+    return () => window.clearTimeout(timer);
   }, [run]);
 
   if (route.tag === "SELECT")
