@@ -598,3 +598,303 @@ function receipt(value: unknown): value is ResolvedEvaluationContext {
     value.context_version !== 1 ||
     !selection(value.selection) ||
     typeof value.as_of !== "string" ||
+    !timestampPattern.test(value.as_of) ||
+    typeof value.resolved_at !== "string" ||
+    !timestampPattern.test(value.resolved_at)
+  )
+    return false;
+  if (
+    !Array.isArray(value.task_population) ||
+    !value.task_population.every(taskPopulation) ||
+    !Array.isArray(value.evidence_bindings) ||
+    !value.evidence_bindings.every(evidenceBinding) ||
+    !Array.isArray(value.input_refs) ||
+    !value.input_refs.every(inputReference) ||
+    !Array.isArray(value.workflow_resolutions) ||
+    !value.workflow_resolutions.every(workflowResolution)
+  )
+    return false;
+  if (
+    !record(value.catalog) ||
+    !closed(value.catalog, [
+      "catalog_id",
+      "version",
+      "semantic_digest",
+      "observation_profile",
+    ]) ||
+    value.catalog.catalog_id !== "agentops.evaluation.metric-catalog" ||
+    value.catalog.version !== "2.0.0" ||
+    value.catalog.semantic_digest !== CATALOG_DIGEST ||
+    value.catalog.observation_profile !== "1.0.0"
+  )
+    return false;
+  if (
+    !oneOf(value.population_state, [
+      "COMPLETE",
+      "PARTIAL",
+      "OPEN",
+      "MIXED",
+      "EXPIRED",
+    ] as const)
+  )
+    return false;
+  const selectedTaskIds = (value.selection as { task_ids: string[] }).task_ids;
+  const population = value.task_population as Array<{
+    task_id: string;
+    memberships: Array<{
+      manifest_digest: string;
+      recorded_at: string;
+    }>;
+  }>;
+  const populationTaskIds = population.map((item) => item.task_id);
+  const bindings = value.evidence_bindings as Array<{
+    route: string;
+    canonical_filter: Record<string, string>;
+    completion_state: string;
+  }>;
+  const bindingKeys = bindings.map(
+    (item) => `${item.route}\u0000${canonicalMap(item.canonical_filter)}`,
+  );
+  const taskBindings = bindings.filter(
+    (item) => item.route === "/v1/evidence/tasks",
+  );
+  const references = value.input_refs as Array<{
+    kind: string;
+    identity: string;
+  }>;
+  const referenceKeys = references.map(
+    (item) => `${item.kind}\u0000${item.identity}`,
+  );
+  const membershipManifests = new Set(
+    population.flatMap((task) =>
+      task.memberships.map((membership) => membership.manifest_digest),
+    ),
+  );
+  const resolutionManifests = (
+    value.workflow_resolutions as Array<{ manifest_digest: string }>
+  ).map((item) => item.manifest_digest);
+  return (
+    new Set(populationTaskIds).size === populationTaskIds.length &&
+    selectedTaskIds.length === populationTaskIds.length &&
+    selectedTaskIds.every((item, index) => populationTaskIds[index] === item) &&
+    new Set(bindingKeys).size === bindingKeys.length &&
+    taskBindings.length === selectedTaskIds.length &&
+    taskBindings.every(
+      (item) =>
+        Object.keys(item.canonical_filter).length === 2 &&
+        item.canonical_filter.task_id !== undefined &&
+        selectedTaskIds.includes(item.canonical_filter.task_id) &&
+        item.canonical_filter.as_of === value.as_of,
+    ) &&
+    new Set(taskBindings.map((item) => item.canonical_filter.task_id)).size ===
+      selectedTaskIds.length &&
+    (value.population_state !== "COMPLETE" ||
+      (taskBindings.every((item) => item.completion_state === "COMPLETE") &&
+        population.every((item) => item.memberships.length > 0))) &&
+    population.every((item) =>
+      item.memberships.every(
+        (membership) =>
+          Date.parse(membership.recorded_at) <=
+          Date.parse(value.as_of as string),
+      ),
+    ) &&
+    new Set(referenceKeys).size === referenceKeys.length &&
+    new Set(resolutionManifests).size === resolutionManifests.length &&
+    resolutionManifests.length === membershipManifests.size &&
+    resolutionManifests.every((item) => membershipManifests.has(item))
+  );
+}
+
+function sideResult(value: unknown): value is SideResult {
+  if (
+    !record(value) ||
+    !closed(value, ["tag", "receipt", "metric_results"]) ||
+    value.tag !== "SIDE_RESULT" ||
+    !receipt(value.receipt) ||
+    !Array.isArray(value.metric_results) ||
+    !value.metric_results.every(metricResult)
+  )
+    return false;
+  const coordinates = value.metric_results.map(
+    (item) => `${item.metric_id}@${item.metric_version}`,
+  );
+  return (
+    coordinates.length === CATALOG_COORDINATES.length &&
+    coordinates.every((item, index) => item === CATALOG_COORDINATES[index])
+  );
+}
+
+function sideError(value: unknown): value is SideError {
+  return (
+    record(value) &&
+    closed(value, ["tag", "code", "retryable", "detail"]) &&
+    value.tag === "SIDE_ERROR" &&
+    typeof value.code === "string" &&
+    value.code.length > 0 &&
+    typeof value.retryable === "boolean" &&
+    typeof value.detail === "string" &&
+    value.detail.length > 0
+  );
+}
+
+function delta(value: unknown): value is DeltaEntry {
+  if (
+    !record(value) ||
+    !closed(
+      value,
+      ["metric_coordinate", "slice_key", "state"],
+      ["value", "withholding_reason", "direction"],
+    ) ||
+    typeof value.metric_coordinate !== "string" ||
+    !CATALOG_COORDINATES.includes(
+      value.metric_coordinate as (typeof CATALOG_COORDINATES)[number],
+    ) ||
+    !stringMap(value.slice_key) ||
+    !oneOf(value.state, ["AVAILABLE", "WITHHELD", "SIDE_UNRESOLVED"] as const)
+  )
+    return false;
+  if (value.state === "AVAILABLE")
+    if (
+      exactValue(value.value) &&
+      value.value.kind !== "BOOLEAN" &&
+      value.withholding_reason === undefined &&
+      oneOf(value.direction, ["INCREASE", "DECREASE", "NO_CHANGE"] as const)
+    ) {
+      const sign =
+        typeof value.value.value === "string"
+          ? Number(rationalParts(value.value.value)?.[0] ?? 0n)
+          : 0;
+      const expected =
+        sign > 0 ? "INCREASE" : sign < 0 ? "DECREASE" : "NO_CHANGE";
+      return value.direction === expected;
+    } else return false;
+  return (
+    value.value === undefined &&
+    value.direction === undefined &&
+    (value.state === "SIDE_UNRESOLVED" ||
+      typeof value.withholding_reason === "string")
+  );
+}
+
+function sliceIdentity(metric: MetricResult, slice: MetricSlice): string {
+  return `${metric.metric_id}@${metric.metric_version}\u0000${canonicalMap(slice.slice_key)}`;
+}
+
+function sideSlices(side: SideResult): Map<string, MetricSlice> {
+  return new Map(
+    side.metric_results.flatMap((metric) =>
+      metric.slices.map(
+        (slice) => [sliceIdentity(metric, slice), slice] as const,
+      ),
+    ),
+  );
+}
+
+function compareDeltas(
+  status: "FULL_COMPARE" | "PARTIAL_COMPARE",
+  left: SideResult | SideError,
+  right: SideResult | SideError,
+  deltas: DeltaEntry[],
+): boolean {
+  const resultSides = [left, right].filter(sideResult);
+  const sliceMaps = resultSides.map(sideSlices);
+  const expected = new Set(sliceMaps.flatMap((items) => [...items.keys()]));
+  const actual = deltas.map(
+    (item) => `${item.metric_coordinate}\u0000${canonicalMap(item.slice_key)}`,
+  );
+  if (
+    new Set(actual).size !== actual.length ||
+    actual.length !== expected.size ||
+    actual.some((item) => !expected.has(item))
+  )
+    return false;
+  if (status === "PARTIAL_COMPARE")
+    return (
+      resultSides.length === 1 &&
+      deltas.every((item) => item.state === "SIDE_UNRESOLVED")
+    );
+  if (
+    resultSides.length !== 2 ||
+    deltas.some((item) => item.state === "SIDE_UNRESOLVED")
+  )
+    return false;
+  for (let index = 0; index < deltas.length; index += 1) {
+    const item = deltas[index]!;
+    const key = actual[index]!;
+    const before = sliceMaps[0]!.get(key);
+    const after = sliceMaps[1]!.get(key);
+    const compatible =
+      before !== undefined &&
+      after !== undefined &&
+      before.state === "AVAILABLE" &&
+      after.state === "AVAILABLE" &&
+      before.value !== undefined &&
+      after.value !== undefined &&
+      before.value.kind === after.value.kind &&
+      before.value.unit === after.value.unit &&
+      canonicalMap(before.compatibility) === canonicalMap(after.compatibility);
+    if ((item.state === "AVAILABLE") !== compatible) return false;
+    if (
+      compatible &&
+      (item.value === undefined ||
+        item.value.kind !== before.value?.kind ||
+        item.value.unit !== before.value.unit)
+    )
+      return false;
+  }
+  return true;
+}
+
+function upstreamError(
+  input: Record<string, unknown>,
+): EvolutionResult | undefined {
+  if (!Object.hasOwn(input, "error")) return undefined;
+  if (
+    !closed(input, ["error"]) ||
+    !record(input.error) ||
+    !closed(input.error, ["code", "retryable", "detail"], ["details"]) ||
+    typeof input.error.code !== "string" ||
+    typeof input.error.retryable !== "boolean" ||
+    typeof input.error.detail !== "string"
+  )
+    return incompatible("invalid Evolution error response");
+  const details = input.error.details;
+  if (
+    details !== undefined &&
+    (!Array.isArray(details) ||
+      details.length > 16 ||
+      !details.every(
+        (item) =>
+          record(item) &&
+          closed(item, ["path", "type"]) &&
+          typeof item.path === "string" &&
+          typeof item.type === "string",
+      ))
+  )
+    return incompatible("invalid Evolution error details");
+  return {
+    ok: false,
+    error: {
+      kind: "UPSTREAM",
+      code: input.error.code,
+      retryable: input.error.retryable,
+      detail: input.error.detail,
+      ...(details === undefined
+        ? {}
+        : { details: details as Array<{ path: string; type: string }> }),
+    },
+  };
+}
+
+export function decodeComputeResponse(input: unknown): EvolutionResult {
+  if (!record(input)) return incompatible("response must be an object");
+  const error = upstreamError(input);
+  if (error) return error;
+  if (input.mode === "SINGLE") {
+    if (
+      !closed(input, ["api_version", "mode", "result"]) ||
+      input.api_version !== 1 ||
+      !sideResult(input.result)
+    )
+      return incompatible("invalid single response");
+    return { ok: true, value: input as unknown as SingleResponse };
