@@ -1,17 +1,26 @@
 import { useRef, useState } from "react";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { OwnedInspector } from "./inspector";
 
-function InspectorHarness({ modal = true }: { modal?: boolean }) {
+function InspectorHarness({
+  modal = true,
+  onOutside,
+}: {
+  modal?: boolean;
+  onOutside?: () => void;
+}) {
   const [open, setOpen] = useState(false);
   const invoker = useRef<HTMLButtonElement>(null);
   return (
     <>
       <button onClick={() => setOpen(true)} ref={invoker} type="button">
         Open receipt
+      </button>
+      <button onClick={onOutside} type="button">
+        Outside action
       </button>
       <OwnedInspector
         invokerRef={invoker}
@@ -62,9 +71,15 @@ describe("owned inspector", () => {
 
   it("does not claim modal focus ownership for a non-modal inspector", async () => {
     const user = userEvent.setup();
-    render(<InspectorHarness modal={false} />);
+    const outside = vi.fn();
+    render(<InspectorHarness modal={false} onOutside={outside} />);
     await user.click(screen.getByRole("button", { name: "Open receipt" }));
 
     expect(screen.getByRole("dialog")).not.toHaveAttribute("aria-modal");
+    expect(screen.getByRole("dialog").parentElement).not.toHaveAttribute(
+      "data-modal",
+    );
+    await user.click(screen.getByRole("button", { name: "Outside action" }));
+    expect(outside).toHaveBeenCalledOnce();
   });
 });

@@ -54,12 +54,16 @@ export function MetricResultFrame({
   visualization,
   onExplain,
   onEvidence,
+  onRecover,
+  recoveryLabel = "Recover result",
 }: {
   coordinate: string;
   content: MetricFrameContent;
   visualization?: ReactNode;
   onExplain?: () => void;
   onEvidence?: () => void;
+  onRecover?: () => void;
+  recoveryLabel?: string;
 }) {
   return (
     <article aria-label={coordinate} className="metric-frame">
@@ -97,6 +101,16 @@ export function MetricResultFrame({
             </p>
           )}
           <footer className="metric-actions">
+            {content.slice.value !== undefined ||
+            onRecover === undefined ? null : (
+              <button
+                className="action-control"
+                onClick={onRecover}
+                type="button"
+              >
+                {recoveryLabel}
+              </button>
+            )}
             {onExplain === undefined ? null : (
               <button
                 className="action-control"
