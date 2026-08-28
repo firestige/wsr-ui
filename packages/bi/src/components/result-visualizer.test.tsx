@@ -41,6 +41,63 @@ describe("Metric panel visualization", () => {
     expect(screen.getAllByText("33.33%")[0]).toBeVisible();
   });
 
+  it.each(["-1/3", "4/3"])(
+    "fails a ratio bar outside its declared unit domain closed: %s",
+    (value) => {
+      render(
+        <MetricPanel
+          result={{
+            ...result,
+            slices: [
+              {
+                ...ratio,
+                value: { kind: "RATIO", value, unit: "ratio" },
+              },
+            ],
+          }}
+          visualizer="ratio-bar@1"
+        />,
+      );
+
+      expect(screen.queryByRole("img", { name: /ratio bar/i })).toBeNull();
+      expect(screen.getByText("Visualizer binding incompatible")).toBeVisible();
+      expect(screen.getByRole("table")).toHaveTextContent(value);
+    },
+  );
+
+  it("keeps every published Result field in the table grammar", () => {
+    render(
+      <MetricPanel
+        result={{
+          ...result,
+          slices: [
+            {
+              ...ratio,
+              contributing_count: "3",
+              measures: { observed: "3" },
+              compatibility: { unit: "ratio" },
+              exclusions: ["expired:delivery-old"],
+              missing_inputs: ["outcome:delivery-missing"],
+              reading: "Descriptive result only.",
+            },
+          ],
+        }}
+        visualizer="table@1"
+      />,
+    );
+
+    const table = screen.getByRole("table", { name: /result data/i });
+    expect(table).toHaveTextContent("1 / 3");
+    expect(table).toHaveTextContent("Contributing: 3");
+    expect(table).toHaveTextContent('"observed":"3"');
+    expect(table).toHaveTextContent("PARTIAL · 3 / 4 · 3/4");
+    expect(table).toHaveTextContent('"unit":"ratio"');
+    expect(table).toHaveTextContent("expired:delivery-old");
+    expect(table).toHaveTextContent("outcome:delivery-missing");
+    expect(table).toHaveTextContent("Descriptive result only.");
+    expect(table).toHaveTextContent("fact:one");
+  });
+
   it("keeps an unavailable Result as truth rather than substituting zero", () => {
     render(
       <MetricPanel

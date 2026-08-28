@@ -137,6 +137,30 @@ describe("Evaluation workspace", () => {
     ).toBeVisible();
   });
 
+  it("falls back to Task ID for a blank receipt display name", async () => {
+    const value = singleResponse();
+    value.result.receipt = {
+      ...value.result.receipt,
+      task_population: value.result.receipt.task_population.map((task) => ({
+        ...task,
+        display_name: "   ",
+      })),
+    };
+    render(
+      <EvaluationWorkspace
+        evolution={{
+          computeSingle: vi.fn(async () => ({ ok: true as const, value })),
+          computeCompare: vi.fn(),
+        }}
+        route={{ tag: "SINGLE", taskIds: ["task-preview"] }}
+      />,
+    );
+
+    await screen.findAllByText("33.33%");
+    const context = screen.getByLabelText("Evaluation context");
+    expect(context.querySelector("code")).toHaveTextContent(/^task-preview$/);
+  });
+
   it("switches presets without recomputing the evaluation", async () => {
     const computeSingle = vi.fn(async (): Promise<EvolutionResult> => ({
       ok: true,
@@ -155,9 +179,9 @@ describe("Evaluation workspace", () => {
       screen.getByLabelText("Layout preset"),
       "detail-table@1",
     );
-    expect(
-      screen.getAllByRole("table", { name: /Fallback result data/ }),
-    ).toHaveLength(CATALOG_COORDINATES.length);
+    expect(screen.getAllByRole("table", { name: /Result data/ })).toHaveLength(
+      CATALOG_COORDINATES.length,
+    );
     expect(computeSingle).toHaveBeenCalledTimes(1);
   });
 

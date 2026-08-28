@@ -172,7 +172,7 @@ function populationLabel(
   if (receipt === undefined) return fallbackTaskIds.join(", ");
   return receipt.task_population
     .map((task) =>
-      task.display_name === undefined
+      task.display_name === undefined || task.display_name.trim() === ""
         ? task.task_id
         : `${task.display_name} (${task.task_id})`,
     )
