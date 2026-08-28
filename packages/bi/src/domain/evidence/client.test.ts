@@ -288,6 +288,7 @@ describe("closed Evidence decoder", () => {
 
     const expired = traceResponse();
     Reflect.set(expired.items[0]!.truth, "expiry", "EXPIRED");
+    Reflect.set(expired.items[0]!.truth, "availability", "UNAVAILABLE");
     expect(decodeEvidencePage("traces", expired, 100)).toMatchObject({
       ok: false,
     });
