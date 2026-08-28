@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
 
+import { evaluationResponse } from "./evolution-fixture";
+
 const taskPage = {
   contract: { name: "evidence.query", revision: "1.0.0" },
   observation_profile: "2.0.0",
@@ -25,8 +27,102 @@ test.beforeEach(async ({ page }) => {
       await route.fulfill({ json: taskPage });
       return;
     }
+    if (
+      route.request().url().includes("/api/evolution/v1/evaluations:compute")
+    ) {
+      await route.fulfill({
+        json: evaluationResponse(route.request().postDataJSON()),
+      });
+      return;
+    }
     await route.continue();
   });
+});
+
+test("single deep link restores authoritative truth, coverage, and receipt", async ({
+  page,
+}) => {
+  let requests = 0;
+  page.on("request", (request) => {
+    if (request.url().includes("/api/evolution/v1/evaluations:compute"))
+      requests += 1;
+  });
+  await page.goto("/evaluate?v=1&task=task-browser");
+
+  await expect(page.getByText("0.00%").first()).toBeVisible();
+  await expect(page.getByText("Low coverage")).toBeVisible();
+  await expect(
+    page.locator(".status-label", { hasText: "Lower bound" }),
+  ).toBeVisible();
+  await expect(page.getByText("Unavailable")).toBeVisible();
+  await expect(
+    page.locator(".status-label", { hasText: "Expired" }),
+  ).toBeVisible();
+  await expect(page.getByText("INCOMPATIBLE", { exact: true })).toBeVisible();
+  await expect(page.getByText("NOT_APPLICABLE", { exact: true })).toBeVisible();
+
+  const receipt = page.getByRole("button", { name: "View receipt" });
+  await receipt.focus();
+  await page.keyboard.press("Enter");
+  await expect(
+    page.getByRole("dialog", { name: "Evaluation receipt" }),
+  ).toContainText("task-browser");
+  await page.keyboard.press("Escape");
+  await expect(receipt).toBeFocused();
+
+  await page.reload();
+  await expect(page).toHaveURL("/evaluate?v=1&task=task-browser");
+  await expect(page.getByText("0.00%").first()).toBeVisible();
+  expect(requests).toBe(2);
+});
+
+test("compare keeps Before and After primary on a narrow viewport", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(
+    "/evaluate?v=1&mode=compare&left_task=task-before&right_task=task-after",
+  );
+
+  const comparison = page
+    .getByRole("article", {
+      name: "Compare role-template-rework-rate@2.0.0",
+    })
+    .first();
+  await expect(comparison).toBeVisible();
+  expect(
+    await comparison
+      .locator(":scope > section")
+      .evaluateAll((sections) =>
+        sections.map((section) => section.getAttribute("aria-label")),
+      ),
+  ).toEqual(["Before result", "After result", "Delta result"]);
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth),
+  ).toBeLessThanOrEqual(390);
+});
+
+test("API failure remains scoped, retryable, and preserves the deep link", async ({
+  page,
+}) => {
+  await page.route("**/api/evolution/v1/evaluations:compute", async (route) =>
+    route.fulfill({
+      status: 503,
+      contentType: "application/json",
+      body: JSON.stringify({
+        error: {
+          code: "UPSTREAM_UNAVAILABLE",
+          detail: "Evidence timed out",
+          retryable: true,
+        },
+      }),
+    }),
+  );
+  await page.goto("/evaluate?v=1&task=task-browser");
+
+  await expect(page.getByRole("alert")).toContainText("Evidence timed out");
+  await expect(page.getByRole("button", { name: "Retry" })).toBeVisible();
+  await expect(page).toHaveURL("/evaluate?v=1&task=task-browser");
 });
 
 test("evaluate selection is keyboard reachable with theme parity", async ({
