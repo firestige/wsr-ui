@@ -180,6 +180,43 @@ describe("closed Evidence decoder", () => {
     });
   });
 
+  it("rejects empty identities, duplicate fields and unordered resources", () => {
+    const empty = factResponse();
+    empty.items[0]!.id = "";
+    expect(decodeEvidencePage("facts", empty, 100)).toMatchObject({
+      ok: false,
+    });
+
+    const duplicateFields = factResponse();
+    duplicateFields.items[0]!.fields = [
+      { field: "agentops.delivery.id", value: "delivery-a" },
+      { field: "agentops.delivery.id", value: "delivery-a" },
+    ] as never;
+    expect(decodeEvidencePage("facts", duplicateFields, 100)).toMatchObject({
+      ok: false,
+    });
+
+    const unordered = factResponse();
+    unordered.items = [
+      { ...unordered.items[0]!, id: "fact-b" },
+      { ...unordered.items[0]!, id: "fact-a" },
+    ];
+    expect(decodeEvidencePage("facts", unordered, 100)).toMatchObject({
+      ok: false,
+    });
+  });
+
+  it("rejects unordered or duplicate Trace summaries", () => {
+    const body = traceResponse();
+    body.trace_summaries = [
+      { trace_id: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", state: "AVAILABLE" },
+      { trace_id: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", state: "AVAILABLE" },
+    ];
+    expect(decodeEvidencePage("traces", body, 100)).toMatchObject({
+      ok: false,
+    });
+  });
+
   it.each([
     [
       "empty node name",
@@ -235,6 +272,27 @@ describe("closed Evidence decoder", () => {
 });
 
 describe("bounded Evidence transport", () => {
+  it("rejects route-incompatible filters before transport", async () => {
+    const fetcher = vi.fn<typeof fetch>();
+    const client = new EvidenceClient({ fetcher });
+
+    await expect(
+      client.getPage("traces", { kind: "NODE", limit: 100 } as never),
+    ).resolves.toMatchObject({ ok: false, error: { kind: "INCOMPATIBLE" } });
+    await expect(
+      client.getPage("traces", {
+        trace_id: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        delivery_id: "delivery-a",
+      } as never),
+    ).resolves.toMatchObject({ ok: false, error: { kind: "INCOMPATIBLE" } });
+    await expect(
+      client.getPage("facts", {
+        kind: "FINDING_FIX",
+        event_name: "usage",
+      }),
+    ).resolves.toMatchObject({ ok: false, error: { kind: "INCOMPATIBLE" } });
+    expect(fetcher).not.toHaveBeenCalled();
+  });
   it("uses same-origin GET, exact filters, JSON accept and no credentials", async () => {
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
       new Response(JSON.stringify(traceResponse()), {
@@ -303,7 +361,10 @@ describe("bounded Evidence transport", () => {
     });
 
     await expect(
-      client.getPage("traces", { limit: 100 }),
+      client.getPage("traces", {
+        trace_id: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        limit: 100,
+      }),
     ).resolves.toMatchObject({
       ok: false,
       error: { kind: "INCOMPATIBLE" },

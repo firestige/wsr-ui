@@ -2,8 +2,10 @@ import type {
   EvidencePage,
   EvidenceResult,
   EvidenceRoute,
+  FactsPage,
   FieldValue,
   Scalar,
+  TracesPage,
   Truth,
 } from "./types";
 import { closed, oneOf, record } from "./validation";
@@ -23,6 +25,17 @@ const tracePattern = /^[a-f0-9]{32}$/;
 const spanPattern = /^[a-f0-9]{16}$/;
 const unsignedNanoPattern = /^(?:0|[1-9][0-9]{0,19})$/;
 const utf8Encoder = new TextEncoder();
+
+function bytewiseCompare(left: string, right: string): number {
+  const leftBytes = utf8Encoder.encode(left);
+  const rightBytes = utf8Encoder.encode(right);
+  const length = Math.min(leftBytes.length, rightBytes.length);
+  for (let index = 0; index < length; index += 1) {
+    const difference = leftBytes[index]! - rightBytes[index]!;
+    if (difference !== 0) return difference;
+  }
+  return leftBytes.length - rightBytes.length;
+}
 
 function boundedText(value: unknown, minimum: number, maximum: number) {
   return (
@@ -59,6 +72,14 @@ function field(value: unknown): value is FieldValue {
     typeof value.field === "string" &&
     value.field.length > 0 &&
     scalar(value.value)
+  );
+}
+
+function uniqueFields(value: unknown): value is FieldValue[] {
+  return (
+    Array.isArray(value) &&
+    value.every(field) &&
+    new Set(value.map((item) => item.field)).size === value.length
   );
 }
 
@@ -173,7 +194,7 @@ function fact(value: unknown) {
     return false;
   }
   if (
-    typeof value.id !== "string" ||
+    !boundedText(value.id, 1, 8192) ||
     !oneOf(value.kind, [
       "EVENT_CONTRIBUTION",
       "FINDING_ASSERTION",
@@ -225,10 +246,10 @@ function fact(value: unknown) {
     compatibility.completeness === value.truth.completeness &&
     Array.isArray(compatibility.dimensions) &&
     compatibility.dimensions.length <= 16 &&
-    compatibility.dimensions.every(field) &&
+    uniqueFields(compatibility.dimensions) &&
     Array.isArray(value.fields) &&
     value.fields.length <= 73 &&
-    value.fields.every(field) &&
+    uniqueFields(value.fields) &&
     Array.isArray(value.relationships) &&
     value.relationships.length <= 16 &&
     value.relationships.every(relationship)
@@ -259,7 +280,7 @@ function traceItem(value: unknown) {
       "node",
       "edge",
     ]) ||
-    typeof value.id !== "string" ||
+    !boundedText(value.id, 1, 8192) ||
     typeof value.trace_id !== "string" ||
     !tracePattern.test(value.trace_id) ||
     !oneOf(value.kind, ["NODE", "PARENT_EDGE", "LINK"] as const) ||
@@ -299,7 +320,7 @@ function traceItem(value: unknown) {
       (node.trace_state === null || boundedText(node.trace_state, 0, 512)) &&
       Array.isArray(node.fields) &&
       node.fields.length <= 73 &&
-      node.fields.every(field)
+      uniqueFields(node.fields)
     );
   }
   const edge = value.edge;
@@ -398,6 +419,27 @@ export function decodeEvidencePage(
   }
   if (route === "facts" && !input.items.every(fact))
     return incompatible("invalid fact item");
+  if (route === "facts") {
+    const items = input.items as Array<{
+      recorded_at: string;
+      kind: string;
+      id: string;
+    }>;
+    if (
+      items.some((item, index) => {
+        const previous = items[index - 1];
+        if (previous === undefined) return false;
+        const left = [previous.recorded_at, previous.kind, previous.id];
+        const right = [item.recorded_at, item.kind, item.id];
+        for (let part = 0; part < left.length; part += 1) {
+          const order = bytewiseCompare(left[part]!, right[part]!);
+          if (order !== 0) return order >= 0;
+        }
+        return true;
+      })
+    )
+      return incompatible("Fact items are not uniquely ordered");
+  }
   if (route === "traces") {
     if (!input.items.every(traceItem))
       return incompatible("invalid trace item");
@@ -421,6 +463,35 @@ export function decodeEvidencePage(
     ) {
       return incompatible("invalid trace summary");
     }
+    const kindOrder = { NODE: 0, PARENT_EDGE: 1, LINK: 2 } as const;
+    const traceItems = input.items as Array<{
+      trace_id: string;
+      kind: keyof typeof kindOrder;
+      id: string;
+    }>;
+    if (
+      traceItems.some((item, index) => {
+        const previous = traceItems[index - 1];
+        if (previous === undefined) return false;
+        const traceOrder = bytewiseCompare(previous.trace_id, item.trace_id);
+        if (traceOrder !== 0) return traceOrder >= 0;
+        const typeOrder = kindOrder[previous.kind] - kindOrder[item.kind];
+        return typeOrder === 0
+          ? bytewiseCompare(previous.id, item.id) >= 0
+          : typeOrder > 0;
+      })
+    )
+      return incompatible("Trace items are not uniquely ordered");
+    const summaryIds = (
+      input.trace_summaries as Array<{ trace_id: string }>
+    ).map((item) => item.trace_id);
+    if (
+      summaryIds.some(
+        (item, index) =>
+          index > 0 && bytewiseCompare(summaryIds[index - 1]!, item) >= 0,
+      )
+    )
+      return incompatible("Trace summaries are not uniquely ordered");
     const summaries = input.trace_summaries as Array<{ state: string }>;
     const expectedState =
       summaries.length === 0
@@ -441,7 +512,140 @@ export function decodeEvidencePage(
   return { ok: true, value: input as unknown as EvidencePage };
 }
 
-type QueryValue = string | number | boolean;
+type FactKind = FactsPage["items"][number]["kind"];
+type EventName =
+  | "delivery.summary"
+  | "review.finding"
+  | "review.summary"
+  | "test.summary"
+  | "intervention"
+  | "role.lineage"
+  | "usage"
+  | "sampling.decision"
+  | "implementation.summary"
+  | "system_design.summary";
+type CommonFilters = { limit?: number; cursor?: string };
+export type FactsFilters = CommonFilters & {
+  kind?: FactKind;
+  event_name?: EventName;
+  family_schema?: string;
+  delivery_id?: string;
+  trace_id?: string;
+  recorded_from?: string;
+  recorded_to?: string;
+};
+export type TracesFilters = CommonFilters &
+  (
+    | { trace_id: string; delivery_id?: never }
+    | { delivery_id: string; trace_id?: never }
+  );
+type QueryValue = string | number;
+
+function requestTimestamp(value: string): number | undefined {
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?Z$/.test(value))
+    return undefined;
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function validFilters(
+  route: EvidenceRoute,
+  filters: Readonly<Record<string, QueryValue>>,
+): boolean {
+  const allowed =
+    route === "facts"
+      ? new Set([
+          "kind",
+          "event_name",
+          "family_schema",
+          "delivery_id",
+          "trace_id",
+          "recorded_from",
+          "recorded_to",
+          "limit",
+          "cursor",
+        ])
+      : new Set(["trace_id", "delivery_id", "limit", "cursor"]);
+  if (Object.keys(filters).some((key) => !allowed.has(key))) return false;
+  const texts = Object.entries(filters).filter(([key]) => key !== "limit");
+  if (
+    texts.some(
+      ([, value]) =>
+        typeof value !== "string" ||
+        value.length === 0 ||
+        /[\x00-\x1f,*%\\]/.test(value),
+    )
+  )
+    return false;
+  if (
+    typeof filters.trace_id === "string" &&
+    !tracePattern.test(filters.trace_id)
+  )
+    return false;
+  if (
+    typeof filters.delivery_id === "string" &&
+    !boundedText(filters.delivery_id, 1, 256)
+  )
+    return false;
+  if (route === "traces")
+    return (
+      (filters.trace_id === undefined) !== (filters.delivery_id === undefined)
+    );
+  if (
+    filters.kind !== undefined &&
+    !oneOf(filters.kind, [
+      "EVENT_CONTRIBUTION",
+      "FINDING_ASSERTION",
+      "FINDING_TARGET",
+      "FINDING_STATUS",
+      "FINDING_FIX",
+      "FINDING_RECHECK",
+      "ROLE_LINEAGE",
+      "DELIVERY_ROOT_BINDING",
+      "MODEL_ATTRIBUTION",
+    ] as const)
+  )
+    return false;
+  if (
+    filters.event_name !== undefined &&
+    (!oneOf(filters.event_name, [
+      "delivery.summary",
+      "review.finding",
+      "review.summary",
+      "test.summary",
+      "intervention",
+      "role.lineage",
+      "usage",
+      "sampling.decision",
+      "implementation.summary",
+      "system_design.summary",
+    ] as const) ||
+      (filters.kind !== undefined && filters.kind !== "EVENT_CONTRIBUTION"))
+  )
+    return false;
+  if (
+    filters.family_schema !== undefined &&
+    !boundedText(filters.family_schema, 1, 128)
+  )
+    return false;
+  const from =
+    typeof filters.recorded_from === "string"
+      ? requestTimestamp(filters.recorded_from)
+      : undefined;
+  const to =
+    typeof filters.recorded_to === "string"
+      ? requestTimestamp(filters.recorded_to)
+      : undefined;
+  if (
+    (filters.recorded_from !== undefined && from === undefined) ||
+    (filters.recorded_to !== undefined && to === undefined) ||
+    (from !== undefined &&
+      to !== undefined &&
+      (from > to || to - from > 366 * 86_400_000))
+  )
+    return false;
+  return true;
+}
 
 export interface EvidenceClientOptions {
   fetcher?: typeof fetch;
@@ -508,15 +712,26 @@ export class EvidenceClient {
   }
 
   async getPage(
+    route: "facts",
+    filters: FactsFilters,
+  ): Promise<EvidenceResult<FactsPage>>;
+  async getPage(
+    route: "traces",
+    filters: TracesFilters,
+  ): Promise<EvidenceResult<TracesPage>>;
+  async getPage(
     route: EvidenceRoute,
-    filters: Readonly<Record<string, QueryValue>>,
+    filters: FactsFilters | TracesFilters,
   ): Promise<EvidenceResult> {
+    const rawFilters = filters as Readonly<Record<string, QueryValue>>;
     const limit = typeof filters.limit === "number" ? filters.limit : 100;
     if (!Number.isInteger(limit) || limit < 1 || limit > 200)
       return incompatible("limit must be between 1 and 200");
+    if (!validFilters(route, rawFilters))
+      return incompatible("filters are not valid for this Evidence route");
     const query = new URLSearchParams(
-      Object.entries(filters)
-        .sort(([left], [right]) => left.localeCompare(right))
+      Object.entries(rawFilters)
+        .sort(([left], [right]) => bytewiseCompare(left, right))
         .map(([key, value]) => [key, String(value)]),
     );
     const controller = new AbortController();
