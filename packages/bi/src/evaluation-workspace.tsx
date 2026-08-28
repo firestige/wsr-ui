@@ -58,10 +58,15 @@ function SingleResults({
   response,
   layout,
   onExplain,
+  onEvidence,
 }: {
   response: SingleResponse;
   layout: DashboardLayout;
   onExplain: (
+    coordinate: keyof typeof METRIC_COPY,
+    trigger: HTMLButtonElement,
+  ) => void;
+  onEvidence: (
     coordinate: keyof typeof METRIC_COPY,
     trigger: HTMLButtonElement,
   ) => void;
@@ -89,6 +94,9 @@ function SingleResults({
               />
             ) : (
               <MetricPanel
+                onEvidence={(trigger) =>
+                  onEvidence(panel.metric_coordinate, trigger)
+                }
                 onExplain={(trigger) =>
                   onExplain(panel.metric_coordinate, trigger)
                 }
@@ -172,9 +180,11 @@ function CompareResults({
 export function EvaluationWorkspace({
   route,
   evolution,
+  onNavigate,
 }: {
   route: WorkspaceRoute;
   evolution: EvolutionPort;
+  onNavigate?: (route: EvaluationRoute) => void;
 }) {
   const [state, setState] = useState<WorkspaceState>({ tag: "LOADING" });
   const [detail, setDetail] = useState<
@@ -288,6 +298,16 @@ export function EvaluationWorkspace({
         ) : state.response.mode === "SINGLE" ? (
           <SingleResults
             layout={PRESET_LAYOUTS[presetId]}
+            onEvidence={(coordinate) => {
+              if (route.tag === "SINGLE")
+                onNavigate?.({
+                  tag: "EVIDENCE",
+                  selection: { tag: "SINGLE", taskIds: route.taskIds },
+                  metric: coordinate,
+                  side: "single",
+                  scope: "result",
+                });
+            }}
             onExplain={(coordinate, trigger) => {
               detailInvoker.current = trigger;
               setDetail({ kind: "explanation", coordinate });

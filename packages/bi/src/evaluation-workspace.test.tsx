@@ -188,6 +188,35 @@ describe("Evaluation workspace", () => {
     expect(trigger).toHaveFocus();
   });
 
+  it("navigates from a Result to exact Evidence scope identity", async () => {
+    const onNavigate = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <EvaluationWorkspace
+        evolution={{
+          computeSingle: vi.fn(async () => ({
+            ok: true as const,
+            value: singleResponse(),
+          })),
+          computeCompare: vi.fn(),
+        }}
+        onNavigate={onNavigate}
+        route={{ tag: "SINGLE", taskIds: ["task-preview"] }}
+      />,
+    );
+
+    await user.click(
+      (await screen.findAllByRole("button", { name: "View evidence" }))[0]!,
+    );
+    expect(onNavigate).toHaveBeenCalledWith({
+      tag: "EVIDENCE",
+      selection: { tag: "SINGLE", taskIds: ["task-preview"] },
+      metric: "role-template-rework-rate@2.0.0",
+      side: "single",
+      scope: "result",
+    });
+  });
+
   it("keeps a failed request scoped and retryable", async () => {
     const computeSingle = vi
       .fn()

@@ -269,7 +269,11 @@ export function ProductApp({
           </p>
         </main>
       ) : (
-        <EvaluationWorkspace evolution={evolution} route={route} />
+        <EvaluationWorkspace
+          evolution={evolution}
+          onNavigate={navigate}
+          route={route}
+        />
       )}
     </>
   );
