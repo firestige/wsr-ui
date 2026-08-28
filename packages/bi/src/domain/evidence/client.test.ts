@@ -279,6 +279,18 @@ describe("closed Evidence decoder", () => {
     expect(decodeEvidencePage("traces", parentMismatch, 100)).toMatchObject({
       ok: false,
     });
+
+    const linkMismatch = linkResponse();
+    linkMismatch.items[0]!.source.span_id = "e".repeat(16);
+    expect(decodeEvidencePage("traces", linkMismatch, 100)).toMatchObject({
+      ok: false,
+    });
+
+    const expired = traceResponse();
+    Reflect.set(expired.items[0]!.truth, "expiry", "EXPIRED");
+    expect(decodeEvidencePage("traces", expired, 100)).toMatchObject({
+      ok: false,
+    });
   });
 
   it.each([

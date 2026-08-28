@@ -428,6 +428,7 @@ export function ProductApp({
         ) : (
           <TraceDrilldown
             evidence={evidence as TracePagePort}
+            key={`${route.traceId}:${route.spanId ?? ""}`}
             onNavigate={navigate}
             route={route}
           />

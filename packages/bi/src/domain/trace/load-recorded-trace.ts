@@ -40,6 +40,7 @@ export async function loadRecordedTrace(
   do {
     if (pages >= maximumPages)
       return { ok: false, reason: "TRACE_PAGE_BOUND_EXCEEDED" };
+    const initialPage = cursor === undefined;
     const result = await port.getTracesPage({
       trace_id: traceId,
       limit: 200,
@@ -56,6 +57,12 @@ export async function loadRecordedTrace(
     }
     const page = result.value;
     pages += 1;
+    if (
+      initialPage &&
+      (page.trace_state === "AVAILABLE" || page.trace_state === "PARTIAL") &&
+      page.items.length === 0
+    )
+      return { ok: false, reason: "TRACE_INITIAL_PAGE_EMPTY" };
     if (snapshot !== undefined && page.snapshot !== snapshot)
       return { ok: false, reason: "TRACE_SNAPSHOT_DRIFT" };
     snapshot = page.snapshot;

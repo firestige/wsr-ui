@@ -56,7 +56,9 @@ describe("recorded Trace bounded loading", () => {
       >()
       .mockResolvedValueOnce({
         ok: true,
-        value: page("snapshot-a", "cursor-2"),
+        value: page("snapshot-a", "cursor-2", [
+          node("record-a", "b".repeat(16)),
+        ]),
       })
       .mockResolvedValueOnce({ ok: true, value: page("snapshot-a", null) });
 
@@ -75,7 +77,9 @@ describe("recorded Trace bounded loading", () => {
       .fn()
       .mockResolvedValueOnce({
         ok: true,
-        value: page("snapshot-a", "cursor-2"),
+        value: page("snapshot-a", "cursor-2", [
+          node("record-a", "b".repeat(16)),
+        ]),
       })
       .mockResolvedValueOnce({ ok: true, value: page("snapshot-b", null) });
     expect(
@@ -87,17 +91,34 @@ describe("recorded Trace bounded loading", () => {
 
     const bounded = vi.fn().mockResolvedValue({
       ok: true,
-      value: page("snapshot-a", "another-cursor"),
+      value: page("snapshot-a", "another-cursor", [
+        node("record-a", "b".repeat(16)),
+      ]),
     });
     expect(
       await loadRecordedTrace({ getTracesPage: bounded }, "a".repeat(32), {
         maximumPages: 1,
       }),
     ).toEqual({ ok: false, reason: "TRACE_PAGE_BOUND_EXCEEDED" });
+
+    const itemBounded = vi.fn().mockResolvedValue({
+      ok: true,
+      value: page("snapshot-a", null, [
+        node("record-a", "b".repeat(16)),
+        node("record-b", "c".repeat(16)),
+      ]),
+    });
+    expect(
+      await loadRecordedTrace({ getTracesPage: itemBounded }, "a".repeat(32), {
+        maximumItems: 1,
+      }),
+    ).toEqual({ ok: false, reason: "TRACE_ITEM_BOUND_EXCEEDED" });
   });
 
   it("rejects Trace summary/state drift before projection", async () => {
-    const first = page("snapshot-a", "cursor-2");
+    const first = page("snapshot-a", "cursor-2", [
+      node("record-a", "b".repeat(16)),
+    ]);
     first.trace_state = "PARTIAL";
     first.trace_summaries = [{ trace_id: "a".repeat(32), state: "PARTIAL" }];
     const second = page("snapshot-a", null);
@@ -117,7 +138,9 @@ describe("recorded Trace bounded loading", () => {
       .fn()
       .mockResolvedValueOnce({
         ok: true,
-        value: page("snapshot-a", "cursor-2"),
+        value: page("snapshot-a", "cursor-2", [
+          node("record-a", "b".repeat(16)),
+        ]),
       })
       .mockResolvedValueOnce({
         ok: true,
@@ -182,5 +205,16 @@ describe("recorded Trace bounded loading", () => {
       pages: 1,
       snapshot: "snapshot-a",
     });
+  });
+
+  it("rejects an empty active initial page", async () => {
+    const emptyActive = vi.fn().mockResolvedValue({
+      ok: true,
+      value: page("snapshot-a", null),
+    });
+
+    await expect(
+      loadRecordedTrace({ getTracesPage: emptyActive }, "a".repeat(32)),
+    ).resolves.toEqual({ ok: false, reason: "TRACE_INITIAL_PAGE_EMPTY" });
   });
 });
