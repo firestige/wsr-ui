@@ -283,6 +283,59 @@
   box-shadow: var(--elevation-panel);
 }
 
+@utility evaluation-shell {
+  min-height: 100vh;
+  padding: var(--space-page);
+  background: var(--surface-canvas);
+  color: var(--content-primary);
+}
+
+@utility evaluation-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  justify-content: space-between;
+  gap: var(--space-grid);
+  max-width: var(--layout-content);
+  margin-inline: auto;
+  margin-block-end: var(--space-section);
+}
+
+@utility context-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-cluster);
+  padding: var(--space-cluster);
+  border: 1px solid var(--border-default);
+  border-radius: var(--shape-control);
+  background: var(--surface-raised);
+}
+
+@utility evaluation-results {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
+  gap: var(--space-grid);
+  max-width: var(--layout-content);
+  margin-inline: auto;
+}
+
+@utility skip-link {
+  position: fixed;
+  inset-block-start: var(--space-tight);
+  inset-inline-start: var(--space-tight);
+  z-index: var(--layer-overlay);
+  padding: var(--space-control);
+  border-radius: var(--shape-control);
+  background: var(--surface-overlay);
+  color: var(--interaction-accent);
+  transform: translateY(-200%);
+
+  &:focus {
+    transform: translateY(0);
+  }
+}
+
 @utility control-label {
   display: grid;
   gap: var(--space-tight);
