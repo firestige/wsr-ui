@@ -128,6 +128,11 @@ describe("Evaluation workspace", () => {
     expect((await screen.findAllByText("33.33%"))[0]).toBeVisible();
     expect(computeSingle).toHaveBeenCalledWith(["task-preview"]);
     expect(screen.getAllByText("0 / 0").length).toBeGreaterThan(0);
+    expect(
+      within(screen.getByLabelText("Evaluation context")).getByText(
+        "Preview task (task-preview)",
+      ),
+    ).toBeVisible();
   });
 
   it("switches presets without recomputing the evaluation", async () => {

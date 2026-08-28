@@ -141,6 +141,20 @@ function findSlice(
   return metric?.slices.find((slice) => sliceKey(slice.slice_key) === key);
 }
 
+function populationLabel(
+  receipt: SideResult["receipt"] | undefined,
+  fallbackTaskIds: readonly string[],
+): string {
+  if (receipt === undefined) return fallbackTaskIds.join(", ");
+  return receipt.task_population
+    .map((task) =>
+      task.display_name === undefined
+        ? task.task_id
+        : `${task.display_name} (${task.task_id})`,
+    )
+    .join(", ");
+}
+
 function CompareResults({
   response,
   onRetry,
@@ -321,8 +335,8 @@ export function EvaluationWorkspace({
           <span>{route.tag === "SINGLE" ? "Single" : "Compare"}</span>
           <code className="text-code">
             {route.tag === "SINGLE"
-              ? route.taskIds.join(", ")
-              : `${route.leftTaskIds.join(", ")} → ${route.rightTaskIds.join(", ")}`}
+              ? populationLabel(receipts.single, route.taskIds)
+              : `${populationLabel(receipts.left, route.leftTaskIds)} → ${populationLabel(receipts.right, route.rightTaskIds)}`}
           </code>
           {receipts.single === undefined ? null : (
             <button
