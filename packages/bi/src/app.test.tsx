@@ -2,11 +2,12 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
-import { App, previewReceipt, previewSlice } from "./app";
+import { App } from "./app";
 import {
   CATALOG_COORDINATES,
   decodeComputeResponse,
 } from "./domain/evolution/client";
+import { previewReceipt, previewSlice } from "./preview-fixtures";
 
 describe("BI component preview", () => {
   it("builds its factual slice and receipt from client-valid fixtures", () => {
