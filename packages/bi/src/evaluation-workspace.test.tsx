@@ -1,6 +1,6 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { CATALOG_COORDINATES } from "./domain/evolution/client";
 import type {
@@ -10,6 +10,8 @@ import type {
 } from "./domain/evolution/types";
 import { EvaluationWorkspace } from "./evaluation-workspace";
 import { previewReceipt, previewSlice } from "./preview-fixtures";
+
+afterEach(() => window.localStorage.clear());
 
 function singleResponse(): SingleResponse {
   const unavailable = {
@@ -156,6 +158,30 @@ describe("Evaluation workspace", () => {
     expect(
       screen.getAllByRole("table", { name: /Fallback result data/ }),
     ).toHaveLength(CATALOG_COORDINATES.length);
+    expect(computeSingle).toHaveBeenCalledTimes(1);
+  });
+
+  it("saves a custom layout locally without changing the selection", async () => {
+    const computeSingle = vi.fn(async (): Promise<EvolutionResult> => ({
+      ok: true,
+      value: singleResponse(),
+    }));
+    const user = userEvent.setup();
+    render(
+      <EvaluationWorkspace
+        evolution={{ computeSingle, computeCompare: vi.fn() }}
+        route={{ tag: "SINGLE", taskIds: ["task-preview"] }}
+      />,
+    );
+
+    await user.click(
+      await screen.findByRole("button", { name: "Edit dashboard" }),
+    );
+    await user.click(screen.getByRole("button", { name: "Save local layout" }));
+    expect(window.localStorage.getItem("wsr.bi.dashboard-layout@1")).toContain(
+      '"layout_version":1',
+    );
+    expect(screen.getByLabelText("Layout preset")).toHaveValue("local@1");
     expect(computeSingle).toHaveBeenCalledTimes(1);
   });
 
