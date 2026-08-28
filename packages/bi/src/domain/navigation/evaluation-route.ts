@@ -67,6 +67,23 @@ function taskIds(params: URLSearchParams, key: string): string[] | undefined {
   return values.toSorted(bytewiseCompare);
 }
 
+function canonicalTaskIds(values: readonly string[]): string[] {
+  if (
+    values.length < 1 ||
+    values.length > MAX_TASKS_PER_SIDE ||
+    values.some((value) => !taskIdPattern.test(value)) ||
+    new Set(values).size !== values.length
+  )
+    throw new Error("INVALID_TASK_SELECTION");
+  return [...values].sort(bytewiseCompare);
+}
+
+function boundedUrl(value: string): string {
+  if (encoder.encode(value).length > MAX_RELATIVE_URL_BYTES)
+    throw new Error("URL_BOUND_EXCEEDED");
+  return value;
+}
+
 function focus(
   params: URLSearchParams,
   allowedSides: readonly Focus["side"][],
@@ -267,12 +284,13 @@ export function serializeEvaluationRoute(route: EvaluationRoute): string {
   const selected =
     route.tag === "EVIDENCE" || route.tag === "TRACE" ? route.selection : route;
   if (selected.tag === "SINGLE") {
-    for (const taskId of selected.taskIds) params.append("task", taskId);
+    for (const taskId of canonicalTaskIds(selected.taskIds))
+      params.append("task", taskId);
   } else {
     params.set("mode", "compare");
-    for (const taskId of selected.leftTaskIds)
+    for (const taskId of canonicalTaskIds(selected.leftTaskIds))
       params.append("left_task", taskId);
-    for (const taskId of selected.rightTaskIds)
+    for (const taskId of canonicalTaskIds(selected.rightTaskIds))
       params.append("right_task", taskId);
   }
   if (route.tag === "EVIDENCE") {
@@ -280,16 +298,18 @@ export function serializeEvaluationRoute(route: EvaluationRoute): string {
     params.set("side", route.side);
     params.set("scope", route.scope);
     if (route.factId) params.set("fact", route.factId);
-    return `/evaluate/evidence?${params.toString()}`;
+    return boundedUrl(`/evaluate/evidence?${params.toString()}`);
   }
   if (route.tag === "TRACE") {
     if (route.spanId) params.set("span", route.spanId);
     params.set("side", route.side);
-    return `/evaluate/trace/${encodeURIComponent(route.traceId)}?${params.toString()}`;
+    return boundedUrl(
+      `/evaluate/trace/${encodeURIComponent(route.traceId)}?${params.toString()}`,
+    );
   }
   if (route.focus) {
     params.set("metric", route.focus.metric);
     params.set("side", route.focus.side);
   }
-  return `/evaluate?${params.toString()}`;
+  return boundedUrl(`/evaluate?${params.toString()}`);
 }
