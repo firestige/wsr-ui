@@ -898,3 +898,213 @@ export function decodeComputeResponse(input: unknown): EvolutionResult {
     )
       return incompatible("invalid single response");
     return { ok: true, value: input as unknown as SingleResponse };
+  }
+  if (input.mode === "COMPARE") {
+    if (
+      !closed(input, [
+        "api_version",
+        "mode",
+        "status",
+        "left",
+        "right",
+        "deltas",
+      ]) ||
+      input.api_version !== 1 ||
+      !oneOf(input.status, ["FULL_COMPARE", "PARTIAL_COMPARE"] as const) ||
+      !(sideResult(input.left) || sideError(input.left)) ||
+      !(sideResult(input.right) || sideError(input.right)) ||
+      !Array.isArray(input.deltas) ||
+      !input.deltas.every(delta)
+    )
+      return incompatible("invalid compare response");
+    if (
+      !compareDeltas(
+        input.status,
+        input.left as SideResult | SideError,
+        input.right as SideResult | SideError,
+        input.deltas as DeltaEntry[],
+      )
+    )
+      return incompatible("compare status does not match side outcomes");
+    return { ok: true, value: input as unknown as CompareResponse };
+  }
+  return incompatible("unsupported compute mode");
+}
+
+export interface EvolutionClientOptions {
+  fetcher?: typeof fetch;
+  timeoutMs?: number;
+  maximumBodyBytes?: number;
+}
+
+async function readBoundedBody(
+  response: Response,
+  maximumBytes: number,
+): Promise<EvolutionResult<Uint8Array>> {
+  const reader = response.body?.getReader();
+  if (reader === undefined) return { ok: true, value: new Uint8Array() };
+  const chunks: Uint8Array[] = [];
+  let length = 0;
+  try {
+    while (true) {
+      const item = await reader.read();
+      if (item.done) break;
+      length += item.value.byteLength;
+      if (length > maximumBytes) {
+        await reader.cancel(
+          "Evolution response exceeded configured byte bound",
+        );
+        return {
+          ok: false,
+          error: { kind: "RESPONSE_BOUND_EXCEEDED", maximumBytes },
+        };
+      }
+      chunks.push(item.value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  const bytes = new Uint8Array(length);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return { ok: true, value: bytes };
+}
+
+function makeSelection(
+  taskIds: readonly string[],
+): EvolutionResult<{ selection_version: 1; task_ids: string[] }> {
+  if (
+    taskIds.length < 1 ||
+    taskIds.length > 24 ||
+    new Set(taskIds).size !== taskIds.length ||
+    !taskIds.every((item) => taskIdPattern.test(item))
+  )
+    return {
+      ok: false,
+      error: {
+        kind: "INVALID_SELECTION",
+        reason: "selection requires 1-24 unique valid Task IDs",
+      },
+    };
+  return {
+    ok: true,
+    value: {
+      selection_version: 1,
+      task_ids: [...taskIds].sort(bytewiseCompare),
+    },
+  };
+}
+
+export class EvolutionClient {
+  readonly #fetcher: typeof fetch;
+  readonly #timeoutMs: number;
+  readonly #maximumBodyBytes: number;
+
+  constructor(options: EvolutionClientOptions = {}) {
+    this.#fetcher = options.fetcher ?? fetch;
+    this.#timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+    this.#maximumBodyBytes = options.maximumBodyBytes ?? MAXIMUM_BODY_BYTES;
+  }
+
+  async computeSingle(taskIds: readonly string[]): Promise<EvolutionResult> {
+    const selected = makeSelection(taskIds);
+    if (!selected.ok) return selected;
+    return this.#post({
+      api_version: 1,
+      mode: "SINGLE",
+      selection: selected.value,
+    });
+  }
+
+  async computeCompare(
+    leftTaskIds: readonly string[],
+    rightTaskIds: readonly string[],
+  ): Promise<EvolutionResult> {
+    const left = makeSelection(leftTaskIds);
+    if (!left.ok) return left;
+    const right = makeSelection(rightTaskIds);
+    if (!right.ok) return right;
+    return this.#post({
+      api_version: 1,
+      mode: "COMPARE",
+      left: left.value,
+      right: right.value,
+    });
+  }
+
+  async #post(body: object): Promise<EvolutionResult> {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), this.#timeoutMs);
+    try {
+      const response = await this.#fetcher(
+        "/api/evolution/v1/evaluations:compute",
+        {
+          method: "POST",
+          credentials: "omit",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(body),
+          signal: controller.signal,
+        },
+      );
+      const contentType = response.headers.get("content-type");
+      if (
+        contentType === null ||
+        !/^application\/json(?:\s*;|$)/i.test(contentType)
+      )
+        return incompatible(
+          "Evolution response content type is not application/json",
+        );
+      const declaredLength = response.headers.get("content-length");
+      if (
+        declaredLength !== null &&
+        /^[0-9]+$/.test(declaredLength) &&
+        BigInt(declaredLength) > BigInt(this.#maximumBodyBytes)
+      )
+        return {
+          ok: false,
+          error: {
+            kind: "RESPONSE_BOUND_EXCEEDED",
+            maximumBytes: this.#maximumBodyBytes,
+          },
+        };
+      const bounded = await readBoundedBody(response, this.#maximumBodyBytes);
+      if (!bounded.ok) return bounded;
+      let decoded: unknown;
+      try {
+        decoded = JSON.parse(
+          new TextDecoder("utf-8", { fatal: true }).decode(bounded.value),
+        );
+      } catch {
+        return {
+          ok: false,
+          error: { kind: "ERROR", reason: "MALFORMED_BODY" },
+        };
+      }
+      const result = decodeComputeResponse(decoded);
+      if (response.ok !== result.ok)
+        return incompatible(
+          "Evolution HTTP status and response envelope disagree",
+        );
+      return result;
+    } catch (error) {
+      return {
+        ok: false,
+        error: {
+          kind: "ERROR",
+          reason:
+            error instanceof DOMException && error.name === "AbortError"
+              ? "TIMEOUT"
+              : "NETWORK",
+        },
+      };
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+}
