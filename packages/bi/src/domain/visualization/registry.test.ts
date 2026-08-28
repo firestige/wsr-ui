@@ -59,6 +59,24 @@ describe("closed visualizer registry", () => {
     );
   });
 
+  it("offers bounded domain-based tools only when their descriptors exist", () => {
+    expect(
+      compatibleVisualizerIds(ratioSlice, {
+        authoritativeDomain: true,
+        orderedDimension: true,
+        sharedNormalizedDomain: true,
+      }),
+    ).toEqual([
+      "numeric-card@1",
+      "ratio-bar@1",
+      "gauge@1",
+      "bar@1",
+      "line@1",
+      "table@1",
+      "radar@1",
+    ]);
+  });
+
   it("keeps a table fallback when truth withholds the value", () => {
     expect(
       compatibleVisualizerIds({

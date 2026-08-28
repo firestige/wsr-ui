@@ -146,13 +146,18 @@ export function compatibleVisualizerIds(
     sharedNormalizedDomain?: boolean;
   } = {},
 ): VisualizerId[] {
-  void context;
   if (slice.value === undefined) return ["numeric-card@1", "table@1"];
   const ids: VisualizerId[] = [];
   if (slice.value.kind === "BOOLEAN") ids.push("badge@1");
   else ids.push("numeric-card@1");
   if (slice.value.kind === "RATIO" && slice.value.unit === "ratio")
     ids.push("ratio-bar@1");
+  if (slice.value.kind !== "BOOLEAN" && context.authoritativeDomain) {
+    ids.push("gauge@1", "bar@1");
+    if (context.orderedDimension) ids.push("line@1");
+  }
   ids.push("table@1");
+  if (slice.value.kind !== "BOOLEAN" && context.sharedNormalizedDomain)
+    ids.push("radar@1");
   return ids;
 }
