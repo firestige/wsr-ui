@@ -202,9 +202,17 @@ export function ProductApp({
   tasks: TaskPort;
   initialRelativeUrl?: string;
 }) {
+  const [theme, setTheme] = useState<"system" | "light" | "dark">("system");
+  const [density, setDensity] = useState<"comfortable" | "compact">(
+    "comfortable",
+  );
   const [route, setRoute] = useState(() =>
     parseEvaluationRoute(initialRelativeUrl),
   );
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    document.documentElement.dataset.density = density;
+  }, [density, theme]);
   useEffect(() => {
     const restore = () =>
       setRoute(
@@ -218,9 +226,42 @@ export function ProductApp({
     window.history.pushState(null, "", relativeUrl);
     setRoute(next);
   };
-  return route.tag === "SELECT" ? (
-    <TaskSelector onSelect={navigate} tasks={tasks} />
-  ) : (
-    <EvaluationWorkspace evolution={evolution} route={route} />
+  return (
+    <>
+      <nav aria-label="Display preferences" className="product-preferences">
+        <label className="control-label">
+          Theme
+          <select
+            className="control-field"
+            onChange={(event) =>
+              setTheme(event.target.value as "system" | "light" | "dark")
+            }
+            value={theme}
+          >
+            <option value="system">System</option>
+            <option value="light">Light</option>
+            <option value="dark">Dark</option>
+          </select>
+        </label>
+        <label className="control-label">
+          Density
+          <select
+            className="control-field"
+            onChange={(event) =>
+              setDensity(event.target.value as "comfortable" | "compact")
+            }
+            value={density}
+          >
+            <option value="comfortable">Comfortable</option>
+            <option value="compact">Compact</option>
+          </select>
+        </label>
+      </nav>
+      {route.tag === "SELECT" ? (
+        <TaskSelector onSelect={navigate} tasks={tasks} />
+      ) : (
+        <EvaluationWorkspace evolution={evolution} route={route} />
+      )}
+    </>
   );
 }

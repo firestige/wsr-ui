@@ -290,6 +290,16 @@
   color: var(--content-primary);
 }
 
+@utility product-preferences {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: end;
+  gap: var(--space-cluster);
+  padding: var(--space-cluster) var(--space-page) 0;
+  background: var(--surface-canvas);
+  color: var(--content-primary);
+}
+
 @utility evaluation-header {
   display: flex;
   flex-wrap: wrap;

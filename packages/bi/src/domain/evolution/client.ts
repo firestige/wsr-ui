@@ -1004,7 +1004,8 @@ export class EvolutionClient {
   readonly #maximumBodyBytes: number;
 
   constructor(options: EvolutionClientOptions = {}) {
-    this.#fetcher = options.fetcher ?? fetch;
+    this.#fetcher =
+      options.fetcher ?? ((input, init) => globalThis.fetch(input, init));
     this.#timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     this.#maximumBodyBytes = options.maximumBodyBytes ?? MAXIMUM_BODY_BYTES;
   }
