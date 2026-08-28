@@ -4,6 +4,7 @@ import { MetricExplanationView, ReceiptView } from "./components/details";
 import { CompareResultFrame } from "./components/compare-result";
 import { OwnedInspector } from "./components/inspector";
 import { MetricPanel } from "./components/result-visualizer";
+import { MetricNavigator } from "./components/metric-result";
 import { ScopedError } from "./components/status";
 import { METRIC_COPY } from "./domain/catalog/metric-copy";
 import { PRESET_LAYOUTS, type DashboardLayout } from "./domain/layout/layout";
@@ -138,9 +139,24 @@ function findSlice(
 function CompareResults({
   response,
   onRetry,
+  onEvidence,
+  onExplain,
+  onSelectMetric,
+  selectedCoordinate,
 }: {
   response: CompareResponse;
   onRetry: () => void;
+  onEvidence: (
+    coordinate: keyof typeof METRIC_COPY,
+    side: "left" | "right",
+    trigger: HTMLButtonElement,
+  ) => void;
+  onExplain: (
+    coordinate: keyof typeof METRIC_COPY,
+    trigger: HTMLButtonElement,
+  ) => void;
+  onSelectMetric: (coordinate: keyof typeof METRIC_COPY) => void;
+  selectedCoordinate?: string;
 }) {
   const before =
     response.left.tag === "SIDE_RESULT" ? response.left : undefined;
@@ -155,6 +171,23 @@ function CompareResults({
   const failedLabel = response.left.tag === "SIDE_ERROR" ? "Before" : "After";
   return (
     <section aria-label="Compared Metric Results" className="compare-results">
+      <MetricNavigator
+        items={response.deltas.map((delta) => ({
+          coordinate: delta.metric_coordinate,
+          resultState:
+            (before === undefined ? undefined : findSlice(before, delta))
+              ?.state ??
+            (after === undefined ? undefined : findSlice(after, delta))
+              ?.state ??
+            "UNAVAILABLE",
+          deltaState: delta.state,
+        }))}
+        mode="compare"
+        onSelect={(coordinate) =>
+          onSelectMetric(coordinate as keyof typeof METRIC_COPY)
+        }
+        selectedCoordinate={selectedCoordinate}
+      />
       {failed === undefined ? null : (
         <ScopedError
           announce="assertive"
@@ -171,6 +204,19 @@ function CompareResults({
           coordinate={delta.metric_coordinate}
           delta={delta}
           key={`${delta.metric_coordinate}:${sliceKey(delta.slice_key)}`}
+          onEvidence={(side, trigger) =>
+            onEvidence(
+              delta.metric_coordinate as keyof typeof METRIC_COPY,
+              side,
+              trigger,
+            )
+          }
+          onExplain={(_, trigger) =>
+            onExplain(
+              delta.metric_coordinate as keyof typeof METRIC_COPY,
+              trigger,
+            )
+          }
         />
       ))}
     </section>
@@ -188,7 +234,7 @@ export function EvaluationWorkspace({
 }) {
   const [state, setState] = useState<WorkspaceState>({ tag: "LOADING" });
   const [detail, setDetail] = useState<
-    | { kind: "receipt" }
+    | { kind: "receipt"; side: "single" | "left" | "right" }
     | { kind: "explanation"; coordinate: keyof typeof METRIC_COPY }
     | null
   >(null);
@@ -227,10 +273,21 @@ export function EvaluationWorkspace({
       />
     );
 
-  const receipt =
-    state.tag === "RESULT" && state.response.mode === "SINGLE"
-      ? state.response.result.receipt
-      : undefined;
+  const receipts =
+    state.tag !== "RESULT"
+      ? {}
+      : state.response.mode === "SINGLE"
+        ? { single: state.response.result.receipt }
+        : {
+            left:
+              state.response.left.tag === "SIDE_RESULT"
+                ? state.response.left.receipt
+                : undefined,
+            right:
+              state.response.right.tag === "SIDE_RESULT"
+                ? state.response.right.receipt
+                : undefined,
+          };
 
   return (
     <main className="evaluation-shell">
@@ -249,17 +306,32 @@ export function EvaluationWorkspace({
               ? route.taskIds.join(", ")
               : `${route.leftTaskIds.join(", ")} → ${route.rightTaskIds.join(", ")}`}
           </code>
-          {receipt === undefined ? null : (
+          {receipts.single === undefined ? null : (
             <button
               className="action-control"
               onClick={(event) => {
                 detailInvoker.current = event.currentTarget;
-                setDetail({ kind: "receipt" });
+                setDetail({ kind: "receipt", side: "single" });
               }}
               type="button"
             >
               View receipt
             </button>
+          )}
+          {(["left", "right"] as const).map((side) =>
+            receipts[side] === undefined ? null : (
+              <button
+                className="action-control"
+                key={side}
+                onClick={(event) => {
+                  detailInvoker.current = event.currentTarget;
+                  setDetail({ kind: "receipt", side });
+                }}
+                type="button"
+              >
+                View {side === "left" ? "Before" : "After"} receipt
+              </button>
+            ),
           )}
           {state.tag === "RESULT" && state.response.mode === "SINGLE" ? (
             <label className="control-label">
@@ -315,11 +387,45 @@ export function EvaluationWorkspace({
             response={state.response}
           />
         ) : (
-          <CompareResults onRetry={run} response={state.response} />
+          <CompareResults
+            onEvidence={(coordinate, side) => {
+              if (route.tag === "COMPARE")
+                onNavigate?.({
+                  tag: "EVIDENCE",
+                  selection: {
+                    tag: "COMPARE",
+                    leftTaskIds: route.leftTaskIds,
+                    rightTaskIds: route.rightTaskIds,
+                  },
+                  metric: coordinate,
+                  side,
+                  scope: "result",
+                });
+            }}
+            onExplain={(coordinate, trigger) => {
+              detailInvoker.current = trigger;
+              setDetail({ kind: "explanation", coordinate });
+            }}
+            onRetry={run}
+            onSelectMetric={(metric) => {
+              if (route.tag === "COMPARE")
+                onNavigate?.({
+                  ...route,
+                  focus: {
+                    metric,
+                    side: route.focus?.side ?? "left",
+                  },
+                });
+            }}
+            response={state.response}
+            selectedCoordinate={route.focus?.metric}
+          />
         )}
       </div>
 
-      {receipt === undefined || detail === null ? null : (
+      {detail === null ||
+      (detail.kind === "receipt" &&
+        receipts[detail.side] === undefined) ? null : (
         <OwnedInspector
           invokerRef={detailInvoker}
           kind={detail.kind}
@@ -333,7 +439,7 @@ export function EvaluationWorkspace({
           }
         >
           {detail.kind === "receipt" ? (
-            <ReceiptView receipt={receipt} side="single" />
+            <ReceiptView receipt={receipts[detail.side]!} side={detail.side} />
           ) : (
             <MetricExplanationView
               {...METRIC_COPY[detail.coordinate]}
