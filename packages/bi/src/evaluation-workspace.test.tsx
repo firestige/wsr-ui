@@ -92,6 +92,24 @@ function compareResponse(partial = false): CompareResponse {
 }
 
 describe("Evaluation workspace", () => {
+  it("keeps an invalid deep link visible and offers explicit reselection", async () => {
+    const onNavigate = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <EvaluationWorkspace
+        evolution={{ computeSingle: vi.fn(), computeCompare: vi.fn() }}
+        onNavigate={onNavigate}
+        route={{ tag: "INVALID", reason: "INVALID_PARAMETERS" }}
+      />,
+    );
+
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Invalid evaluation link",
+    );
+    await user.click(screen.getByRole("button", { name: "Re-select Tasks" }));
+    expect(onNavigate).toHaveBeenCalledWith({ tag: "SELECT" });
+  });
+
   it("submits the URL selection and renders authoritative single results", async () => {
     const computeSingle = vi.fn(async (): Promise<EvolutionResult> => ({
       ok: true,
@@ -134,6 +152,39 @@ describe("Evaluation workspace", () => {
       screen.getAllByRole("table", { name: /Fallback result data/ }),
     ).toHaveLength(CATALOG_COORDINATES.length);
     expect(computeSingle).toHaveBeenCalledTimes(1);
+  });
+
+  it("marks an exact single metric focus without hiding the dashboard", async () => {
+    render(
+      <EvaluationWorkspace
+        evolution={{
+          computeSingle: vi.fn(async () => ({
+            ok: true as const,
+            value: singleResponse(),
+          })),
+          computeCompare: vi.fn(),
+        }}
+        route={{
+          tag: "SINGLE",
+          taskIds: ["task-preview"],
+          focus: {
+            metric: "role-template-rework-rate@2.0.0",
+            side: "single",
+          },
+        }}
+      />,
+    );
+
+    const focused = await screen.findByRole("article", {
+      name: "role-template-rework-rate@2.0.0",
+    });
+    expect(focused.closest(".dashboard-panel")).toHaveAttribute(
+      "aria-current",
+      "true",
+    );
+    expect(
+      screen.getByRole("region", { name: "Metric Results" }),
+    ).toBeVisible();
   });
 
   it("opens the receipt without moving authority into route state", async () => {

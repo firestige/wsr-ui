@@ -23,11 +23,13 @@ export interface TaskPort {
 function TaskChoice({
   task,
   checked,
+  disabled = false,
   prefix,
   onChange,
 }: {
   task: TaskListItem;
   checked: boolean;
+  disabled?: boolean;
   prefix?: string;
   onChange: (checked: boolean) => void;
 }) {
@@ -37,6 +39,7 @@ function TaskChoice({
       <input
         aria-label={`${prefix === undefined ? "" : `${prefix} `}${display} (${task.task_id})`}
         checked={checked}
+        disabled={disabled}
         onChange={(event) => onChange(event.target.checked)}
         type="checkbox"
       />
@@ -148,6 +151,9 @@ function TaskSelector({
               {page.value.items.map((task) => (
                 <TaskChoice
                   checked={single.includes(task.task_id)}
+                  disabled={
+                    single.length >= 24 && !single.includes(task.task_id)
+                  }
                   key={task.task_id}
                   onChange={(checked) =>
                     setSingle(toggle(single, task.task_id, checked))
@@ -167,6 +173,10 @@ function TaskSelector({
                     {page.value.items.map((task) => (
                       <TaskChoice
                         checked={selected.includes(task.task_id)}
+                        disabled={
+                          selected.length >= 24 &&
+                          !selected.includes(task.task_id)
+                        }
                         key={task.task_id}
                         onChange={(checked) =>
                           setSelected(toggle(selected, task.task_id, checked))
@@ -180,6 +190,7 @@ function TaskSelector({
               })}
             </div>
           )}
+          <p className="status-reading">24 Task limit per side.</p>
           <button
             className="action-control"
             disabled={
