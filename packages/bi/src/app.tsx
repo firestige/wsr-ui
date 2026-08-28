@@ -25,6 +25,7 @@ import type {
   MetricSlice,
   ResolvedEvaluationContext,
   TruthState,
+  WithholdingReason,
 } from "./domain/evolution/types";
 
 type Theme = "system" | "light" | "dark";
@@ -109,6 +110,27 @@ const previewSlice: MetricSlice = {
   provenance_refs: ["fact:preview"],
 };
 
+const withheldReasons: Partial<Record<TruthState, WithholdingReason>> = {
+  NOT_APPLICABLE: "NO_APPLICABLE_POPULATION",
+  UNAVAILABLE: "MISSING_INPUT",
+  EXPIRED: "EXPIRED_INPUT",
+  INCOMPATIBLE: "INCOMPATIBLE_INPUT",
+};
+
+const truthSlices = truthStates.map((state): MetricSlice => {
+  const hasValue = state === "AVAILABLE" || state === "LOWER_BOUND";
+  return {
+    ...previewSlice,
+    state,
+    value: hasValue ? previewSlice.value : undefined,
+    withholding_reason: withheldReasons[state],
+    reading: hasValue
+      ? "Authoritative Metric Result value."
+      : "Value is withheld; inspect the reason or change the selection.",
+    coverage: state === "NOT_APPLICABLE" ? coverages[0]! : coverages[1]!,
+  };
+});
+
 const evidenceRows: EvidenceConsoleRow[] = [
   {
     factId: "fact-preview",
@@ -179,24 +201,45 @@ function FactualPreview() {
     [],
   );
   return (
-    <svg
-      aria-label="Factual trend preview"
-      className="visual-preview text-data-series-1"
-      role="img"
-      viewBox="0 0 206 70"
-    >
-      <path className="stroke-border-default" d="M8 62 H198" fill="none" />
-      <path className="stroke-current" d={path ?? undefined} fill="none" />
-      {trendPoints.map(([x, y]) => (
-        <circle
-          className="fill-current"
-          cx={x}
-          cy={y}
-          key={`${x}-${y}`}
-          r="2.5"
-        />
-      ))}
-    </svg>
+    <div className="visual-with-fallback">
+      <svg
+        aria-label="Factual trend preview"
+        className="visual-preview text-data-series-1"
+        role="img"
+        viewBox="0 0 206 70"
+      >
+        <path className="stroke-border-default" d="M8 62 H198" fill="none" />
+        <path className="stroke-current" d={path ?? undefined} fill="none" />
+        {trendPoints.map(([x, y]) => (
+          <circle
+            className="fill-current"
+            cx={x}
+            cy={y}
+            key={`${x}-${y}`}
+            r="2.5"
+          />
+        ))}
+      </svg>
+      <table className="visual-data-table">
+        <caption>Factual trend data</caption>
+        <thead>
+          <tr>
+            <th scope="col">Point</th>
+            <th scope="col">X</th>
+            <th scope="col">Y</th>
+          </tr>
+        </thead>
+        <tbody>
+          {trendPoints.map(([x, y], index) => (
+            <tr key={`${x}-${y}`}>
+              <th scope="row">{index + 1}</th>
+              <td>{x}</td>
+              <td>{y}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
@@ -300,6 +343,19 @@ export function App() {
             ))}
           </div>
           <div className="grid gap-layout-grid lg:grid-cols-2">
+            {truthSlices.map((slice) => (
+              <MetricResultFrame
+                content={{ tag: "RESULT", slice }}
+                coordinate={`${slice.state.toLowerCase().replaceAll("_", "-")}-preview@2.0.0`}
+                key={slice.state}
+                onRecover={
+                  slice.value === undefined ? () => undefined : undefined
+                }
+                recoveryLabel="Change selection"
+              />
+            ))}
+          </div>
+          <div className="grid gap-layout-grid lg:grid-cols-2">
             {coverages.map((coverage) => (
               <CoverageLabel coverage={coverage} key={coverage.state} />
             ))}
@@ -388,7 +444,7 @@ export function App() {
             canStart
             mode={motion}
             onReset={() => setMotion("STILL")}
-            onStart={() => setMotion("LIVE")}
+            onStart={() => setMotion("COMPLETE")}
             onStop={() => setMotion("STILL")}
             reducedMotion={reducedMotion}
           />
