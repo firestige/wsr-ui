@@ -1,13 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { ReceiptView } from "./components/details";
+import { CompareResultFrame } from "./components/compare-result";
 import { OwnedInspector } from "./components/inspector";
 import { MetricResultFrame } from "./components/metric-result";
 import { ScopedError } from "./components/status";
 import type { EvaluationRoute } from "./domain/navigation/evaluation-route";
 import type {
   CompareResponse,
+  DeltaEntry,
   EvolutionResult,
+  MetricSlice,
+  SideResult,
   SingleResponse,
 } from "./domain/evolution/types";
 
@@ -56,6 +60,72 @@ function SingleResults({ response }: { response: SingleResponse }) {
           />
         ));
       })}
+    </section>
+  );
+}
+
+function sliceKey(value: Record<string, string>): string {
+  return JSON.stringify(
+    Object.fromEntries(
+      Object.entries(value).sort(([left], [right]) =>
+        left < right ? -1 : left > right ? 1 : 0,
+      ),
+    ),
+  );
+}
+
+function findSlice(
+  side: SideResult,
+  delta: DeltaEntry,
+): MetricSlice | undefined {
+  const split = delta.metric_coordinate.lastIndexOf("@");
+  const metric = side.metric_results.find(
+    (candidate) =>
+      candidate.metric_id === delta.metric_coordinate.slice(0, split) &&
+      candidate.metric_version === delta.metric_coordinate.slice(split + 1),
+  );
+  const key = sliceKey(delta.slice_key);
+  return metric?.slices.find((slice) => sliceKey(slice.slice_key) === key);
+}
+
+function CompareResults({
+  response,
+  onRetry,
+}: {
+  response: CompareResponse;
+  onRetry: () => void;
+}) {
+  const before =
+    response.left.tag === "SIDE_RESULT" ? response.left : undefined;
+  const after =
+    response.right.tag === "SIDE_RESULT" ? response.right : undefined;
+  const failed =
+    response.left.tag === "SIDE_ERROR"
+      ? response.left
+      : response.right.tag === "SIDE_ERROR"
+        ? response.right
+        : undefined;
+  const failedLabel = response.left.tag === "SIDE_ERROR" ? "Before" : "After";
+  return (
+    <section aria-label="Compared Metric Results" className="compare-results">
+      {failed === undefined ? null : (
+        <ScopedError
+          announce="assertive"
+          detail={`${failed.code}: ${failed.detail}`}
+          onRetry={onRetry}
+          retryable={failed.retryable}
+          title={`${failedLabel} unavailable`}
+        />
+      )}
+      {response.deltas.map((delta) => (
+        <CompareResultFrame
+          after={after === undefined ? undefined : findSlice(after, delta)}
+          before={before === undefined ? undefined : findSlice(before, delta)}
+          coordinate={delta.metric_coordinate}
+          delta={delta}
+          key={`${delta.metric_coordinate}:${sliceKey(delta.slice_key)}`}
+        />
+      ))}
     </section>
   );
 }
@@ -152,7 +222,7 @@ export function EvaluationWorkspace({
         ) : state.response.mode === "SINGLE" ? (
           <SingleResults response={state.response} />
         ) : (
-          <p className="empty-state">Compare result composition is loading.</p>
+          <CompareResults onRetry={run} response={state.response} />
         )}
       </div>
 
