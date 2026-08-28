@@ -33,6 +33,8 @@ describe("Wave9 serving boundary", () => {
   );
 
   it("fails closed for every unapproved API path before SPA fallback", () => {
+    expect(nginx).toMatch(/location = \/api \{[\s\S]*?return 404/);
+    expect(nginx).toMatch(/location = \/v1\/evidence \{[\s\S]*?return 404/);
     expect(nginx).toMatch(/location \/api\/ \{[\s\S]*?return 404/);
     expect(nginx).toMatch(/location \/v1\/evidence\/ \{[\s\S]*?return 404/);
     expect(nginx).toMatch(

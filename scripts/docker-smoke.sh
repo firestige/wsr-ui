@@ -58,6 +58,8 @@ curl --fail --silent --show-error \
   grep -q '"identity":"evolution","method":"POST","url":"/api/evolution/v1/evaluations:compute?probe=1","body":"{\\"api_version\\":1}"'
 
 for route in \
+  /api \
+  /v1/evidence \
   /v1/evidence/manifests/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa \
   /v1/evidence/unknown \
   /api/evolution/v1/unknown; do
