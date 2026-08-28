@@ -514,6 +514,40 @@
   gap: var(--space-cluster);
 }
 
+@utility compare-result {
+  display: grid;
+  gap: var(--space-grid);
+  min-width: 0;
+}
+
+@utility compare-side {
+  display: grid;
+  align-content: start;
+  gap: var(--space-cluster);
+  min-width: 0;
+}
+
+@utility compare-delta {
+  display: grid;
+  gap: var(--space-cluster);
+  min-width: 0;
+  padding: var(--space-cluster);
+  border: 1px solid var(--border-default);
+  border-radius: var(--shape-control);
+  background: var(--surface-inset);
+  color: var(--compare-delta-neutral);
+}
+
+@media (min-width: 48rem) {
+  .compare-result {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .compare-delta {
+    grid-column: 1 / -1;
+  }
+}
+
 @utility loading-state {
   min-height: var(--density-row);
   color: var(--content-secondary);
