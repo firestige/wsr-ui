@@ -445,10 +445,14 @@
 @utility visual-with-fallback {
   display: grid;
   gap: var(--space-cluster);
+  min-width: 0;
+  max-width: 100%;
 }
 
 @utility visual-data-table {
   width: 100%;
+  max-width: 100%;
+  table-layout: fixed;
   border-collapse: collapse;
   font-size: var(--type-label-size);
 
@@ -462,6 +466,7 @@
     padding: var(--space-tight);
     border-block-end: 1px solid var(--border-default);
     text-align: start;
+    overflow-wrap: anywhere;
   }
 }
 
