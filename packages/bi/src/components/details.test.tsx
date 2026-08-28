@@ -72,7 +72,9 @@ describe("inspector detail content", () => {
   it("renders receipt identity, display-name fallback and exact resolved context", () => {
     render(<ReceiptView receipt={receipt} side="single" />);
 
-    expect(screen.getByRole("heading", { name: "Evaluation receipt" })).toBeVisible();
+    expect(
+      screen.getByRole("heading", { name: "Evaluation receipt" }),
+    ).toBeVisible();
     expect(screen.getByText("Checkout optimization")).toBeVisible();
     expect(screen.getAllByText("task-b").length).toBeGreaterThan(0);
     expect(screen.getAllByText("PARTIAL").length).toBeGreaterThan(0);

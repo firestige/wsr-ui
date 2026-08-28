@@ -108,7 +108,9 @@ describe("Metric Result foundations", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: "Metric explanation" }));
+    await user.click(
+      screen.getByRole("button", { name: "Metric explanation" }),
+    );
     await user.click(screen.getByRole("button", { name: "View evidence" }));
     expect(explain).toHaveBeenCalledOnce();
     expect(evidence).toHaveBeenCalledOnce();
@@ -137,10 +139,9 @@ describe("Metric Result foundations", () => {
       />,
     );
 
-    expect(screen.getByRole("button", { name: /metric-a@2.0.0/ })).toHaveAttribute(
-      "aria-current",
-      "true",
-    );
+    expect(
+      screen.getByRole("button", { name: /metric-a@2.0.0/ }),
+    ).toHaveAttribute("aria-current", "true");
     expect(screen.getByText("Delta: side unresolved")).toBeVisible();
     expect(screen.queryByText(/winner|rank/i)).toBeNull();
     await user.click(screen.getByRole("button", { name: /metric-b@2.0.0/ }));

@@ -132,7 +132,9 @@ export function EvidenceConsoleFoundation({
     <section className="evidence-console">
       <header>
         <h2 className="text-heading">Evidence Console</h2>
-        <p className="text-body">Read-only Fact and recorded Trace drill-down.</p>
+        <p className="text-body">
+          Read-only Fact and recorded Trace drill-down.
+        </p>
       </header>
       <div aria-label="Evidence scope" className="scope-tabs" role="tablist">
         {scopes.map((item) => (
@@ -167,10 +169,14 @@ export function EvidenceConsoleFoundation({
             <p className="empty-state">No Evidence in this scope</p>
           ) : null}
           {state.tag === "PARTIAL" ? (
-            <p className="status-banner status-attention">Partial Evidence data</p>
+            <p className="status-banner status-attention">
+              Partial Evidence data
+            </p>
           ) : null}
           {state.tag === "EXPIRED" ? (
-            <p className="status-banner status-expired">Evidence detail expired</p>
+            <p className="status-banner status-expired">
+              Evidence detail expired
+            </p>
           ) : null}
           {rows.length === 0 ? null : (
             <EvidenceTable

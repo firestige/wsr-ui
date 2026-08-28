@@ -75,8 +75,7 @@ export function CoverageLabel({ coverage }: { coverage: Coverage }) {
   );
 }
 
-const humanize = (value: string) =>
-  value.toLowerCase().replaceAll("_", " ");
+const humanize = (value: string) => value.toLowerCase().replaceAll("_", " ");
 
 type EvidenceLifecycleProps =
   | { truth: Truth; traceState?: never }
@@ -110,9 +109,7 @@ export function EvidenceLifecycleLabel(props: EvidenceLifecycleProps) {
   const { truth } = props;
   return (
     <div className="lifecycle-grid">
-      <span>
-        Completeness: {humanize(truth.completeness ?? "UNSPECIFIED")}
-      </span>
+      <span>Completeness: {humanize(truth.completeness ?? "UNSPECIFIED")}</span>
       <span>Availability: {humanize(truth.availability)}</span>
       <span>Expiry: {humanize(truth.expiry)}</span>
     </div>

@@ -38,7 +38,9 @@ describe("owned inspector", () => {
     expect(
       screen.getByRole("dialog", { name: "Evaluation receipt" }),
     ).toHaveAttribute("aria-modal", "true");
-    expect(screen.getByRole("button", { name: "Close inspector" })).toHaveFocus();
+    expect(
+      screen.getByRole("button", { name: "Close inspector" }),
+    ).toHaveFocus();
 
     await user.keyboard("{Escape}");
     expect(screen.queryByRole("dialog")).toBeNull();
@@ -53,7 +55,9 @@ describe("owned inspector", () => {
     await user.tab();
     expect(screen.getByRole("button", { name: "Copy digest" })).toHaveFocus();
     await user.tab();
-    expect(screen.getByRole("button", { name: "Close inspector" })).toHaveFocus();
+    expect(
+      screen.getByRole("button", { name: "Close inspector" }),
+    ).toHaveFocus();
   });
 
   it("does not claim modal focus ownership for a non-modal inspector", async () => {
