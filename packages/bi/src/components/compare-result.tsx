@@ -16,6 +16,7 @@ function CompareSide({
   onRetry,
   onExplain,
   onEvidence,
+  focusEvidenceAction,
 }: {
   label: "Before" | "After";
   coordinate: string;
@@ -25,6 +26,7 @@ function CompareSide({
   onRetry?: () => void;
   onExplain?: (trigger: HTMLButtonElement) => void;
   onEvidence?: (trigger: HTMLButtonElement) => void;
+  focusEvidenceAction: boolean;
 }) {
   return (
     <section aria-label={`${label} result`} className="compare-side">
@@ -33,6 +35,7 @@ function CompareSide({
         <MetricResultFrame
           content={{ tag: "RESULT", slice }}
           coordinate={coordinate}
+          focusEvidenceAction={focusEvidenceAction}
           onEvidence={onEvidence}
           onExplain={onExplain}
         />
@@ -97,6 +100,7 @@ export function CompareResultFrame({
   delta,
   onRetryFailedSide,
   ownsFailedSide = true,
+  focusEvidenceSide,
   onExplain,
   onEvidence,
 }: {
@@ -108,6 +112,7 @@ export function CompareResultFrame({
   delta: DeltaEntry;
   onRetryFailedSide?: () => void;
   ownsFailedSide?: boolean;
+  focusEvidenceSide?: "left" | "right";
   onExplain?: (side: "left" | "right", trigger: HTMLButtonElement) => void;
   onEvidence?: (side: "left" | "right", trigger: HTMLButtonElement) => void;
 }) {
@@ -116,6 +121,7 @@ export function CompareResultFrame({
       <CompareSide
         coordinate={coordinate}
         error={beforeError}
+        focusEvidenceAction={focusEvidenceSide === "left"}
         label="Before"
         ownsError={ownsFailedSide}
         onEvidence={
@@ -134,6 +140,7 @@ export function CompareResultFrame({
       <CompareSide
         coordinate={coordinate}
         error={afterError}
+        focusEvidenceAction={focusEvidenceSide === "right"}
         label="After"
         ownsError={ownsFailedSide}
         onEvidence={

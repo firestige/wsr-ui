@@ -88,11 +88,13 @@ export function EvidenceDrilldown({
   route,
   evolution,
   evidence,
+  onBack,
   onNavigate,
 }: {
   route: EvidenceDrilldownRoute;
   evolution: EvolutionPort;
   evidence: EvidenceFactsPort;
+  onBack?: () => void;
   onNavigate?: (route: EvaluationRoute) => void;
 }) {
   const [state, setState] = useState<State>({ tag: "LOADING" });
@@ -248,10 +250,10 @@ export function EvidenceDrilldown({
           focus: { metric: route.metric, side: route.side },
         };
   return (
-    <main className="evaluation-shell">
+    <main className="evaluation-shell" id="main-content" tabIndex={-1}>
       <button
         className="link-control"
-        onClick={() => onNavigate?.(parent)}
+        onClick={() => (onBack === undefined ? onNavigate?.(parent) : onBack())}
         type="button"
       >
         Back to evaluation

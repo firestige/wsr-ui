@@ -124,6 +124,9 @@ function SingleResults({
               />
             ) : (
               <MetricPanel
+                focusEvidenceAction={
+                  focusedCoordinate === panel.metric_coordinate
+                }
                 onEvidence={(trigger) =>
                   onEvidence(panel.metric_coordinate, trigger)
                 }
@@ -188,6 +191,7 @@ function CompareResults({
   onExplain,
   onSelectMetric,
   selectedCoordinate,
+  selectedSide,
 }: {
   response: CompareResponse;
   onRetry: () => void;
@@ -204,6 +208,7 @@ function CompareResults({
   ) => void;
   onSelectMetric: (coordinate: keyof typeof METRIC_COPY) => void;
   selectedCoordinate?: string;
+  selectedSide?: "left" | "right";
 }) {
   const before =
     response.left.tag === "SIDE_RESULT" ? response.left : undefined;
@@ -263,6 +268,11 @@ function CompareResults({
           beforeError={beforeError}
           coordinate={delta.metric_coordinate}
           delta={delta}
+          focusEvidenceSide={
+            selectedCoordinate === delta.metric_coordinate
+              ? selectedSide
+              : undefined
+          }
           key={`${delta.metric_coordinate}:${sliceKey(delta.slice_key)}`}
           onEvidence={(side, trigger) =>
             onEvidence(
@@ -359,7 +369,7 @@ export function EvaluationWorkspace({
     return <p className="empty-state">Choose one or more Tasks to evaluate.</p>;
   if (route.tag === "INVALID")
     return (
-      <main className="evaluation-shell">
+      <main className="evaluation-shell" id="main-content" tabIndex={-1}>
         <ScopedError
           announce="assertive"
           detail={route.reason}
@@ -397,10 +407,7 @@ export function EvaluationWorkspace({
       : PRESET_LAYOUTS[layoutState.choice];
 
   return (
-    <main className="evaluation-shell">
-      <a className="skip-link" href="#evaluation-results">
-        Skip to Metric Results
-      </a>
+    <main className="evaluation-shell" id="main-content" tabIndex={-1}>
       <header className="evaluation-header">
         <div>
           <p className="text-label">Business intelligence</p>
@@ -553,6 +560,11 @@ export function EvaluationWorkspace({
             retryError={state.retryError}
             retrying={state.retrying}
             selectedCoordinate={route.focus?.metric}
+            selectedSide={
+              route.focus?.side === "left" || route.focus?.side === "right"
+                ? route.focus.side
+                : undefined
+            }
           />
         )}
       </div>
