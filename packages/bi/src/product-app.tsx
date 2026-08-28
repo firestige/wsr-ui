@@ -1,11 +1,15 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { ScopedError } from "./components/status";
 import {
   EvidenceDrilldown,
   type EvidenceFactsPort,
 } from "./evidence-drilldown";
-import type { TaskListItem, TaskResult } from "./domain/evidence/task-client";
+import type {
+  TaskListItem,
+  TaskPage,
+  TaskResult,
+} from "./domain/evidence/task-client";
 import {
   parseEvaluationRoute,
   serializeEvaluationRoute,
@@ -60,6 +64,13 @@ const toggle = (current: string[], taskId: string, checked: boolean) =>
       : [...current, taskId]
     : current.filter((item) => item !== taskId);
 
+const taskErrorDetail = (result: Extract<TaskResult, { ok: false }>) =>
+  result.error.kind === "UPSTREAM"
+    ? `${result.error.code}: ${result.error.message}`
+    : "reason" in result.error
+      ? result.error.reason
+      : "Task query failed";
+
 function TaskSelector({
   tasks,
   onSelect,
@@ -67,22 +78,72 @@ function TaskSelector({
   tasks: TaskPort;
   onSelect: (route: EvaluationRoute) => void;
 }) {
-  const [page, setPage] = useState<TaskResult | undefined>();
+  const [page, setPage] = useState<TaskPage | undefined>();
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [queryError, setQueryError] = useState<string | undefined>();
+  const [search, setSearch] = useState("");
   const [mode, setMode] = useState<"single" | "compare">("single");
   const [single, setSingle] = useState<string[]>([]);
   const [before, setBefore] = useState<string[]>([]);
   const [after, setAfter] = useState<string[]>([]);
   const [selectionError, setSelectionError] = useState<string | undefined>();
 
+  const load = useCallback(
+    async (cursor?: string) => {
+      if (cursor === undefined) setLoading(true);
+      else setLoadingMore(true);
+      setQueryError(undefined);
+      const result = await tasks.getPage({
+        limit: 100,
+        ...(cursor === undefined ? {} : { cursor }),
+      });
+      if (!result.ok) {
+        setQueryError(taskErrorDetail(result));
+      } else if (cursor === undefined) {
+        setPage(result.value);
+      } else {
+        setPage((current) => {
+          if (
+            current === undefined ||
+            current.snapshot !== result.value.snapshot
+          ) {
+            setQueryError("Task pagination changed snapshot");
+            return current;
+          }
+          const known = new Set(current.items.map((item) => item.task_id));
+          if (result.value.items.some((item) => known.has(item.task_id))) {
+            setQueryError("Task pagination repeated an identity");
+            return current;
+          }
+          return {
+            ...current,
+            items: [...current.items, ...result.value.items],
+            next_cursor: result.value.next_cursor,
+          };
+        });
+      }
+      setLoading(false);
+      setLoadingMore(false);
+    },
+    [tasks],
+  );
+
   useEffect(() => {
-    let active = true;
-    void tasks.getPage({ limit: 100 }).then((result) => {
-      if (active) setPage(result);
-    });
-    return () => {
-      active = false;
-    };
-  }, [tasks]);
+    const timer = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(timer);
+  }, [load]);
+
+  const normalizedSearch = search.trim();
+  const visibleTasks =
+    page?.items.filter(
+      (task) =>
+        normalizedSearch.length === 0 ||
+        task.task_id === normalizedSearch ||
+        task.display_name
+          ?.toLocaleLowerCase()
+          .includes(normalizedSearch.toLocaleLowerCase()),
+    ) ?? [];
 
   return (
     <main className="evaluation-shell">
@@ -92,21 +153,16 @@ function TaskSelector({
           <h1 className="text-title">Choose Tasks</h1>
         </div>
       </header>
-      {page === undefined ? (
+      {loading && page === undefined ? (
         <p className="loading-state" role="status">
           Loading Tasks…
         </p>
-      ) : !page.ok ? (
+      ) : page === undefined ? (
         <ScopedError
           announce="assertive"
-          detail={
-            page.error.kind === "UPSTREAM"
-              ? `${page.error.code}: ${page.error.message}`
-              : "reason" in page.error
-                ? page.error.reason
-                : "Task query failed"
-          }
-          retryable={false}
+          detail={queryError ?? "Task query failed"}
+          onRetry={() => void load()}
+          retryable
           title="Task list unavailable"
         />
       ) : (
@@ -133,6 +189,15 @@ function TaskSelector({
             }
           }}
         >
+          <label className="control-label">
+            Search Tasks
+            <input
+              className="control-field"
+              onChange={(event) => setSearch(event.target.value)}
+              type="search"
+              value={search}
+            />
+          </label>
           <fieldset className="mode-selector">
             <legend>Evaluation mode</legend>
             <label>
@@ -157,7 +222,7 @@ function TaskSelector({
           {mode === "single" ? (
             <fieldset className="task-list">
               <legend>Tasks</legend>
-              {page.value.items.map((task) => (
+              {visibleTasks.map((task) => (
                 <TaskChoice
                   checked={single.includes(task.task_id)}
                   disabled={
@@ -179,7 +244,7 @@ function TaskSelector({
                 return (
                   <fieldset className="task-list" key={side}>
                     <legend>{side}</legend>
-                    {page.value.items.map((task) => (
+                    {visibleTasks.map((task) => (
                       <TaskChoice
                         checked={selected.includes(task.task_id)}
                         disabled={
@@ -198,6 +263,25 @@ function TaskSelector({
                 );
               })}
             </div>
+          )}
+          {queryError === undefined ? null : (
+            <ScopedError
+              announce="polite"
+              detail={queryError}
+              onRetry={() => void load(page.next_cursor ?? undefined)}
+              retryable
+              title="More Tasks unavailable"
+            />
+          )}
+          {page.next_cursor === null ? null : (
+            <button
+              className="action-control"
+              disabled={loadingMore}
+              onClick={() => void load(page.next_cursor ?? undefined)}
+              type="button"
+            >
+              {loadingMore ? "Loading more Tasks…" : "Load more Tasks"}
+            </button>
           )}
           <p className="status-reading">24 Task limit per side.</p>
           {selectionError === undefined ? null : (
