@@ -51,6 +51,8 @@ test("single deep link restores authoritative truth, coverage, and receipt", asy
 
   await expect(page.getByText("0.00%").first()).toBeVisible();
   await expect(page.getByText("Low coverage")).toBeVisible();
+  await expect(page.getByText("sample_size").first()).toBeVisible();
+  await expect(page.getByText("4", { exact: true }).first()).toBeVisible();
   await expect(
     page.locator(".status-label", { hasText: "Lower bound" }),
   ).toBeVisible();
@@ -77,6 +79,33 @@ test("single deep link restores authoritative truth, coverage, and receipt", asy
   await expect(page).toHaveURL("/evaluate?v=1&task=task-browser");
   await expect(page.getByText("0.00%").first()).toBeVisible();
   expect(requests).toBe(2);
+});
+
+test("compare uses two sides with Delta below on tablet", async ({ page }) => {
+  await page.setViewportSize({ width: 900, height: 900 });
+  await page.goto(
+    "/evaluate?v=1&mode=compare&left_task=task-before&right_task=task-after",
+  );
+
+  const comparison = page
+    .getByRole("article", {
+      name: "Compare role-template-rework-rate@2.0.0",
+    })
+    .first();
+  const before = await comparison
+    .getByRole("region", { name: "Before result" })
+    .boundingBox();
+  const after = await comparison
+    .getByRole("region", { name: "After result" })
+    .boundingBox();
+  const delta = await comparison
+    .getByRole("region", { name: "Delta result" })
+    .boundingBox();
+  expect(before).not.toBeNull();
+  expect(after).not.toBeNull();
+  expect(delta).not.toBeNull();
+  expect(Math.abs(before!.y - after!.y)).toBeLessThan(2);
+  expect(delta!.y).toBeGreaterThan(before!.y + before!.height);
 });
 
 test("compare keeps Before and After primary on a narrow viewport", async ({
