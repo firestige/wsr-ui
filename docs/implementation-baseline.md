@@ -55,7 +55,7 @@ runtime program is the frozen Nginx base.
 | wsr-ui BI source      | `packages/bi/**`                                                                                   |
 | wsr-ui build/runtime  | `package*.json`, TypeScript/Vite/test config, `Dockerfile`, `.dockerignore`, `deployment/nginx/**` |
 | wsr-ui qualification  | `.github/workflows/ci.yml`, `scripts/**`, `tests/browser/**`, `docs/dependency-inventory.ndjson`   |
-| superproject assembly | `deployment/compose.iter5.yaml` (Wave 9), `qualification/iter5/**` (Wave 10), `wsr-ui` pin        |
+| superproject assembly | `deployment/compose.iter5.yaml` (Wave 9), `qualification/iter5/**` (Wave 10), `wsr-ui` pin         |
 
 The complete `pg + evidence + bi-app` Compose never lives in this repository. The BI Dockerfile and
 Nginx configuration never live in the superproject. Future UI deliverables do not consume or constrain
@@ -165,17 +165,17 @@ returns to design review.
 
 Wave3 adds the following future implementation verification map without changing current product code:
 
-| Design boundary | Required later-wave verification |
-| ---------------- | -------------------------------- |
-| authority | no Catalog formula, Delta computation, currency/unit conversion or missing-value fill in BI |
-| selection/deep link | exact ID-only restoration; Task display-name missing/duplicate/rename cases; 24 IDs/side and 8 KiB encoded URL bounds |
-| Metric Result | 14 coordinates on every successful side; canonical multi-slice keys; zero/absence and coverage/sample separation |
-| compare | full compare and `PARTIAL_COMPARE`; successful side retained; failed side scoped retry; all Delta coordinates side-unresolved |
-| dashboard/registry | closed preset/import schema; named channels; compatibility/domain/missing tolerance; table/text fallback |
-| semantic UI | light/dark parity, print/forced-colors, status redundancy, compact/comfortable information parity |
-| responsive/a11y | desktop/tablet/narrow, long names/numbers, 200-row table, keyboard-only journey, focus restoration and announcements |
-| Evidence drill-down | receipt-bound exact evidence vs related non-lineage Facts vs resolved read set; no reconstructed Fact/detail |
-| recorded Trace | parent-depth only, siblings together, independent LINK, orphan lane, no timestamp/arrival ordering, finite Still/Live |
+| Design boundary     | Required later-wave verification                                                                                                                                                       |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| authority           | no Catalog formula, Delta computation, currency/unit conversion or missing-value fill in BI                                                                                            |
+| selection/deep link | exact ID-only restoration; Task display-name missing/duplicate/rename cases; 24 IDs/side and 8 KiB encoded URL bounds                                                                  |
+| Metric Result       | 12 candidate coordinates on every successful side; canonical multi-slice keys; zero/absence and coverage/sample separation; exact integer wire values remain canonical decimal strings |
+| compare             | full compare and `PARTIAL_COMPARE`; successful side retained; failed side scoped retry; all Delta coordinates side-unresolved                                                          |
+| dashboard/registry  | closed preset/import schema; named channels; compatibility/domain/missing tolerance; table/text fallback                                                                               |
+| semantic UI         | light/dark parity, print/forced-colors, status redundancy, compact/comfortable information parity                                                                                      |
+| responsive/a11y     | desktop/tablet/narrow, long names/numbers, 200-row table, keyboard-only journey, focus restoration and announcements                                                                   |
+| Evidence drill-down | receipt-bound exact evidence vs related non-lineage Facts vs resolved read set; no reconstructed Fact/detail                                                                           |
+| recorded Trace      | parent-depth only, siblings together, independent LINK, orphan lane, no timestamp/arrival ordering, finite Still/Live                                                                  |
 
 These cases extend existing identity, duplicate/conflict, pagination, completeness, retention and expiry
 fixtures. They do not introduce a Task-specific or cross-Fact/Trace global-snapshot Oracle.
