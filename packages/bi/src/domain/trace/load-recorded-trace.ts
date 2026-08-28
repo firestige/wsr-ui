@@ -29,9 +29,12 @@ export async function loadRecordedTrace(
   const maximumItems = options.maximumItems ?? 4_000;
   const items: TraceItem[] = [];
   const identities = new Set<string>();
+  const canonicalIdentities = new Set<string>();
   let snapshot: string | undefined;
   let cursor: string | undefined;
   let state: TracesPage["trace_state"] | undefined;
+  let summaries: string | undefined;
+  const cursors = new Set<string>();
   let pages = 0;
 
   do {
@@ -44,7 +47,11 @@ export async function loadRecordedTrace(
     });
     if (!result.ok) {
       const detail =
-        "reason" in result.error ? result.error.reason : result.error.kind;
+        "reason" in result.error
+          ? result.error.reason
+          : "code" in result.error
+            ? result.error.code
+            : result.error.kind;
       return { ok: false, reason: detail };
     }
     const page = result.value;
@@ -52,16 +59,40 @@ export async function loadRecordedTrace(
     if (snapshot !== undefined && page.snapshot !== snapshot)
       return { ok: false, reason: "TRACE_SNAPSHOT_DRIFT" };
     snapshot = page.snapshot;
+    const pageSummaries = JSON.stringify(page.trace_summaries);
+    if (
+      (state !== undefined && page.trace_state !== state) ||
+      (summaries !== undefined && pageSummaries !== summaries)
+    )
+      return { ok: false, reason: "TRACE_SUMMARY_DRIFT" };
     state = page.trace_state;
+    summaries = pageSummaries;
+    if (
+      page.trace_summaries.some((summary) => summary.trace_id !== traceId) ||
+      page.items.some((item) => item.trace_id !== traceId)
+    )
+      return { ok: false, reason: "TRACE_IDENTITY_MISMATCH" };
     for (const item of page.items) {
       if (identities.has(item.id))
         return { ok: false, reason: "TRACE_DUPLICATE_IDENTITY" };
       identities.add(item.id);
+      const canonicalIdentity =
+        item.kind === "NODE"
+          ? `NODE:${item.trace_id}:${item.node.span_id}`
+          : `${item.kind}:${item.edge.from.trace_id}:${item.edge.from.span_id}:${item.edge.to.trace_id}:${item.edge.to.span_id}`;
+      if (canonicalIdentities.has(canonicalIdentity))
+        return { ok: false, reason: "TRACE_DUPLICATE_CANONICAL_IDENTITY" };
+      canonicalIdentities.add(canonicalIdentity);
       items.push(item);
     }
     if (items.length > maximumItems)
       return { ok: false, reason: "TRACE_ITEM_BOUND_EXCEEDED" };
     cursor = page.next_cursor ?? undefined;
+    if (cursor !== undefined) {
+      if (cursors.has(cursor))
+        return { ok: false, reason: "TRACE_CURSOR_REPEATED" };
+      cursors.add(cursor);
+    }
   } while (cursor !== undefined);
 
   if (snapshot === undefined || state === undefined)

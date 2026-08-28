@@ -252,6 +252,35 @@ describe("closed Evidence decoder", () => {
     });
   });
 
+  it("rejects Trace identities that disagree across item, source, node, and edge", () => {
+    const nodeMismatch = traceResponse();
+    nodeMismatch.items[0]!.source.span_id = "c".repeat(16);
+    expect(decodeEvidencePage("traces", nodeMismatch, 100)).toMatchObject({
+      ok: false,
+    });
+
+    const parentMismatch = traceResponse();
+    parentMismatch.items[0] = {
+      ...parentMismatch.items[0]!,
+      id: "parent-1",
+      kind: "PARENT_EDGE",
+      node: null as never,
+      edge: {
+        from: {
+          trace_id: "a".repeat(32),
+          span_id: "b".repeat(16),
+        },
+        to: {
+          trace_id: "c".repeat(32),
+          span_id: "d".repeat(16),
+        },
+      } as never,
+    };
+    expect(decodeEvidencePage("traces", parentMismatch, 100)).toMatchObject({
+      ok: false,
+    });
+  });
+
   it.each([
     ["invalid LINK flags", { flags: 4294967296 }],
     ["invalid LINK trace state", { trace_state: "x".repeat(513) }],
@@ -324,6 +353,26 @@ describe("bounded Evidence transport", () => {
         headers: { Accept: "application/json" },
       }),
     );
+  });
+
+  it("rejects a successful Trace page for a different exact Trace", async () => {
+    const client = new EvidenceClient({
+      fetcher: vi.fn<typeof fetch>().mockResolvedValue(
+        new Response(JSON.stringify(traceResponse()), {
+          headers: { "content-type": "application/json" },
+        }),
+      ),
+    });
+
+    await expect(
+      client.getPage("traces", {
+        trace_id: "c".repeat(32),
+        limit: 100,
+      }),
+    ).resolves.toMatchObject({
+      ok: false,
+      error: { kind: "INCOMPATIBLE" },
+    });
   });
 
   it("rejects a response above four MiB before JSON decoding", async () => {
