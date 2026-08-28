@@ -1,8 +1,36 @@
 import { line } from "d3";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+
+import { MetricExplanationView, ReceiptView } from "./components/details";
+import {
+  EvidenceConsoleFoundation,
+  type EvidenceConsoleRow,
+  type EvidenceScope,
+} from "./components/evidence-console";
+import { OwnedInspector } from "./components/inspector";
+import { MetricResultFrame } from "./components/metric-result";
+import {
+  MotionControl,
+  RecordedStructureFoundation,
+  type MotionMode,
+  type RecordedStructureViewModel,
+} from "./components/recorded-structure";
+import {
+  CoverageLabel,
+  EvidenceLifecycleLabel,
+  MetricTruthLabel,
+} from "./components/status";
+import type {
+  Coverage,
+  MetricSlice,
+  ResolvedEvaluationContext,
+  TruthState,
+} from "./domain/evolution/types";
 
 type Theme = "system" | "light" | "dark";
 type Density = "comfortable" | "compact";
+type InspectorKind = "explanation" | "receipt";
+type EvidencePreviewState = "READY" | "EMPTY" | "PARTIAL" | "EXPIRED";
 
 const trendPoints: ReadonlyArray<readonly [number, number]> = [
   [8, 57],
@@ -13,6 +41,122 @@ const trendPoints: ReadonlyArray<readonly [number, number]> = [
   [198, 18],
 ];
 
+const truthStates: TruthState[] = [
+  "AVAILABLE",
+  "LOWER_BOUND",
+  "NOT_APPLICABLE",
+  "UNAVAILABLE",
+  "EXPIRED",
+  "INCOMPATIBLE",
+];
+
+const coverages: Coverage[] = [
+  {
+    numerator: "0",
+    denominator: "0",
+    raw_ratio: null,
+    state: "NO_POPULATION",
+    alert: null,
+  },
+  {
+    numerator: "0",
+    denominator: "4",
+    raw_ratio: "0",
+    state: "NO_COVERAGE",
+    alert: "LOW_COVERAGE",
+  },
+  {
+    numerator: "3",
+    denominator: "4",
+    raw_ratio: "3/4",
+    state: "PARTIAL",
+    alert: null,
+  },
+  {
+    numerator: "4",
+    denominator: "4",
+    raw_ratio: "1",
+    state: "FULL",
+    alert: null,
+  },
+];
+
+const previewSlice: MetricSlice = {
+  slice_key: {},
+  state: "AVAILABLE",
+  value: { kind: "RATIO", value: "3/4", unit: "ratio" },
+  measures: {},
+  numerator: "3",
+  denominator: "4",
+  contributing_count: "4",
+  coverage: coverages[3]!,
+  compatibility: {},
+  exclusions: [],
+  missing_inputs: [],
+  provenance_refs: ["fact:preview"],
+};
+
+const evidenceRows: EvidenceConsoleRow[] = [
+  {
+    factId: "fact-preview",
+    factClass: "delivery.outcome",
+    coordinates: { delivery_id: "delivery-preview" },
+    provenance: "accepted:event-preview",
+    truth: {
+      completeness: "FINAL",
+      availability: "AVAILABLE",
+      expiry: "ACTIVE",
+      expires_at: null,
+    },
+    trace: {
+      traceId: "trace-preview",
+      spanId: "span-preview",
+      state: "PARTIAL",
+    },
+  },
+];
+
+const structure: RecordedStructureViewModel = {
+  depthGroups: [
+    { depth: 0, nodes: [{ id: "root", label: "Root", state: "AVAILABLE" }] },
+    {
+      depth: 1,
+      nodes: [
+        { id: "writer", label: "Writer", state: "PARTIAL" },
+        { id: "reviewer", label: "Reviewer", state: "AVAILABLE" },
+      ],
+    },
+  ],
+  links: [{ sourceId: "writer", targetId: "reviewer", state: "AVAILABLE" }],
+  orphans: [{ id: "orphan", label: "Missing endpoint", state: "EXPIRED" }],
+};
+
+const receipt: ResolvedEvaluationContext = {
+  context_version: 1,
+  selection: { selection_version: 1, task_ids: ["task-preview"] },
+  as_of: "2026-08-28T01:00:00.000000Z",
+  resolved_at: "2026-08-28T01:00:01.000000Z",
+  task_population: [
+    {
+      task_id: "task-preview",
+      display_name: "Preview task",
+      memberships: [],
+      cohort_coordinates: {},
+      exclusions: ["UNDEFINED_TASK_MEMBERSHIP"],
+    },
+  ],
+  catalog: {
+    catalog_id: "agentops.evaluation.metric-catalog",
+    version: "2.0.0",
+    semantic_digest: "a".repeat(64),
+    observation_profile: "1.0.0",
+  },
+  evidence_bindings: [],
+  input_refs: [],
+  workflow_resolutions: [],
+  population_state: "OPEN",
+};
+
 function FactualPreview() {
   const path = useMemo(
     () =>
@@ -21,27 +165,15 @@ function FactualPreview() {
         .y(([, y]) => y)(trendPoints),
     [],
   );
-
   return (
     <svg
       aria-label="Factual trend preview"
-      className="h-24 w-full text-data-series-1"
+      className="visual-preview text-data-series-1"
       role="img"
       viewBox="0 0 206 70"
     >
-      <path
-        className="stroke-border-default"
-        d="M8 62 H198"
-        fill="none"
-        vectorEffect="non-scaling-stroke"
-      />
-      <path
-        className="stroke-current"
-        d={path ?? undefined}
-        fill="none"
-        strokeWidth="2.5"
-        vectorEffect="non-scaling-stroke"
-      />
+      <path className="stroke-border-default" d="M8 62 H198" fill="none" />
+      <path className="stroke-current" d={path ?? undefined} fill="none" />
       {trendPoints.map(([x, y]) => (
         <circle
           className="fill-current"
@@ -59,7 +191,7 @@ function TracePreview() {
   return (
     <svg
       aria-label="Recorded trace preview"
-      className="h-24 w-full text-data-series-2"
+      className="visual-preview text-data-series-2"
       role="img"
       viewBox="0 0 206 70"
     >
@@ -67,8 +199,6 @@ function TracePreview() {
         className="stroke-border-strong"
         d="M29 35 H94 M112 35 H177"
         fill="none"
-        strokeDasharray="4 3"
-        vectorEffect="non-scaling-stroke"
       />
       {[20, 103, 186].map((x) => (
         <circle
@@ -77,35 +207,33 @@ function TracePreview() {
           cy="35"
           key={x}
           r="9"
-          strokeWidth="2"
         />
       ))}
     </svg>
   );
 }
 
-function TruthBadge({
-  children,
-  tone,
-}: {
-  children: string;
-  tone: "available" | "partial";
-}) {
-  const toneClass = tone === "available" ? "truth-available" : "truth-partial";
-  return <span className={`truth-badge ${toneClass}`}>{children}</span>;
-}
-
 export function App() {
   const [theme, setTheme] = useState<Theme>("system");
   const [density, setDensity] = useState<Density>("comfortable");
+  const [inspector, setInspector] = useState<InspectorKind | null>(null);
+  const [scope, setScope] = useState<EvidenceScope>("result");
+  const [evidenceState, setEvidenceState] =
+    useState<EvidencePreviewState>("READY");
+  const [motion, setMotion] = useState<MotionMode>("STILL");
+  const explanationButton = useRef<HTMLButtonElement>(null);
+  const receiptButton = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
   }, [theme]);
-
   useEffect(() => {
     document.documentElement.dataset.density = density;
   }, [density]);
+
+  const evidenceConsoleState = { tag: evidenceState } as const;
+  const invokerRef =
+    inspector === "receipt" ? receiptButton : explanationButton;
 
   return (
     <main className="min-h-screen bg-surface-canvas px-layout-page py-layout-section text-content-primary">
@@ -115,8 +243,8 @@ export function App() {
             <p className="text-label text-content-muted">Component preview</p>
             <h1 className="text-title">BI visual system</h1>
             <p className="max-w-prose text-body text-content-secondary">
-              Semantic tokens bind theme, density, spacing and D3 color without
-              fixing page composition.
+              Semantic, typed presentation foundations; this is not the product
+              dashboard.
             </p>
           </div>
           <div className="flex flex-wrap gap-layout-cluster">
@@ -147,34 +275,135 @@ export function App() {
         </header>
 
         <section
-          aria-label="Semantic component examples"
+          aria-label="Metric truth states"
+          className="panel-card"
+          role="region"
+        >
+          <h2 className="text-heading">Metric truth states</h2>
+          <div className="flex flex-wrap gap-layout-cluster">
+            {truthStates.map((state) => (
+              <MetricTruthLabel key={state} state={state} />
+            ))}
+          </div>
+          <div className="grid gap-layout-grid lg:grid-cols-2">
+            {coverages.map((coverage) => (
+              <CoverageLabel coverage={coverage} key={coverage.state} />
+            ))}
+          </div>
+        </section>
+
+        <section
+          aria-label="Metric presentation foundations"
           className="grid gap-layout-grid lg:grid-cols-2"
         >
+          <MetricResultFrame
+            content={{ tag: "RESULT", slice: previewSlice }}
+            coordinate="terminal-outcome-rate-preview@2.0.0"
+            visualization={<FactualPreview />}
+          />
           <article className="panel-card">
-            <div className="flex items-start justify-between gap-layout-cluster">
-              <div>
-                <p className="text-label text-content-muted">
-                  Factual primitive
-                </p>
-                <h2 className="text-heading">Trend geometry</h2>
-              </div>
-              <TruthBadge tone="available">Available</TruthBadge>
-            </div>
-            <FactualPreview />
-          </article>
-
-          <article className="panel-card">
-            <div className="flex items-start justify-between gap-layout-cluster">
-              <div>
-                <p className="text-label text-content-muted">Trace primitive</p>
-                <h2 className="text-heading">Recorded relationships</h2>
-              </div>
-              <TruthBadge tone="partial">Partial</TruthBadge>
-            </div>
+            <EvidenceLifecycleLabel traceState="PARTIAL" />
             <TracePreview />
           </article>
+          <MetricResultFrame
+            content={{ tag: "LOADING" }}
+            coordinate="loading-preview@2.0.0"
+          />
+          <MetricResultFrame
+            content={{
+              tag: "ERROR",
+              detail: "Scoped preview error; selection remains intact.",
+              retryable: false,
+            }}
+            coordinate="error-preview@2.0.0"
+          />
+        </section>
+
+        <section className="panel-card">
+          <h2 className="text-heading">Owned detail inspector</h2>
+          <div className="metric-actions">
+            <button
+              className="action-control"
+              onClick={() => setInspector("explanation")}
+              ref={explanationButton}
+              type="button"
+            >
+              Preview metric explanation
+            </button>
+            <button
+              className="action-control"
+              onClick={() => setInspector("receipt")}
+              ref={receiptButton}
+              type="button"
+            >
+              Preview receipt
+            </button>
+          </div>
+        </section>
+
+        <section className="panel-card">
+          <label className="control-label">
+            Evidence preview state
+            <select
+              className="control-field"
+              onChange={(event) =>
+                setEvidenceState(event.target.value as EvidencePreviewState)
+              }
+              value={evidenceState}
+            >
+              <option value="READY">Ready</option>
+              <option value="EMPTY">Empty</option>
+              <option value="PARTIAL">Partial</option>
+              <option value="EXPIRED">Expired</option>
+            </select>
+          </label>
+          <EvidenceConsoleFoundation
+            onScopeChange={setScope}
+            rows={evidenceState === "EMPTY" ? [] : evidenceRows}
+            scope={scope}
+            state={evidenceConsoleState}
+          />
+        </section>
+
+        <section className="panel-card">
+          <RecordedStructureFoundation
+            model={structure}
+            onSelect={() => undefined}
+          />
+          <MotionControl
+            canStart
+            mode={motion}
+            onReset={() => setMotion("STILL")}
+            onStart={() => setMotion("LIVE")}
+            onStop={() => setMotion("STILL")}
+            reducedMotion={false}
+          />
         </section>
       </div>
+
+      <OwnedInspector
+        invokerRef={invokerRef}
+        kind={inspector ?? "explanation"}
+        modal
+        onClose={() => setInspector(null)}
+        open={inspector !== null}
+        title={
+          inspector === "receipt" ? "Evaluation receipt" : "Metric explanation"
+        }
+      >
+        {inspector === "receipt" ? (
+          <ReceiptView receipt={receipt} side="single" />
+        ) : (
+          <MetricExplanationView
+            definition="Share of eligible Deliveries with a terminal outcome."
+            eligibility="Closed Deliveries with a valid outcome Fact."
+            exclusions={["Open Deliveries", "Invalid values"]}
+            limits="This metric does not attribute causes or recommend Workflow changes."
+            metricCoordinate="terminal-outcome-rate@2.0.0"
+            valueSemantics="Exact ratio over the eligible Delivery population."
+          />
+        )}
+      </OwnedInspector>
     </main>
   );
 }

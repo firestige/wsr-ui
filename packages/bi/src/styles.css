@@ -143,6 +143,7 @@
   --layout-inspector: 36rem;
   --layout-table-cell-min: 10rem;
   --layout-recorded-node-min: 12rem;
+  --layout-visual-preview-height: 6rem;
   --type-display-size: clamp(1.75rem, 4vw, 2.5rem);
   --type-heading-size: 1rem;
   --type-body-size: 0.9375rem;
@@ -323,6 +324,11 @@
 @utility truth-partial {
   background: var(--status-attention-surface);
   color: var(--status-attention);
+}
+
+@utility visual-preview {
+  width: 100%;
+  height: var(--layout-visual-preview-height);
 }
 
 @utility status-stack {
