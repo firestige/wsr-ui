@@ -312,6 +312,60 @@
   background: var(--surface-raised);
 }
 
+@utility task-selector {
+  display: grid;
+  gap: var(--space-section);
+  max-width: var(--layout-content);
+  margin-inline: auto;
+}
+
+@utility mode-selector {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-grid);
+  padding: var(--space-cluster);
+  border: 1px solid var(--border-default);
+  border-radius: var(--shape-control);
+  background: var(--surface-panel);
+}
+
+@utility task-list {
+  display: grid;
+  align-content: start;
+  gap: var(--space-tight);
+  min-width: 0;
+  padding: var(--space-cluster);
+  border: 1px solid var(--border-default);
+  border-radius: var(--shape-panel);
+  background: var(--surface-panel);
+}
+
+@utility task-choice {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-cluster);
+  min-height: var(--density-row);
+  padding: var(--space-cluster);
+  border-radius: var(--shape-control);
+
+  & span {
+    display: grid;
+    gap: var(--space-tight);
+  }
+
+  &:has(input:checked) {
+    background: var(--interaction-selection);
+    box-shadow: inset var(--selection-marker-size) 0 0 var(--interaction-accent);
+  }
+}
+
+@utility compare-task-lists {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
+  gap: var(--space-grid);
+}
+
 @utility evaluation-results {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
