@@ -125,6 +125,32 @@ test("API failure remains scoped, retryable, and preserves the deep link", async
   await expect(page).toHaveURL("/evaluate?v=1&task=task-browser");
 });
 
+test("Evidence drill-down preserves exact selection, scope, and return identity", async ({
+  page,
+}) => {
+  await page.goto("/evaluate?v=1&task=task-browser");
+  await page.getByRole("button", { name: "View evidence" }).first().focus();
+  await page.keyboard.press("Enter");
+
+  await expect(
+    page.getByRole("heading", { name: "Evidence Console" }),
+  ).toBeVisible();
+  await expect(page).toHaveURL(
+    "/evaluate/evidence?v=1&task=task-browser&metric=role-template-rework-rate%402.0.0&side=single&scope=result",
+  );
+  await page.getByRole("button", { name: "Related Facts" }).click();
+  await expect(page).toHaveURL(/scope=related/);
+  await page.getByRole("button", { name: "Back to evaluation" }).click();
+  await expect(page).toHaveURL(
+    "/evaluate?v=1&task=task-browser&metric=role-template-rework-rate%402.0.0&side=single",
+  );
+  await expect(
+    page
+      .getByRole("article", { name: "role-template-rework-rate@2.0.0" })
+      .first(),
+  ).toBeVisible();
+});
+
 test("evaluate selection is keyboard reachable with theme parity", async ({
   page,
 }) => {
