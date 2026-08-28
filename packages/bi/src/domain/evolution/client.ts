@@ -283,7 +283,7 @@ function metricSlice(value: unknown): value is MetricSlice {
   )
     return false;
   if (
-    !coverage(value.coverage) ||
+    (value.coverage !== null && !coverage(value.coverage)) ||
     !strings(value.exclusions) ||
     !strings(value.missing_inputs) ||
     !strings(value.provenance_refs)

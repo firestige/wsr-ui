@@ -58,6 +58,13 @@ describe("semantic status components", () => {
     expect(screen.queryByText(/0%/)).not.toBeInTheDocument();
   });
 
+  it("renders explicit null coverage as unavailable rather than zero", () => {
+    render(<CoverageLabel coverage={null} />);
+
+    expect(screen.getByText("Coverage unavailable")).toBeVisible();
+    expect(screen.queryByText(/0 \/ 0/)).not.toBeInTheDocument();
+  });
+
   it("preserves exact large coverage counts and low-coverage alert text", () => {
     render(
       <CoverageLabel
