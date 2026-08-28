@@ -27,7 +27,7 @@ describe("bounded dashboard layouts", () => {
           metric_coordinate: "delivery-terminal-outcome-rate@2.0.0",
           visualizer: "ratio-bar@1",
           size: "MEDIUM",
-          channels: { value: "value" },
+          channels: { value: "value", domain: "ratio-domain" },
           transforms: ["RATIO_TO_PERCENT", "SCALE_LAYOUT"],
         },
       ],
@@ -49,6 +49,37 @@ describe("bounded dashboard layouts", () => {
     expect(
       decodeLayout({ layout_version: 1, name: "Local", panels: [panel] }),
     ).toMatchObject({ ok: true });
+  });
+
+  it.each([
+    {
+      panel_id: "missing-channel",
+      metric_coordinate: "delivery-terminal-outcome-rate@2.0.0",
+      visualizer: "ratio-bar@1",
+      size: "MEDIUM",
+      channels: { value: "value" },
+      transforms: ["RATIO_TO_PERCENT", "SCALE_LAYOUT"],
+    },
+    {
+      panel_id: "wrong-binding",
+      metric_coordinate: "delivery-terminal-outcome-rate@2.0.0",
+      visualizer: "ratio-bar@1",
+      size: "MEDIUM",
+      channels: { value: "invented", domain: "ratio-domain" },
+      transforms: ["RATIO_TO_PERCENT", "SCALE_LAYOUT"],
+    },
+    {
+      panel_id: "missing-transform",
+      metric_coordinate: "delivery-terminal-outcome-rate@2.0.0",
+      visualizer: "ratio-bar@1",
+      size: "MEDIUM",
+      channels: { value: "value", domain: "ratio-domain" },
+      transforms: ["RATIO_TO_PERCENT"],
+    },
+  ])("rejects an open or partial panel binding", (panel) => {
+    expect(
+      decodeLayout({ layout_version: 1, name: "Local", panels: [panel] }),
+    ).toMatchObject({ ok: false });
   });
 
   it.each([

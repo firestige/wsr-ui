@@ -65,7 +65,11 @@ const tablePanel = (
   visualizer: "table@1",
   size: "WIDE",
   channels: { "published-result": "slices" },
-  transforms: ["DISPLAY_ROUNDING", "STABLE_AUTHORITATIVE_SORT"],
+  transforms: [
+    "DISPLAY_ROUNDING",
+    "RATIO_TO_PERCENT",
+    "STABLE_AUTHORITATIVE_SORT",
+  ],
 });
 
 export const PRESET_LAYOUTS = {
@@ -95,7 +99,7 @@ export const PRESET_LAYOUTS = {
         visualizer: "numeric-card@1",
         size: "SMALL",
         channels: { value: "value" },
-        transforms: ["DISPLAY_ROUNDING"],
+        transforms: ["DISPLAY_ROUNDING", "RATIO_TO_PERCENT"],
       },
       tablePanel("delivery-stage-reach@2.0.0"),
       {
@@ -143,14 +147,20 @@ function panel(value: unknown): value is LayoutPanel {
   )
     return false;
   const declaration = VISUALIZER_REGISTRY[value.visualizer as VisualizerId];
+  const expectedChannels = Object.fromEntries(
+    declaration.channels.map((channel) => [
+      channel,
+      channelBinding[channel] ?? channel,
+    ]),
+  );
   return (
-    Object.keys(value.channels).every((channel) =>
-      declaration.channels.includes(channel),
+    Object.keys(value.channels).length === declaration.channels.length &&
+    Object.entries(value.channels).every(
+      ([channel, binding]) => expectedChannels[channel] === binding,
     ) &&
+    value.transforms.length === declaration.transforms.length &&
     value.transforms.every(
-      (transform) =>
-        typeof transform === "string" &&
-        declaration.transforms.includes(transform as never),
+      (transform, index) => transform === declaration.transforms[index],
     )
   );
 }
