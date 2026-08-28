@@ -19,15 +19,20 @@ npm run docker:smoke
 ```
 
 The app is TypeScript/TSX throughout. Vite is the only application development/build path. The
-`/preview` SPA route is a lightweight Wave 2 component and token preview, not a factual or Trace
-business implementation.
+`/preview` SPA route is a component/token catalog. The product workspace is rooted at `/evaluate`.
 
 ## Runtime boundary
 
 `Dockerfile` builds `packages/bi/dist` and copies it into Nginx. The runtime image contains no BI
-business server. Nginx serves the SPA and proxies only `GET /v1/evidence/facts` and
-`GET /v1/evidence/traces` to `EVIDENCE_UPSTREAM` (default `evidence:4318`). It never connects to
-PostgreSQL.
+business server. Nginx serves the SPA and exposes this closed same-origin API surface:
+
+- `POST /api/evolution/v1/evaluations:compute` to `EVOLUTION_UPSTREAM`;
+- `GET /v1/evidence/tasks`, `/v1/evidence/facts`, and `/v1/evidence/traces` to
+  `EVIDENCE_UPSTREAM`.
+
+Other `/api/**` and `/v1/evidence/**` routes fail closed instead of reaching the SPA. The browser
+cannot query Manifest projections; Evolution does so on its private Evidence connection. Nginx never
+computes metrics or connects to PostgreSQL. Its `/healthz` reports Nginx/static-service liveness only.
 
 Build locally without publishing:
 
