@@ -149,6 +149,12 @@ test("Evidence drill-down preserves exact selection, scope, and return identity"
       .getByRole("article", { name: "role-template-rework-rate@2.0.0" })
       .first(),
   ).toBeVisible();
+  await expect(
+    page
+      .getByRole("article", { name: "role-template-rework-rate@2.0.0" })
+      .first()
+      .getByRole("button", { name: "View evidence" }),
+  ).toBeFocused();
 });
 
 test("evaluate selection is keyboard reachable with theme parity", async ({

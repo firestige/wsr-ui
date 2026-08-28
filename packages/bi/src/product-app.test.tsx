@@ -37,6 +37,28 @@ const taskPage: TaskPage = {
 afterEach(() => window.history.replaceState(null, "", "/preview"));
 
 describe("BI product route", () => {
+  it("places the main-content skip link first in keyboard order", async () => {
+    const user = userEvent.setup();
+    render(
+      <ProductApp
+        evidence={{ getFactsPage: vi.fn() }}
+        evolution={{ computeSingle: vi.fn(), computeCompare: vi.fn() }}
+        initialRelativeUrl="/evaluate"
+        tasks={{
+          getPage: vi.fn(async () => ({ ok: true as const, value: taskPage })),
+        }}
+      />,
+    );
+
+    await user.tab();
+    expect(
+      screen.getByRole("link", { name: "Skip to main content" }),
+    ).toHaveFocus();
+    expect(
+      screen.getByRole("link", { name: "Skip to main content" }),
+    ).toHaveAttribute("href", "#main-content");
+  });
+
   it("uses display name for reading and Task ID for navigation identity", async () => {
     const getPage = vi.fn(async (): Promise<TaskResult> => ({
       ok: true,

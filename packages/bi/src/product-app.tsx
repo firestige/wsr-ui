@@ -146,7 +146,7 @@ function TaskSelector({
     ) ?? [];
 
   return (
-    <main className="evaluation-shell">
+    <main className="evaluation-shell" id="main-content" tabIndex={-1}>
       <header className="evaluation-header">
         <div>
           <p className="text-label">Business intelligence</p>
@@ -338,11 +338,29 @@ export function ProductApp({
   }, []);
   const navigate = (next: EvaluationRoute) => {
     const relativeUrl = serializeEvaluationRoute(next);
-    window.history.pushState(null, "", relativeUrl);
+    if (next.tag === "EVIDENCE" && route.tag !== "EVIDENCE") {
+      const parent: EvaluationRoute = {
+        ...next.selection,
+        focus: { metric: next.metric, side: next.side },
+      };
+      window.history.replaceState(
+        { wsrBi: true },
+        "",
+        serializeEvaluationRoute(parent),
+      );
+      window.history.pushState({ wsrBiParent: true }, "", relativeUrl);
+    } else if (next.tag === "EVIDENCE" && route.tag === "EVIDENCE") {
+      window.history.replaceState({ wsrBiParent: true }, "", relativeUrl);
+    } else {
+      window.history.pushState({ wsrBi: true }, "", relativeUrl);
+    }
     setRoute(next);
   };
   return (
     <>
+      <a className="skip-link" href="#main-content">
+        Skip to main content
+      </a>
       <nav aria-label="Display preferences" className="product-preferences">
         <label className="control-label">
           Theme
@@ -378,11 +396,22 @@ export function ProductApp({
         <EvidenceDrilldown
           evidence={evidence}
           evolution={evolution}
+          onBack={() => {
+            if (window.history.state?.wsrBiParent === true)
+              window.history.back();
+            else {
+              const parent: EvaluationRoute = {
+                ...route.selection,
+                focus: { metric: route.metric, side: route.side },
+              };
+              navigate(parent);
+            }
+          }}
           onNavigate={navigate}
           route={route}
         />
       ) : route.tag === "TRACE" ? (
-        <main className="evaluation-shell">
+        <main className="evaluation-shell" id="main-content" tabIndex={-1}>
           <h1 className="text-title">Recorded Trace</h1>
           <p aria-live="polite" className="loading-state" role="status">
             Resolving evaluation context…

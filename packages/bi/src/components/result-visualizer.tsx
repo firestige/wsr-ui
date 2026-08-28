@@ -12,9 +12,11 @@ import { ScopedError } from "./status";
 function PanelActions({
   onExplain,
   onEvidence,
+  focusEvidenceAction = false,
 }: {
   onExplain?: (trigger: HTMLButtonElement) => void;
   onEvidence?: (trigger: HTMLButtonElement) => void;
+  focusEvidenceAction?: boolean;
 }) {
   if (onExplain === undefined && onEvidence === undefined) return null;
   return (
@@ -30,6 +32,7 @@ function PanelActions({
       )}
       {onEvidence === undefined ? null : (
         <button
+          autoFocus={focusEvidenceAction}
           className="action-control"
           onClick={(event) => onEvidence(event.currentTarget)}
           type="button"
@@ -182,11 +185,13 @@ export function MetricPanel({
   visualizer,
   onExplain,
   onEvidence,
+  focusEvidenceAction = false,
 }: {
   result: MetricResult;
   visualizer: VisualizerId;
   onExplain?: (trigger: HTMLButtonElement) => void;
   onEvidence?: (trigger: HTMLButtonElement) => void;
+  focusEvidenceAction?: boolean;
 }) {
   const coordinate = `${result.metric_id}@${result.metric_version}`;
   const compatible = result.slices.every((slice) =>
@@ -211,14 +216,22 @@ export function MetricPanel({
           label="Fallback result data"
           slices={result.slices}
         />
-        <PanelActions onEvidence={onEvidence} onExplain={onExplain} />
+        <PanelActions
+          focusEvidenceAction={focusEvidenceAction}
+          onEvidence={onEvidence}
+          onExplain={onExplain}
+        />
       </section>
     );
   if (visualizer === "table@1")
     return (
       <section className="panel-card">
         <ResultTable coordinate={coordinate} slices={result.slices} />
-        <PanelActions onEvidence={onEvidence} onExplain={onExplain} />
+        <PanelActions
+          focusEvidenceAction={focusEvidenceAction}
+          onEvidence={onEvidence}
+          onExplain={onExplain}
+        />
       </section>
     );
   return result.slices.map((slice) => (
@@ -228,6 +241,7 @@ export function MetricPanel({
       key={JSON.stringify(slice.slice_key)}
       onEvidence={onEvidence}
       onExplain={onExplain}
+      focusEvidenceAction={focusEvidenceAction}
       visualization={
         visualizer === "ratio-bar@1" ? <RatioBar slice={slice} /> : undefined
       }

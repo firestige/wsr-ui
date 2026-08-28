@@ -77,6 +77,7 @@ export function MetricResultFrame({
   onExplain,
   onEvidence,
   onRecover,
+  focusEvidenceAction = false,
   recoveryLabel = "Recover result",
 }: {
   coordinate: string;
@@ -85,6 +86,7 @@ export function MetricResultFrame({
   onExplain?: (trigger: HTMLButtonElement) => void;
   onEvidence?: (trigger: HTMLButtonElement) => void;
   onRecover?: () => void;
+  focusEvidenceAction?: boolean;
   recoveryLabel?: string;
 }) {
   return (
@@ -145,6 +147,7 @@ export function MetricResultFrame({
             )}
             {onEvidence === undefined ? null : (
               <button
+                autoFocus={focusEvidenceAction}
                 className="action-control"
                 onClick={(event) => onEvidence(event.currentTarget)}
                 type="button"
