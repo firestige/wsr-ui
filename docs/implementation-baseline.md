@@ -1,7 +1,10 @@
 # Iteration 5 BI Implementation Baseline
 
-> Status: Wave 2 G2b conformity PASS, 2026-08-27. This document freezes routine implementation
-> parameters under the owner-approved G1 design at superproject commit `7de892a7c02ca8164798c1d61b5b68b88182b99c`.
+> Status: Wave 2 G2b conformity PASS with Wave3 design rebaseline, 2026-08-28. The exact toolchain,
+> repository, source-build and test feasibility below remain reusable. Browser metric evaluation,
+> the BI-local manifest, fixed `/factual`/`/trace` IA and single-Evidence-upstream assumptions are
+> superseded by the accepted Wave3 candidate designs in the superproject. This document does not
+> authorize product implementation or publish a Contract.
 
 ## Repository and authority
 
@@ -16,9 +19,9 @@
 | Superproject mount            | `wsr-ui/` submodule                                                      |
 | Product scope                 | BI only; no workflow-builder/intake-sidebar package, shell, image or job |
 
-All Iter5 source changes land on `iter5/implementation`. Wave 8 must squash-merge the component
+All Iter5 source changes land on `iter5/implementation`. Wave 11 must squash-merge the component
 feature line to component `main` first, then repin the superproject feature line to that main commit.
-The superproject feature line is squash-merged to superproject `main` only after Wave 9 PASS.
+The superproject feature line is squash-merged to superproject `main` only after Wave 12 qualification.
 
 ## Exact toolchain and dependencies
 
@@ -52,7 +55,7 @@ runtime program is the frozen Nginx base.
 | wsr-ui BI source      | `packages/bi/**`                                                                                   |
 | wsr-ui build/runtime  | `package*.json`, TypeScript/Vite/test config, `Dockerfile`, `.dockerignore`, `deployment/nginx/**` |
 | wsr-ui qualification  | `.github/workflows/ci.yml`, `scripts/**`, `tests/browser/**`, `docs/dependency-inventory.ndjson`   |
-| superproject assembly | `deployment/compose.iter5.yaml` (Wave 6), `qualification/iter5/**` (Wave 7), `wsr-ui` pin          |
+| superproject assembly | `deployment/compose.iter5.yaml` (Wave 9), `qualification/iter5/**` (Wave 10), `wsr-ui` pin        |
 
 The complete `pg + evidence + bi-app` Compose never lives in this repository. The BI Dockerfile and
 Nginx configuration never live in the superproject. Future UI deliverables do not consume or constrain
@@ -60,14 +63,25 @@ the BI package in Iter5.
 
 ## Runtime and distribution
 
-The BI application is an SPA with Vite routes `/factual`, `/trace` and the Wave 2-only `/preview`.
-Nginx listens on container port 80. `EVIDENCE_UPSTREAM` defaults to Docker DNS `evidence:4318` and
-is substituted into the Nginx template at container start. Only the exact facts and traces paths admit
-GET/HEAD; other methods are denied. `/healthz` is local infrastructure health, not Evidence health.
+The accepted Iter5 application is one SPA rooted at `/evaluate`; single is the default and compare is
+an explicit same-workspace mode. Evidence Console and recorded Trace are drill-down routes that retain
+the evaluation selection and return identity. `/preview` remains only a Wave 2 feasibility route until
+later waves replace the superseded feature-branch UI.
+
+The future Nginx boundary has two private upstream authorities:
+
+- Evolution accepts only the approved side-effect-free Metric Result compute POST;
+- Evidence accepts only approved Task discovery and Fact/recorded-Trace read operations.
+
+The exact Evidence Task-query route and final upstream ports/DNS are contract/deployment alignment
+inputs for later waves; the current Nginx file must not guess them. `EVIDENCE_UPSTREAM` remains a Wave2
+scaffold fact, not the complete Wave3 topology. Unknown/write routes fail closed. Nginx computes no
+metric, stores no receipt and has no database client. `/healthz` is local infrastructure health, not
+Evolution or Evidence semantic health.
 
 The superproject-owned Compose path is frozen as `deployment/compose.iter5.yaml`. Its default host
-binding is `127.0.0.1:8080:80`; PostgreSQL and Evidence expose no host port. Wave 6 owns its
-implementation and Wave 9 owns the clean full-Compose oracle:
+binding is `127.0.0.1:8080:80`; PostgreSQL, Evidence and Evolution expose no host port. Wave 9 owns its
+implementation and Wave 12 owns the clean full-Compose oracle:
 
 ```sh
 docker compose -f deployment/compose.iter5.yaml up --build --wait
@@ -97,11 +111,38 @@ The bounded preview proves:
 
 This is stack feasibility only. It does not implement, claim or infer #53–#55 business behavior.
 
+Wave3 freezes the future UI contract in superproject
+`docs/systems/bi/bi-ui-design.md`. Tailwind continues to consume semantic bindings; the detailed
+contract adds `/evaluate` deep-link restoration, bounded dashboard presets/custom layout, a closed
+visualizer registry, multi-slice Metric Results, full/partial compare, receipt/metric-explanation
+responsibility separation, Evidence Console, recorded-structure navigation, finite Still/Live motion,
+three responsive capacities and complete accessibility/error recovery. The old preview's factual line,
+fixed pages and component names are not authority for those behaviors.
+
+## Superseded feature-branch boundary
+
+The following committed feature-branch work is retained as history but must not be imported into the
+new product path:
+
+- browser-side Catalog formulas, evaluator or result digest;
+- `wsr.bi.evaluation-context@1.0.0` and local `evaluation-context.json`;
+- fixed `/factual` and `/trace` page composition;
+- any component/API whose semantics require a single Evidence upstream;
+- an independent `Recorded Reach` result/component.
+
+The typed Evidence transport/decoder can be reused only after rebinding it to direct Fact/Trace
+drill-down and the exact revised Contract coordinates. React/D3/Tailwind/Vite, semantic tokens,
+theme/density controls, primitives and test/build infrastructure remain reusable. The published
+`delivery-stage-reach` Metric Result remains valid; Trace recorded-structure navigation is a separate
+presentation responsibility.
+
 ## Contract-derived fixtures and oracle map
 
-`packages/bi/src/test/fixtures/upstream-binding.json` binds four Wave 3 mock derivations to exact files,
-digests and commit `b50525f5b1db2c017d71ed307ed25bb1c3a7c783` from `system-contracts`. Wave 2 records provenance;
-Wave 3 owns typed payload derivation. No formula or Evidence response is copied into UI production code.
+`packages/bi/src/test/fixtures/upstream-binding.json` binds the Wave 2 feasibility fixtures to exact files,
+digests and commit `b50525f5b1db2c017d71ed307ed25bb1c3a7c783` from `system-contracts`. This is historical fixture
+provenance, not proof of the accepted Evolution result or Task-query contracts. Later waves must derive
+their typed fixtures from the then-approved coordinates; no formula or Evidence response is copied into
+UI production code.
 
 | Gate                          | Exact command / artifact                           |
 | ----------------------------- | -------------------------------------------------- |
@@ -118,8 +159,26 @@ Wave 3 owns typed payload derivation. No formula or Evidence response is copied 
 | future complete Compose       | superproject `deployment/compose.iter5.yaml`       |
 | future independence oracle    | superproject `qualification/iter5/independence/**` |
 
-Any need for a BI backend, database route, write proxy, registry publication, cross-system contract
-change, future-product abstraction or inferred fact/relationship blocks the current wave.
+Any need for a BI backend, database route, write proxy, registry publication, future-product abstraction,
+inferred fact/relationship, or cross-system semantic change beyond the accepted Task/Evolution alignment
+returns to design review.
+
+Wave3 adds the following future implementation verification map without changing current product code:
+
+| Design boundary | Required later-wave verification |
+| ---------------- | -------------------------------- |
+| authority | no Catalog formula, Delta computation, currency/unit conversion or missing-value fill in BI |
+| selection/deep link | exact ID-only restoration; Task display-name missing/duplicate/rename cases; 24 IDs/side and 8 KiB encoded URL bounds |
+| Metric Result | 14 coordinates on every successful side; canonical multi-slice keys; zero/absence and coverage/sample separation |
+| compare | full compare and `PARTIAL_COMPARE`; successful side retained; failed side scoped retry; all Delta coordinates side-unresolved |
+| dashboard/registry | closed preset/import schema; named channels; compatibility/domain/missing tolerance; table/text fallback |
+| semantic UI | light/dark parity, print/forced-colors, status redundancy, compact/comfortable information parity |
+| responsive/a11y | desktop/tablet/narrow, long names/numbers, 200-row table, keyboard-only journey, focus restoration and announcements |
+| Evidence drill-down | receipt-bound exact evidence vs related non-lineage Facts vs resolved read set; no reconstructed Fact/detail |
+| recorded Trace | parent-depth only, siblings together, independent LINK, orphan lane, no timestamp/arrival ordering, finite Still/Live |
+
+These cases extend existing identity, duplicate/conflict, pagination, completeness, retention and expiry
+fixtures. They do not introduce a Task-specific or cross-Fact/Trace global-snapshot Oracle.
 
 Wave 2 exit verification passed on 2026-08-27: clean locked install, format, lint, strict TypeScript,
 four unit/token tests, Vite build, dependency/license drift, Playwright keyboard/theme coverage,
