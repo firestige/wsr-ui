@@ -96,6 +96,30 @@ describe("Metric Result foundations", () => {
     expect(recover).toHaveBeenCalledOnce();
   });
 
+  it("shows exact mismatch coordinates for an incompatible result", () => {
+    render(
+      <MetricResultFrame
+        content={{
+          tag: "RESULT",
+          slice: {
+            ...availableSlice,
+            state: "INCOMPATIBLE",
+            value: undefined,
+            withholding_reason: "INCOMPATIBLE_INPUT",
+            compatibility: {
+              unit: "token|money",
+              source: "provider-a|provider-b",
+            },
+          },
+        }}
+        coordinate="delivery-count@2.0.0"
+      />,
+    );
+
+    expect(screen.getByText("unit=token|money")).toBeVisible();
+    expect(screen.getByText("source=provider-a|provider-b")).toBeVisible();
+  });
+
   it("keeps loading and error outside the MetricSlice truth union", () => {
     const { rerender } = render(
       <MetricResultFrame
