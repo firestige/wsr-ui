@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import type { FactsPage } from "./domain/evidence/types";
@@ -44,7 +44,7 @@ const facts: FactsPage = {
   ],
 };
 
-function response(): SingleResponse {
+function response(deliveryId = "delivery-a"): SingleResponse {
   return {
     api_version: 1,
     mode: "SINGLE",
@@ -57,7 +57,7 @@ function response(): SingleResponse {
             ...previewReceipt.task_population[0]!,
             memberships: [
               {
-                delivery_id: "delivery-a",
+                delivery_id: deliveryId,
                 manifest_digest: "b".repeat(64),
                 accepted_digest: "c".repeat(64),
                 profile_version: "2.0.0",
@@ -113,5 +113,70 @@ describe("Evidence drill-down", () => {
       limit: 200,
     });
     expect(screen.getByText(digest)).toBeVisible();
+  });
+
+  it("does not let an older drill-down request replace the current route", async () => {
+    let resolveOld:
+      ((value: { ok: true; value: SingleResponse }) => void) | undefined;
+    const oldRequest = new Promise<{ ok: true; value: SingleResponse }>(
+      (resolve) => {
+        resolveOld = resolve;
+      },
+    );
+    const computeSingle = vi.fn((taskIds: readonly string[]) =>
+      taskIds[0] === "task-old"
+        ? oldRequest
+        : Promise.resolve({ ok: true as const, value: response("delivery-b") }),
+    );
+    const getFactsPage = vi.fn(
+      async ({ delivery_id }: { delivery_id?: string }) => ({
+        ok: true as const,
+        value: {
+          ...facts,
+          items: facts.items.map((item) => ({
+            ...item,
+            id: delivery_id === "delivery-b" ? "fact-current" : "fact-old",
+          })),
+        },
+      }),
+    );
+    const evolution = { computeSingle, computeCompare: vi.fn() };
+    const evidence = { getFactsPage };
+    const route = {
+      tag: "EVIDENCE" as const,
+      metric: "delivery-cycle-time-ms@2.0.0" as const,
+      side: "single" as const,
+      scope: "result" as const,
+    };
+    const { rerender } = render(
+      <EvidenceDrilldown
+        evidence={evidence}
+        evolution={evolution}
+        route={{
+          ...route,
+          selection: { tag: "SINGLE", taskIds: ["task-old"] },
+        }}
+      />,
+    );
+    await vi.waitFor(() => expect(computeSingle).toHaveBeenCalledOnce());
+
+    rerender(
+      <EvidenceDrilldown
+        evidence={evidence}
+        evolution={evolution}
+        route={{
+          ...route,
+          selection: { tag: "SINGLE", taskIds: ["task-current"] },
+        }}
+      />,
+    );
+    expect(await screen.findByText("fact-current")).toBeVisible();
+    await act(async () => {
+      resolveOld?.({ ok: true, value: response("delivery-old") });
+      await oldRequest;
+    });
+
+    expect(screen.queryByText("fact-old")).toBeNull();
+    expect(screen.getByText("fact-current")).toBeVisible();
   });
 });

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
   EvidenceConsoleFoundation,
@@ -94,7 +94,9 @@ export function EvidenceDrilldown({
   onNavigate?: (route: EvaluationRoute) => void;
 }) {
   const [state, setState] = useState<State>({ tag: "LOADING" });
+  const requestGeneration = useRef(0);
   const load = useCallback(async () => {
+    const generation = ++requestGeneration.current;
     setState({ tag: "LOADING" });
     const computed =
       route.selection.tag === "SINGLE"
@@ -103,6 +105,7 @@ export function EvidenceDrilldown({
             route.selection.leftTaskIds,
             route.selection.rightTaskIds,
           );
+    if (generation !== requestGeneration.current) return;
     if (!computed.ok) {
       setState({ tag: "ERROR", detail: "Evaluation context unavailable" });
       return;
@@ -138,6 +141,7 @@ export function EvidenceDrilldown({
         delivery_id,
         limit: MAX_ROWS,
       });
+      if (generation !== requestGeneration.current) return;
       if (result.ok) pages.push(result.value);
       else failed = errorDetail(result);
     }
@@ -175,12 +179,16 @@ export function EvidenceDrilldown({
         : selectedFacts.every((fact) => fact.truth.expiry === "EXPIRED")
           ? "EXPIRED"
           : "READY";
+    if (generation !== requestGeneration.current) return;
     setState({ tag: "RESULT", rows: selectedFacts.map(row), truth });
   }, [evidence, evolution, route]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => void load(), 0);
-    return () => window.clearTimeout(timer);
+    return () => {
+      window.clearTimeout(timer);
+      requestGeneration.current += 1;
+    };
   }, [load]);
 
   const parent: EvaluationRoute =
