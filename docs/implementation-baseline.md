@@ -57,9 +57,10 @@ runtime program is the frozen Nginx base.
 | wsr-ui qualification  | `.github/workflows/ci.yml`, `scripts/**`, `tests/browser/**`, `docs/dependency-inventory.ndjson`   |
 | superproject assembly | `deployment/compose.iter5.yaml` (Wave 9), `qualification/iter5/**` (Wave 10), `wsr-ui` pin         |
 
-The complete `pg + evidence + bi-app` Compose never lives in this repository. The BI Dockerfile and
-Nginx configuration never live in the superproject. Future UI deliverables do not consume or constrain
-the BI package in Iter5.
+The complete `database + evidence + evolution + bi-app` Compose never lives in this repository (the
+Evidence migration job remains an operational prerequisite). The BI Dockerfile and Nginx configuration
+never live in the superproject. Future UI deliverables do not consume or constrain the BI package in
+Iter5.
 
 ## Runtime and distribution
 
@@ -68,16 +69,16 @@ an explicit same-workspace mode. Evidence Console and recorded Trace are drill-d
 the evaluation selection and return identity. `/preview` remains only a Wave 2 feasibility route until
 later waves replace the superseded feature-branch UI.
 
-The future Nginx boundary has two private upstream authorities:
+The Nginx boundary has two private upstream authorities:
 
 - Evolution accepts only the approved side-effect-free Metric Result compute POST;
 - Evidence accepts only approved Task discovery and Fact/recorded-Trace read operations.
 
-The exact Evidence Task-query route and final upstream ports/DNS are contract/deployment alignment
-inputs for later waves; the current Nginx file must not guess them. `EVIDENCE_UPSTREAM` remains a Wave2
-scaffold fact, not the complete Wave3 topology. Unknown/write routes fail closed. Nginx computes no
-metric, stores no receipt and has no database client. `/healthz` is local infrastructure health, not
-Evolution or Evidence semantic health.
+The closed browser surface is Evolution compute POST plus Evidence Task/Facts/Traces GET. Manifest
+projection stays private to Evolution. `EVIDENCE_UPSTREAM` defaults to `evidence:4318` and
+`EVOLUTION_UPSTREAM` defaults to `evolution:8000`; these are private container coordinates, not host
+ports. Unknown/write routes fail closed. Nginx computes no metric, stores no receipt and has no database
+client. `/healthz` is local infrastructure health, not Evolution or Evidence semantic health.
 
 The superproject-owned Compose path is frozen as `deployment/compose.iter5.yaml`. Its default host
 binding is `127.0.0.1:8080:80`; PostgreSQL, Evidence and Evolution expose no host port. Wave 9 owns its

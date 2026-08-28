@@ -14,7 +14,8 @@ ARG WSR_UI_REVISION=unbound
 LABEL org.opencontainers.image.source="https://github.com/firestige/wsr-ui" \
       org.opencontainers.image.revision=$WSR_UI_REVISION
 
-ENV EVIDENCE_UPSTREAM=evidence:4318
+ENV EVIDENCE_UPSTREAM=evidence:4318 \
+    EVOLUTION_UPSTREAM=evolution:8000
 COPY deployment/nginx/default.conf.template /etc/nginx/templates/default.conf.template
 COPY --from=build /workspace/packages/bi/dist /usr/share/nginx/html
 
