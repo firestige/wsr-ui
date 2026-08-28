@@ -79,7 +79,9 @@ function ResultTable({
                   : presentExactValue(slice.value).exact}
               </td>
               <td className="numeric-exact">
-                {slice.coverage.numerator} / {slice.coverage.denominator}
+                {slice.coverage === null
+                  ? "Unavailable"
+                  : `${slice.coverage.numerator} / ${slice.coverage.denominator}`}
               </td>
               <td className="numeric-exact">
                 {slice.provenance_refs.join(", ") || "None"}

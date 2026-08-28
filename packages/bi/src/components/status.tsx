@@ -64,7 +64,16 @@ const coveragePresentation: Record<
   FULL: { marker: "●", tone: "available" },
 };
 
-export function CoverageLabel({ coverage }: { coverage: Coverage }) {
+export function CoverageLabel({ coverage }: { coverage: Coverage | null }) {
+  if (coverage === null)
+    return (
+      <div className="coverage-label" data-coverage="UNAVAILABLE">
+        <span className="status-label status-unavailable">
+          <span aria-hidden="true">○</span>
+          Coverage unavailable
+        </span>
+      </div>
+    );
   const presentation = coveragePresentation[coverage.state];
   return (
     <div className="coverage-label" data-coverage={coverage.state}>

@@ -167,6 +167,23 @@ describe("closed Evolution decoder", () => {
     expect(decodeComputeResponse(body)).toMatchObject({ ok: true });
   });
 
+  it("accepts explicit null coverage but rejects an omitted coverage field", () => {
+    const nullCoverage = singleResponse();
+    nullCoverage.result.metric_results[0]!.slices[0]!.coverage = null as never;
+    expect(decodeComputeResponse(nullCoverage)).toMatchObject({ ok: true });
+
+    const omittedCoverage = singleResponse();
+    delete (
+      omittedCoverage.result.metric_results[0]!.slices[0] as Partial<
+        (typeof omittedCoverage.result.metric_results)[number]["slices"][number]
+      >
+    ).coverage;
+    expect(decodeComputeResponse(omittedCoverage)).toMatchObject({
+      ok: false,
+      error: { kind: "INCOMPATIBLE" },
+    });
+  });
+
   it.each([
     [
       "unknown field",

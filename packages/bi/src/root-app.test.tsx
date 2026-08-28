@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { RootApp } from "./root-app";
@@ -46,6 +46,6 @@ describe("BI route boundary", () => {
     );
 
     expect(screen.getByRole("heading", { name: "Choose Tasks" })).toBeVisible();
-    expect(getPage).toHaveBeenCalledWith({ limit: 100 });
+    await waitFor(() => expect(getPage).toHaveBeenCalledWith({ limit: 100 }));
   });
 });

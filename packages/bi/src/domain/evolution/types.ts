@@ -55,7 +55,7 @@ export interface MetricSlice {
   numerator?: string;
   denominator?: string;
   contributing_count?: string;
-  coverage: Coverage;
+  coverage: Coverage | null;
   compatibility: Record<string, string>;
   exclusions: string[];
   missing_inputs: string[];
