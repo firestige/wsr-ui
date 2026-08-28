@@ -35,6 +35,12 @@ describe("bounded dashboard layouts", () => {
     expect(decodeLayout(layout)).toEqual({ ok: true, value: layout });
   });
 
+  it("rejects an empty layout that would hide compare truth and recovery", () => {
+    expect(
+      decodeLayout({ layout_version: 1, name: "Empty", panels: [] }),
+    ).toMatchObject({ ok: false });
+  });
+
   it("creates only closed channel and transform bindings", () => {
     const panel = bindLayoutPanel(
       "local-1",

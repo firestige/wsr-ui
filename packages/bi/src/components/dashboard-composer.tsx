@@ -221,6 +221,7 @@ export function DashboardComposer({
                   </button>
                   <button
                     className="action-control"
+                    disabled={draft.panels.length === 1}
                     onClick={() =>
                       setDraft((current) => ({
                         ...current,

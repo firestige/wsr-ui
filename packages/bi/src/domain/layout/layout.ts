@@ -174,6 +174,7 @@ export function decodeLayout(input: unknown): LayoutResult {
     input.name.trim().length < 1 ||
     input.name.length > 80 ||
     !Array.isArray(input.panels) ||
+    input.panels.length < 1 ||
     input.panels.length > 24 ||
     !input.panels.every(panel)
   )

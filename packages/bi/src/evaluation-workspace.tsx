@@ -161,11 +161,24 @@ function SingleResults({
   );
 }
 
+const utf8Encoder = new TextEncoder();
+
+function bytewiseCompare(left: string, right: string): number {
+  const leftBytes = utf8Encoder.encode(left);
+  const rightBytes = utf8Encoder.encode(right);
+  const length = Math.min(leftBytes.length, rightBytes.length);
+  for (let index = 0; index < length; index += 1) {
+    const difference = leftBytes[index]! - rightBytes[index]!;
+    if (difference !== 0) return difference;
+  }
+  return leftBytes.length - rightBytes.length;
+}
+
 function sliceKey(value: Record<string, string>): string {
   return JSON.stringify(
     Object.fromEntries(
       Object.entries(value).sort(([left], [right]) =>
-        left < right ? -1 : left > right ? 1 : 0,
+        bytewiseCompare(left, right),
       ),
     ),
   );
