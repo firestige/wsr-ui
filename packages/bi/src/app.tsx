@@ -25,12 +25,12 @@ function FactualPreview() {
   return (
     <svg
       aria-label="Factual trend preview"
-      className="h-24 w-full text-data-primary"
+      className="h-24 w-full text-data-series-1"
       role="img"
       viewBox="0 0 206 70"
     >
       <path
-        className="stroke-border-subtle"
+        className="stroke-border-default"
         d="M8 62 H198"
         fill="none"
         vectorEffect="non-scaling-stroke"
@@ -59,7 +59,7 @@ function TracePreview() {
   return (
     <svg
       aria-label="Recorded trace preview"
-      className="h-24 w-full text-data-secondary"
+      className="h-24 w-full text-data-series-2"
       role="img"
       viewBox="0 0 206 70"
     >
@@ -72,7 +72,7 @@ function TracePreview() {
       />
       {[20, 103, 186].map((x) => (
         <circle
-          className="fill-surface-elevated stroke-current"
+          className="fill-surface-panel stroke-current"
           cx={x}
           cy="35"
           key={x}
