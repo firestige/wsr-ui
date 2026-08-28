@@ -80,8 +80,8 @@ function compareResponse(partial = false): CompareResponse {
               metric_coordinate,
               slice_key: {},
               state: "AVAILABLE",
-              value: { kind: "RATIO", value: "1/3", unit: "ratio" },
-              direction: "INCREASE",
+              value: { kind: "RATIO", value: "0", unit: "ratio" },
+              direction: "NO_CHANGE",
             }
           : {
               metric_coordinate,
@@ -487,5 +487,65 @@ describe("Evaluation workspace", () => {
     expect(
       screen.getAllByText("Delta unavailable until both sides resolve"),
     ).toHaveLength(12);
+  });
+
+  it("keeps the successful compare side visible while retrying", async () => {
+    let resolveRetry: ((result: EvolutionResult) => void) | undefined;
+    const retry = new Promise<EvolutionResult>((resolve) => {
+      resolveRetry = resolve;
+    });
+    const computeCompare = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: true, value: compareResponse(true) })
+      .mockImplementationOnce(() => retry);
+    const user = userEvent.setup();
+    render(
+      <EvaluationWorkspace
+        evolution={{ computeSingle: vi.fn(), computeCompare }}
+        route={{
+          tag: "COMPARE",
+          leftTaskIds: ["task-before"],
+          rightTaskIds: ["task-after"],
+        }}
+      />,
+    );
+
+    await user.click(await screen.findByRole("button", { name: "Retry" }));
+    expect(screen.getByRole("status")).toHaveTextContent("Retrying comparison");
+    expect(screen.getAllByText("Available").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Resolving evaluation…")).toBeNull();
+    await act(async () => {
+      resolveRetry?.({ ok: true, value: compareResponse() });
+      await retry;
+    });
+
+    expect(screen.queryByText("Retrying comparison")).toBeNull();
+    expect(screen.getAllByText("After")).toHaveLength(12);
+  });
+
+  it("retains the successful compare side when its retry also fails", async () => {
+    const computeCompare = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: true, value: compareResponse(true) })
+      .mockResolvedValueOnce({
+        ok: false,
+        error: { kind: "ERROR", reason: "NETWORK" },
+      });
+    const user = userEvent.setup();
+    render(
+      <EvaluationWorkspace
+        evolution={{ computeSingle: vi.fn(), computeCompare }}
+        route={{
+          tag: "COMPARE",
+          leftTaskIds: ["task-before"],
+          rightTaskIds: ["task-after"],
+        }}
+      />,
+    );
+
+    await user.click(await screen.findByRole("button", { name: "Retry" }));
+    expect(await screen.findByText("Comparison retry failed")).toBeVisible();
+    expect(screen.getByText("NETWORK")).toBeVisible();
+    expect(screen.getAllByText("Available").length).toBeGreaterThan(0);
   });
 });
