@@ -124,7 +124,8 @@ export class EvidenceTaskClient {
   readonly #timeoutMs: number;
 
   constructor(options: { fetcher?: typeof fetch; timeoutMs?: number } = {}) {
-    this.#fetcher = options.fetcher ?? fetch;
+    this.#fetcher =
+      options.fetcher ?? ((input, init) => globalThis.fetch(input, init));
     this.#timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   }
 
