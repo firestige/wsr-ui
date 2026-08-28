@@ -38,7 +38,12 @@ export type WorkspaceRoute = Extract<
 
 type WorkspaceState =
   | { tag: "LOADING" }
-  | { tag: "RESULT"; response: SingleResponse | CompareResponse }
+  | {
+      tag: "RESULT";
+      response: SingleResponse | CompareResponse;
+      retrying: boolean;
+      retryError?: { detail: string; retryable: boolean };
+    }
   | { tag: "ERROR"; detail: string; retryable: boolean };
 
 const LOCAL_LAYOUT_KEY = "wsr.bi.dashboard-layout@1";
@@ -177,6 +182,8 @@ function populationLabel(
 function CompareResults({
   response,
   onRetry,
+  retrying,
+  retryError,
   onEvidence,
   onExplain,
   onSelectMetric,
@@ -184,6 +191,8 @@ function CompareResults({
 }: {
   response: CompareResponse;
   onRetry: () => void;
+  retrying: boolean;
+  retryError?: { detail: string; retryable: boolean };
   onEvidence: (
     coordinate: keyof typeof METRIC_COPY,
     side: "left" | "right",
@@ -235,8 +244,21 @@ function CompareResults({
           announce="assertive"
           detail={`${failed.code}: ${failed.detail}`}
           onRetry={onRetry}
-          retryable={failed.retryable}
+          retryable={failed.retryable && !retrying}
           title={`${failedLabel} unavailable`}
+        />
+      )}
+      {retrying ? (
+        <p aria-live="polite" className="loading-state" role="status">
+          Retrying comparison… The resolved side remains visible.
+        </p>
+      ) : retryError === undefined ? null : (
+        <ScopedError
+          announce="assertive"
+          detail={retryError.detail}
+          onRetry={onRetry}
+          retryable={retryError.retryable}
+          title="Comparison retry failed"
         />
       )}
       {response.deltas.map((delta) => (
@@ -292,21 +314,38 @@ export function EvaluationWorkspace({
   const detailInvoker = useRef<HTMLButtonElement>(null);
   const requestGeneration = useRef(0);
 
-  const run = useCallback(async () => {
-    if (route.tag !== "SINGLE" && route.tag !== "COMPARE") return;
-    const generation = ++requestGeneration.current;
-    setState({ tag: "LOADING" });
-    const result =
-      route.tag === "SINGLE"
-        ? await evolution.computeSingle(route.taskIds)
-        : await evolution.computeCompare(route.leftTaskIds, route.rightTaskIds);
-    if (generation !== requestGeneration.current) return;
-    setState(
-      result.ok
-        ? { tag: "RESULT", response: result.value }
-        : { tag: "ERROR", ...errorPresentation(result) },
-    );
-  }, [evolution, route]);
+  const run = useCallback(
+    async (preserveCompare = false) => {
+      if (route.tag !== "SINGLE" && route.tag !== "COMPARE") return;
+      const generation = ++requestGeneration.current;
+      setState((current) =>
+        preserveCompare &&
+        current.tag === "RESULT" &&
+        current.response.mode === "COMPARE"
+          ? { ...current, retrying: true, retryError: undefined }
+          : { tag: "LOADING" },
+      );
+      const result =
+        route.tag === "SINGLE"
+          ? await evolution.computeSingle(route.taskIds)
+          : await evolution.computeCompare(
+              route.leftTaskIds,
+              route.rightTaskIds,
+            );
+      if (generation !== requestGeneration.current) return;
+      if (result.ok) {
+        setState({ tag: "RESULT", response: result.value, retrying: false });
+        return;
+      }
+      const error = errorPresentation(result);
+      setState((current) =>
+        preserveCompare && current.tag === "RESULT"
+          ? { ...current, retrying: false, retryError: error }
+          : { tag: "ERROR", ...error },
+      );
+    },
+    [evolution, route],
+  );
 
   useEffect(() => {
     const timer = window.setTimeout(() => void run(), 0);
@@ -499,7 +538,7 @@ export function EvaluationWorkspace({
               detailInvoker.current = trigger;
               setDetail({ kind: "explanation", coordinate });
             }}
-            onRetry={run}
+            onRetry={() => void run(true)}
             onSelectMetric={(metric) => {
               if (route.tag === "COMPARE")
                 onNavigate?.({
@@ -511,6 +550,8 @@ export function EvaluationWorkspace({
                 });
             }}
             response={state.response}
+            retryError={state.retryError}
+            retrying={state.retrying}
             selectedCoordinate={route.focus?.metric}
           />
         )}
