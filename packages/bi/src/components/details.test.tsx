@@ -19,6 +19,7 @@ const receipt: ResolvedEvaluationContext = {
     },
     {
       task_id: "task-b",
+      display_name: "   ",
       memberships: [],
       cohort_coordinates: {},
       exclusions: ["UNDEFINED_TASK_MEMBERSHIP"],
@@ -76,7 +77,7 @@ describe("inspector detail content", () => {
       screen.getByRole("heading", { name: "Evaluation receipt" }),
     ).toBeVisible();
     expect(screen.getByText("Checkout optimization")).toBeVisible();
-    expect(screen.getAllByText("task-b").length).toBeGreaterThan(0);
+    expect(screen.getByText("task-b").tagName).toBe("STRONG");
     expect(screen.getAllByText("PARTIAL").length).toBeGreaterThan(0);
     expect(screen.getByText("task-snapshot-a")).toBeVisible();
     expect(screen.getByText("fact-a")).toBeVisible();

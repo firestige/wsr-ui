@@ -136,20 +136,22 @@ export function EvidenceConsoleFoundation({
           Read-only Fact and recorded Trace drill-down.
         </p>
       </header>
-      <div aria-label="Evidence scope" className="scope-tabs" role="tablist">
-        {scopes.map((item) => (
-          <button
-            aria-selected={scope === item.id}
-            className="scope-tab"
-            key={item.id}
-            onClick={() => onScopeChange?.(item.id)}
-            role="tab"
-            type="button"
-          >
-            {item.label}
-          </button>
-        ))}
-      </div>
+      <nav aria-label="Evidence scope" className="scope-tabs">
+        <ul>
+          {scopes.map((item) => (
+            <li key={item.id}>
+              <button
+                aria-current={scope === item.id ? "page" : undefined}
+                className="scope-tab"
+                onClick={() => onScopeChange?.(item.id)}
+                type="button"
+              >
+                {item.label}
+              </button>
+            </li>
+          ))}
+        </ul>
+      </nav>
       <p className="scope-note">{scopeNotes[scope]}</p>
       {state.tag === "LOADING" ? (
         <p aria-live="polite" role="status">
