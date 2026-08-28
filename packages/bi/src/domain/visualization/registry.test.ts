@@ -67,6 +67,6 @@ describe("closed visualizer registry", () => {
         value: undefined,
         withholding_reason: "MISSING_INPUT",
       }),
-    ).toEqual(["table@1"]);
+    ).toEqual(["numeric-card@1", "table@1"]);
   });
 });
