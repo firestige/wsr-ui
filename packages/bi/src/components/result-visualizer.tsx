@@ -184,8 +184,7 @@ function BooleanBadge({ slice }: { slice: MetricSlice }) {
   if (slice.value?.kind !== "BOOLEAN") return null;
   return (
     <span aria-label="Boolean result" className="status-label" role="status">
-      <span aria-hidden="true">{slice.value.value ? "✓" : "○"}</span>
-      {" "}
+      <span aria-hidden="true">{slice.value.value ? "✓" : "○"}</span>{" "}
       {slice.value.value ? "True" : "False"}
     </span>
   );
