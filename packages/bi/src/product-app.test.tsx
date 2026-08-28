@@ -49,6 +49,7 @@ describe("BI product route", () => {
     const user = userEvent.setup();
     render(
       <ProductApp
+        evidence={{ getFactsPage: vi.fn() }}
         evolution={{ computeSingle, computeCompare: vi.fn() }}
         initialRelativeUrl="/evaluate"
         tasks={{ getPage }}
@@ -77,6 +78,7 @@ describe("BI product route", () => {
     const user = userEvent.setup();
     render(
       <ProductApp
+        evidence={{ getFactsPage: vi.fn() }}
         evolution={{ computeSingle: vi.fn(), computeCompare }}
         initialRelativeUrl="/evaluate"
         tasks={{
@@ -105,6 +107,7 @@ describe("BI product route", () => {
     const computeSingle = vi.fn();
     render(
       <ProductApp
+        evidence={{ getFactsPage: vi.fn() }}
         evolution={{ computeSingle, computeCompare: vi.fn() }}
         initialRelativeUrl="/evaluate?v=9&task=task-a"
         tasks={{ getPage }}

@@ -1,6 +1,10 @@
 import { useEffect, useState } from "react";
 
 import { ScopedError } from "./components/status";
+import {
+  EvidenceDrilldown,
+  type EvidenceFactsPort,
+} from "./evidence-drilldown";
 import type { TaskListItem, TaskResult } from "./domain/evidence/task-client";
 import {
   parseEvaluationRoute,
@@ -195,10 +199,12 @@ function TaskSelector({
 
 export function ProductApp({
   evolution,
+  evidence,
   tasks,
   initialRelativeUrl = window.location.pathname + window.location.search,
 }: {
   evolution: EvolutionPort;
+  evidence: EvidenceFactsPort;
   tasks: TaskPort;
   initialRelativeUrl?: string;
 }) {
@@ -259,11 +265,16 @@ export function ProductApp({
       </nav>
       {route.tag === "SELECT" ? (
         <TaskSelector onSelect={navigate} tasks={tasks} />
-      ) : route.tag === "EVIDENCE" || route.tag === "TRACE" ? (
+      ) : route.tag === "EVIDENCE" ? (
+        <EvidenceDrilldown
+          evidence={evidence}
+          evolution={evolution}
+          onNavigate={navigate}
+          route={route}
+        />
+      ) : route.tag === "TRACE" ? (
         <main className="evaluation-shell">
-          <h1 className="text-title">
-            {route.tag === "EVIDENCE" ? "Evidence Console" : "Recorded Trace"}
-          </h1>
+          <h1 className="text-title">Recorded Trace</h1>
           <p aria-live="polite" className="loading-state" role="status">
             Resolving evaluation context…
           </p>

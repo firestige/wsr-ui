@@ -8,6 +8,7 @@ describe("BI route boundary", () => {
     const getPage = vi.fn();
     render(
       <RootApp
+        evidence={{ getFactsPage: vi.fn() }}
         evolution={{ computeSingle: vi.fn(), computeCompare: vi.fn() }}
         relativeUrl="/preview"
         tasks={{ getPage }}
@@ -37,6 +38,7 @@ describe("BI route boundary", () => {
     }));
     render(
       <RootApp
+        evidence={{ getFactsPage: vi.fn() }}
         evolution={{ computeSingle: vi.fn(), computeCompare: vi.fn() }}
         relativeUrl="/evaluate"
         tasks={{ getPage }}
