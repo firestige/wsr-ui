@@ -146,7 +146,7 @@ export function compatibleVisualizerIds(
     sharedNormalizedDomain?: boolean;
   } = {},
 ): VisualizerId[] {
-  if (slice.value === undefined) return ["table@1"];
+  if (slice.value === undefined) return ["numeric-card@1", "table@1"];
   const ids: VisualizerId[] = [];
   if (slice.value.kind === "BOOLEAN") ids.push("badge@1");
   else ids.push("numeric-card@1");

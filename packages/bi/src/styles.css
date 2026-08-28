@@ -457,6 +457,19 @@
   }
 }
 
+@utility bounded-table {
+  max-height: var(--layout-table-max-height);
+  overflow: auto;
+  border: 1px solid var(--border-default);
+  border-radius: var(--shape-control);
+
+  & thead {
+    position: sticky;
+    inset-block-start: 0;
+    background: var(--surface-raised);
+  }
+}
+
 @utility status-stack {
   display: grid;
   gap: var(--space-tight);
