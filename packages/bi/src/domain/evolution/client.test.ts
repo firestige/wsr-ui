@@ -298,3 +298,292 @@ describe("closed Evolution decoder", () => {
           raw_ratio: "1",
           state: "FULL",
           alert: null,
+        },
+      } as never;
+    }
+    const body = {
+      api_version: 1,
+      mode: "COMPARE",
+      status: "FULL_COMPARE",
+      left,
+      right,
+      deltas: CATALOG_COORDINATES.map((metric_coordinate, index) =>
+        index === 0
+          ? {
+              metric_coordinate,
+              slice_key: {},
+              state: "AVAILABLE",
+              value: { kind: "RATIO", value: "1/3", unit: "ratio" },
+              direction: "DECREASE",
+            }
+          : {
+              metric_coordinate,
+              slice_key: {},
+              state: "WITHHELD",
+              withholding_reason: "MISSING_INPUT",
+            },
+      ),
+    };
+
+    expect(decodeComputeResponse(body)).toMatchObject({
+      ok: false,
+      error: { kind: "INCOMPATIBLE" },
+    });
+  });
+
+  it("preserves integers beyond the JavaScript safe range as canonical strings", () => {
+    const body = singleResponse();
+    body.result.metric_results[0]!.slices[0] = {
+      ...body.result.metric_results[0]!.slices[0]!,
+      state: "AVAILABLE",
+      value: {
+        kind: "COUNT",
+        value: "9007199254740993",
+        unit: "count",
+      },
+      withholding_reason: undefined,
+      measures: { observed: "9007199254740993" },
+      numerator: "9007199254740993",
+      denominator: "9007199254740993",
+      contributing_count: "9007199254740993",
+      coverage: {
+        numerator: "9007199254740993",
+        denominator: "9007199254740993",
+        raw_ratio: "1",
+        state: "FULL",
+        alert: null,
+      },
+    } as never;
+
+    const result = decodeComputeResponse(body);
+
+    expect(result).toMatchObject({ ok: true });
+    if (result.ok && result.value.mode === "SINGLE") {
+      expect(
+        result.value.result.metric_results[0]!.slices[0]!.value!.value,
+      ).toBe("9007199254740993");
+    }
+  });
+
+  it("rejects incomplete or state-incompatible compare Delta sets", () => {
+    const full = {
+      api_version: 1,
+      mode: "COMPARE",
+      status: "FULL_COMPARE",
+      left: singleResponse().result,
+      right: singleResponse().result,
+      deltas: [],
+    };
+    expect(decodeComputeResponse(full)).toMatchObject({ ok: false });
+
+    const partial = {
+      api_version: 1,
+      mode: "COMPARE",
+      status: "PARTIAL_COMPARE",
+      left: singleResponse().result,
+      right: {
+        tag: "SIDE_ERROR",
+        code: "UPSTREAM_UNAVAILABLE",
+        retryable: true,
+        detail: "Evidence unavailable",
+      },
+      deltas: CATALOG_COORDINATES.map((metric_coordinate) => ({
+        metric_coordinate,
+        slice_key: {},
+        state: "WITHHELD",
+        withholding_reason: "MISSING_INPUT",
+      })),
+    };
+    expect(decodeComputeResponse(partial)).toMatchObject({ ok: false });
+  });
+
+  it("rejects source proof on an unresolved Workflow reading", () => {
+    const body = responseWithManifest();
+    Object.assign(body.result.receipt.workflow_resolutions[0]!, {
+      matched_source_id: "official",
+      matched_source_index: 0,
+    });
+
+    expect(decodeComputeResponse(body)).toMatchObject({
+      ok: false,
+      error: { kind: "INCOMPATIBLE" },
+    });
+  });
+
+  it("requires exactly one Workflow resolution for every membership Manifest", () => {
+    const body = responseWithManifest();
+    body.result.receipt.workflow_resolutions = [];
+
+    expect(decodeComputeResponse(body)).toMatchObject({ ok: false });
+  });
+
+  it("rejects semantically duplicate slice keys regardless of insertion order", () => {
+    const body = singleResponse();
+    const original = body.result.metric_results[0]!.slices[0]!;
+    body.result.metric_results[0]!.slices = [
+      { ...original, slice_key: { a: "1", b: "2" } },
+      { ...original, slice_key: { b: "2", a: "1" } },
+    ];
+
+    expect(decodeComputeResponse(body)).toMatchObject({ ok: false });
+  });
+});
+
+describe("bounded Evolution transport", () => {
+  it("canonicalizes Task IDs and submits a same-origin credential-free request", async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(JSON.stringify(singleResponse()), {
+        headers: { "content-type": "application/json" },
+      }),
+    );
+    const client = new EvolutionClient({ fetcher });
+
+    const result = await client.computeSingle(["task-z", "task-a"]);
+
+    expect(result.ok).toBe(true);
+    expect(fetcher).toHaveBeenCalledWith(
+      "/api/evolution/v1/evaluations:compute",
+      expect.objectContaining({
+        method: "POST",
+        credentials: "omit",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          api_version: 1,
+          mode: "SINGLE",
+          selection: { selection_version: 1, task_ids: ["task-a", "task-z"] },
+        }),
+      }),
+    );
+  });
+
+  it("uses UTF-8 bytewise Task ordering rather than locale collation", async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(JSON.stringify(singleResponse("task-Z")), {
+        headers: { "content-type": "application/json" },
+      }),
+    );
+
+    await new EvolutionClient({ fetcher }).computeSingle(["task-a", "task-Z"]);
+
+    expect(fetcher).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        body: JSON.stringify({
+          api_version: 1,
+          mode: "SINGLE",
+          selection: { selection_version: 1, task_ids: ["task-Z", "task-a"] },
+        }),
+      }),
+    );
+  });
+
+  it("rejects duplicate or over-bound selections before transport", async () => {
+    const fetcher = vi.fn<typeof fetch>();
+    const client = new EvolutionClient({ fetcher });
+
+    await expect(
+      client.computeSingle(["task-a", "task-a"]),
+    ).resolves.toMatchObject({
+      ok: false,
+      error: { kind: "INVALID_SELECTION" },
+    });
+    await expect(
+      client.computeSingle(
+        Array.from({ length: 25 }, (_, index) => `task-${index}`),
+      ),
+    ).resolves.toMatchObject({
+      ok: false,
+      error: { kind: "INVALID_SELECTION" },
+    });
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it("maps the published top-level Evolution error without inventing Metric Results", async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          error: {
+            code: "UPSTREAM_UNAVAILABLE",
+            detail: "Evidence timed out",
+            retryable: true,
+          },
+        }),
+        { status: 503, headers: { "content-type": "application/json" } },
+      ),
+    );
+
+    await expect(
+      new EvolutionClient({ fetcher }).computeSingle(["task-a"]),
+    ).resolves.toEqual({
+      ok: false,
+      error: {
+        kind: "UPSTREAM",
+        code: "UPSTREAM_UNAVAILABLE",
+        detail: "Evidence timed out",
+        retryable: true,
+      },
+    });
+  });
+
+  it.each([
+    [
+      "success envelope on an error status",
+      new Response(JSON.stringify(singleResponse()), {
+        status: 503,
+        headers: { "content-type": "application/json" },
+      }),
+    ],
+    [
+      "error envelope on a success status",
+      new Response(
+        JSON.stringify({
+          error: {
+            code: "UPSTREAM_UNAVAILABLE",
+            retryable: true,
+            detail: "Evidence unavailable",
+          },
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      ),
+    ],
+    [
+      "non-JSON content type",
+      new Response(JSON.stringify(singleResponse()), {
+        status: 200,
+        headers: { "content-type": "text/plain" },
+      }),
+    ],
+  ])("rejects %s", async (_name, response) => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(response);
+
+    await expect(
+      new EvolutionClient({ fetcher }).computeSingle(["task-a"]),
+    ).resolves.toMatchObject({
+      ok: false,
+      error: { kind: "INCOMPATIBLE" },
+    });
+  });
+
+  it("stops a chunked response once the configured byte bound is exceeded", async () => {
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(
+        new Response(
+          new TextEncoder().encode(JSON.stringify(singleResponse())),
+          { headers: { "content-type": "application/json" } },
+        ),
+      );
+
+    await expect(
+      new EvolutionClient({ fetcher, maximumBodyBytes: 16 }).computeSingle([
+        "task-a",
+      ]),
+    ).resolves.toEqual({
+      ok: false,
+      error: { kind: "RESPONSE_BOUND_EXCEEDED", maximumBytes: 16 },
+    });
+  });
+});
