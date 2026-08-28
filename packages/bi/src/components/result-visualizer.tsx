@@ -9,6 +9,30 @@ import { presentExactValue } from "../domain/visualization/presentation";
 import { MetricResultFrame } from "./metric-result";
 import { ScopedError } from "./status";
 
+function PanelActions({
+  onExplain,
+  onEvidence,
+}: {
+  onExplain?: () => void;
+  onEvidence?: () => void;
+}) {
+  if (onExplain === undefined && onEvidence === undefined) return null;
+  return (
+    <footer className="metric-actions">
+      {onExplain === undefined ? null : (
+        <button className="action-control" onClick={onExplain} type="button">
+          Metric explanation
+        </button>
+      )}
+      {onEvidence === undefined ? null : (
+        <button className="action-control" onClick={onEvidence} type="button">
+          View evidence
+        </button>
+      )}
+    </footer>
+  );
+}
+
 function ResultTable({
   coordinate,
   slices,
@@ -105,9 +129,13 @@ function RatioBar({ slice }: { slice: MetricSlice }) {
 export function MetricPanel({
   result,
   visualizer,
+  onExplain,
+  onEvidence,
 }: {
   result: MetricResult;
   visualizer: VisualizerId;
+  onExplain?: () => void;
+  onEvidence?: () => void;
 }) {
   const coordinate = `${result.metric_id}@${result.metric_version}`;
   const compatible = result.slices.every((slice) =>
@@ -123,15 +151,23 @@ export function MetricPanel({
           title="Visualizer binding incompatible"
         />
         <ResultTable coordinate={coordinate} slices={result.slices} />
+        <PanelActions onEvidence={onEvidence} onExplain={onExplain} />
       </section>
     );
   if (visualizer === "table@1")
-    return <ResultTable coordinate={coordinate} slices={result.slices} />;
+    return (
+      <section className="panel-card">
+        <ResultTable coordinate={coordinate} slices={result.slices} />
+        <PanelActions onEvidence={onEvidence} onExplain={onExplain} />
+      </section>
+    );
   return result.slices.map((slice) => (
     <MetricResultFrame
       content={{ tag: "RESULT", slice }}
       coordinate={coordinate}
       key={JSON.stringify(slice.slice_key)}
+      onEvidence={onEvidence}
+      onExplain={onExplain}
       visualization={
         visualizer === "ratio-bar@1" ? <RatioBar slice={slice} /> : undefined
       }

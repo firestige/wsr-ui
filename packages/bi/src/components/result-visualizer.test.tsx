@@ -1,5 +1,6 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import userEvent from "@testing-library/user-event";
+import { describe, expect, it, vi } from "vitest";
 
 import type { MetricResult, MetricSlice } from "../domain/evolution/types";
 import { MetricPanel } from "./result-visualizer";
@@ -71,5 +72,27 @@ describe("Metric panel visualization", () => {
     expect(
       screen.getByRole("table", { name: /fallback result data/i }),
     ).toBeVisible();
+  });
+
+  it("keeps explanation and Evidence entry points with every visualizer", async () => {
+    const explain = vi.fn();
+    const evidence = vi.fn();
+    render(
+      <MetricPanel
+        onEvidence={evidence}
+        onExplain={explain}
+        result={result}
+        visualizer="table@1"
+      />,
+    );
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "Metric explanation" }),
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: "View evidence" }),
+    );
+    expect(explain).toHaveBeenCalledOnce();
+    expect(evidence).toHaveBeenCalledOnce();
   });
 });
