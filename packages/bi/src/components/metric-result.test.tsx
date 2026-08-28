@@ -71,6 +71,31 @@ describe("Metric Result foundations", () => {
     expect(screen.queryByText(/^0$/)).not.toBeInTheDocument();
   });
 
+  it("offers an explicit recovery path for a withheld result", async () => {
+    const user = userEvent.setup();
+    const recover = vi.fn();
+    render(
+      <MetricResultFrame
+        content={{
+          tag: "RESULT",
+          slice: {
+            ...availableSlice,
+            state: "EXPIRED",
+            value: undefined,
+            withholding_reason: "EXPIRED_INPUT",
+            reading: "Choose an active Delivery population.",
+          },
+        }}
+        coordinate="delivery-count@2.0.0"
+        onRecover={recover}
+        recoveryLabel="Change selection"
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Change selection" }));
+    expect(recover).toHaveBeenCalledOnce();
+  });
+
   it("keeps loading and error outside the MetricSlice truth union", () => {
     const { rerender } = render(
       <MetricResultFrame

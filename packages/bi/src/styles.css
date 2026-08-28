@@ -595,11 +595,18 @@
 
 @utility inspector-backdrop {
   position: fixed;
-  inset: 0;
+  inset-block: 0;
+  inset-inline-end: 0;
   z-index: var(--layer-overlay);
   display: grid;
   justify-items: end;
-  background: var(--surface-scrim);
+  pointer-events: none;
+
+  &[data-modal="true"] {
+    inset-inline-start: 0;
+    background: var(--surface-scrim);
+    pointer-events: auto;
+  }
 }
 
 @utility owned-inspector {
@@ -611,6 +618,7 @@
   background: var(--surface-overlay);
   box-shadow: var(--elevation-overlay);
   color: var(--content-primary);
+  pointer-events: auto;
 }
 
 @utility inspector-header {
