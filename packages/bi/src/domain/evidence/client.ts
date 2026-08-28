@@ -374,7 +374,11 @@ function traceItem(value: unknown) {
     !source(value.source) ||
     typeof value.recorded_at !== "string" ||
     !timestampPattern.test(value.recorded_at) ||
-    !truth(value.truth, true)
+    !truth(value.truth, true) ||
+    !record(value.source) ||
+    value.source.kind !== "SPAN" ||
+    !record(value.truth) ||
+    value.truth.expiry !== "ACTIVE"
   ) {
     return false;
   }
@@ -407,7 +411,9 @@ function traceItem(value: unknown) {
       (node.trace_state === null || boundedText(node.trace_state, 0, 512)) &&
       Array.isArray(node.fields) &&
       node.fields.length <= 73 &&
-      orderedFields(node.fields)
+      orderedFields(node.fields) &&
+      value.source.trace_id === value.trace_id &&
+      value.source.span_id === node.span_id
     );
   }
   const edge = value.edge;
@@ -423,7 +429,15 @@ function traceItem(value: unknown) {
     traceEndpoint(edge.to)
   ))
     return false;
-  if (value.kind === "PARENT_EDGE") return true;
+  if (
+    !record(edge.from) ||
+    !record(edge.to) ||
+    value.source.trace_id !== value.trace_id ||
+    value.source.span_id !== edge.from.span_id ||
+    edge.from.trace_id !== value.trace_id
+  )
+    return false;
+  if (value.kind === "PARENT_EDGE") return edge.to.trace_id === value.trace_id;
   return (
     (!Object.hasOwn(edge, "trace_state") ||
       boundedText(edge.trace_state, 0, 512)) &&
@@ -870,6 +884,23 @@ export class EvidenceClient {
       if (response.ok) {
         if (!decoded.ok && decoded.error.kind === "UPSTREAM")
           return incompatible("HTTP success carried an error envelope");
+        if (
+          decoded.ok &&
+          route === "traces" &&
+          "trace_id" in filters &&
+          filters.trace_id !== undefined
+        ) {
+          const page = decoded.value as TracesPage;
+          if (
+            page.items.some((item) => item.trace_id !== filters.trace_id) ||
+            page.trace_summaries.some(
+              (summary) => summary.trace_id !== filters.trace_id,
+            )
+          )
+            return incompatible(
+              "Trace response did not match the exact filter",
+            );
+        }
         return decoded;
       }
       if (decoded.ok || decoded.error.kind !== "UPSTREAM")
