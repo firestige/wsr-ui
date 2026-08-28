@@ -23,8 +23,22 @@ const structure: RecordedStructureViewModel = {
       ],
     },
   ],
-  links: [{ sourceId: "child-a", targetId: "child-b", state: "AVAILABLE" }],
-  orphans: [{ id: "orphan-a", label: "Missing parent", state: "PARTIAL" }],
+  parentEdges: [
+    {
+      id: "parent-child-a-root",
+      sourceId: "trace-a:child-a",
+      targetId: "trace-a:root",
+    },
+  ],
+  links: [
+    {
+      id: "link-child-a-child-b",
+      sourceId: "trace-a:child-a",
+      targetId: "trace-b:child-b",
+      state: "AVAILABLE",
+    },
+  ],
+  orphans: [{ id: "orphan-a", label: "Missing parent", state: "UNRESOLVED" }],
   selectedId: "child-a",
 };
 
@@ -41,11 +55,17 @@ describe("recorded-structure foundations", () => {
       screen.getByText("LINK — independent recorded relation"),
     ).toBeVisible();
     expect(
+      screen.getByRole("img", { name: "Recorded parent structure graph" }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole("button", {
+        name: /recorded parent relation trace-a:child-a to trace-a:root/i,
+      }),
+    ).toBeVisible();
+    expect(
       screen.getByRole("group", { name: "Orphan endpoints" }),
     ).toHaveTextContent("Missing parent");
-    expect(
-      screen.getAllByText("Partial recorded detail").length,
-    ).toBeGreaterThan(0);
+    expect(screen.getByText("Unresolved recorded endpoint")).toBeVisible();
     expect(
       screen.queryByText("Expired recorded detail"),
     ).not.toBeInTheDocument();
@@ -68,6 +88,12 @@ describe("recorded-structure foundations", () => {
     ).toEqual(before);
     await user.click(screen.getByRole("button", { name: /Reviewer/ }));
     expect(select).toHaveBeenCalledWith("child-b");
+    await user.click(
+      screen.getByRole("button", {
+        name: /independent LINK trace-a:child-a to trace-b:child-b/i,
+      }),
+    );
+    expect(select).toHaveBeenCalledWith("link-child-a-child-b");
   });
 
   it("defaults to Still and exposes no timer or wall-clock input", () => {

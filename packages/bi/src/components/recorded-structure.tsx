@@ -1,20 +1,25 @@
+import { scalePoint } from "d3";
 import { useId } from "react";
 
-export type RecordedDetailState = "AVAILABLE" | "PARTIAL";
+export type RecordedDetailState = "AVAILABLE" | "PARTIAL" | "UNRESOLVED";
 
 export interface RecordedNodeView {
   id: string;
+  endpointId?: string;
   label: string;
   state: RecordedDetailState;
 }
 
+interface RecordedRelationView {
+  id: string;
+  sourceId: string;
+  targetId: string;
+}
+
 export interface RecordedStructureViewModel {
   depthGroups: Array<{ depth: number; nodes: RecordedNodeView[] }>;
-  links: Array<{
-    sourceId: string;
-    targetId: string;
-    state: RecordedDetailState;
-  }>;
+  parentEdges: RecordedRelationView[];
+  links: Array<RecordedRelationView & { state: RecordedDetailState }>;
   orphans: RecordedNodeView[];
   selectedId?: string;
 }
@@ -22,7 +27,77 @@ export interface RecordedStructureViewModel {
 const detailStateLabels: Record<RecordedDetailState, string> = {
   AVAILABLE: "Available recorded detail",
   PARTIAL: "Partial recorded detail",
+  UNRESOLVED: "Unresolved recorded endpoint",
 };
+
+function RecordedGraph({ model }: { model: RecordedStructureViewModel }) {
+  const width = 960;
+  const rowHeight = 120;
+  const positions = new Map<string, { x: number; y: number }>();
+  for (const group of model.depthGroups) {
+    const identities = group.nodes.map((node) => node.endpointId ?? node.id);
+    const x = scalePoint<string>()
+      .domain(identities)
+      .range([80, width - 80]);
+    for (const node of group.nodes) {
+      const identity = node.endpointId ?? node.id;
+      positions.set(identity, {
+        x: x(identity) ?? width / 2,
+        y: 60 + group.depth * rowHeight,
+      });
+    }
+  }
+  const height = Math.max(120, model.depthGroups.length * rowHeight);
+  const line = (relation: RecordedRelationView, kind: "parent" | "link") => {
+    const source = positions.get(relation.sourceId);
+    const target = positions.get(relation.targetId);
+    return source === undefined || target === undefined ? null : (
+      <line
+        className={`recorded-graph-${kind}`}
+        data-kind={kind === "parent" ? "PARENT_EDGE" : "LINK"}
+        key={`${kind}:${relation.id}`}
+        x1={source.x}
+        x2={target.x}
+        y1={source.y}
+        y2={target.y}
+      />
+    );
+  };
+  return (
+    <div className="recorded-graph-frame">
+      <svg
+        aria-label="Recorded parent structure graph"
+        className="recorded-graph"
+        role="img"
+        viewBox={`0 0 ${width} ${height}`}
+      >
+        <title>Recorded parent structure graph</title>
+        {model.parentEdges.map((edge) => line(edge, "parent"))}
+        {model.links.map((link) => line(link, "link"))}
+        {model.depthGroups.flatMap((group) =>
+          group.nodes.map((node) => {
+            const position = positions.get(node.endpointId ?? node.id)!;
+            return (
+              <g
+                key={node.endpointId ?? node.id}
+                transform={`translate(${position.x} ${position.y})`}
+              >
+                <circle className="recorded-graph-node" r="10" />
+                <text
+                  className="recorded-graph-label"
+                  textAnchor="middle"
+                  y="28"
+                >
+                  {node.label}
+                </text>
+              </g>
+            );
+          }),
+        )}
+      </svg>
+    </div>
+  );
+}
 
 function NodeButton({
   node,
@@ -64,6 +139,31 @@ export function RecordedStructureFoundation({
           Parent depth, independent LINK records, and unresolved endpoints only.
         </p>
       </header>
+      <RecordedGraph model={model} />
+      <section className="recorded-parent-edges">
+        <h3 className="text-label">PARENT_EDGE — recorded structure</h3>
+        {model.parentEdges.length === 0 ? (
+          <p className="text-body">No recorded parent relations.</p>
+        ) : (
+          <ul>
+            {model.parentEdges.map((edge) => (
+              <li key={edge.id}>
+                <button
+                  aria-label={`Recorded parent relation ${edge.sourceId} to ${edge.targetId}`}
+                  className="recorded-relation"
+                  onClick={() => onSelect(edge.id)}
+                  type="button"
+                >
+                  <code className="text-code">
+                    {edge.sourceId} → {edge.targetId}
+                  </code>
+                  <span>PARENT_EDGE</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
       <div className="recorded-depths">
         {model.depthGroups.map((group) => (
           <div
@@ -93,11 +193,18 @@ export function RecordedStructureFoundation({
         ) : (
           <ul>
             {model.links.map((link) => (
-              <li key={`${link.sourceId}:${link.targetId}`}>
-                <code className="text-code">
-                  {link.sourceId} ⇢ {link.targetId}
-                </code>
-                <span>{detailStateLabels[link.state]}</span>
+              <li key={link.id}>
+                <button
+                  aria-label={`Independent LINK ${link.sourceId} to ${link.targetId}`}
+                  className="recorded-relation"
+                  onClick={() => onSelect(link.id)}
+                  type="button"
+                >
+                  <code className="text-code">
+                    {link.sourceId} ⇢ {link.targetId}
+                  </code>
+                  <span>LINK · {detailStateLabels[link.state]}</span>
+                </button>
               </li>
             ))}
           </ul>

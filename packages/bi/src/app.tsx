@@ -143,8 +143,19 @@ const structure: RecordedStructureViewModel = {
       ],
     },
   ],
-  links: [{ sourceId: "writer", targetId: "reviewer", state: "AVAILABLE" }],
-  orphans: [{ id: "orphan", label: "Missing endpoint", state: "PARTIAL" }],
+  parentEdges: [
+    { id: "parent-writer-root", sourceId: "writer", targetId: "root" },
+    { id: "parent-reviewer-root", sourceId: "reviewer", targetId: "root" },
+  ],
+  links: [
+    {
+      id: "link-writer-reviewer",
+      sourceId: "writer",
+      targetId: "reviewer",
+      state: "AVAILABLE",
+    },
+  ],
+  orphans: [{ id: "orphan", label: "Missing endpoint", state: "UNRESOLVED" }],
 };
 
 function FactualPreview({ slice }: { slice: MetricSlice }) {
