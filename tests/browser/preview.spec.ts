@@ -8,6 +8,15 @@ test("semantic preview works by keyboard in both themes", async ({ page }) => {
 
   await page.getByLabel("Theme").selectOption("light");
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+  const lightTruth = await page
+    .getByRole("region", { name: "Metric truth states" })
+    .innerText();
+
+  await page.getByLabel("Theme").selectOption("dark");
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  expect(
+    await page.getByRole("region", { name: "Metric truth states" }).innerText(),
+  ).toBe(lightTruth);
 
   await page.getByLabel("Density").focus();
   await page.keyboard.press("c");
@@ -26,6 +35,17 @@ test("semantic preview works by keyboard in both themes", async ({ page }) => {
   ).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(explanation).toBeFocused();
+});
+
+test("forced colors retains textual status and controls", async ({ page }) => {
+  await page.emulateMedia({ forcedColors: "active" });
+  await page.goto("/preview");
+
+  const truth = page.getByRole("region", { name: "Metric truth states" });
+  await expect(truth.getByText("Incompatible").first()).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Preview receipt" }),
+  ).toBeVisible();
 });
 
 test("platform reduced motion forces the Still preview", async ({ page }) => {
