@@ -1,10 +1,12 @@
 import type {
   DeltaEntry,
+  MetricResult,
   MetricSlice,
   SideError,
 } from "../domain/evolution/types";
+import type { VisualizerId } from "../domain/visualization/registry";
 import { presentExactValue } from "../domain/visualization/presentation";
-import { MetricResultFrame } from "./metric-result";
+import { MetricPanel } from "./result-visualizer";
 import { ScopedError } from "./status";
 
 function CompareSide({
@@ -17,6 +19,7 @@ function CompareSide({
   onExplain,
   onEvidence,
   focusEvidenceAction,
+  visualizer,
 }: {
   label: "Before" | "After";
   coordinate: string;
@@ -27,14 +30,24 @@ function CompareSide({
   onExplain?: (trigger: HTMLButtonElement) => void;
   onEvidence?: (trigger: HTMLButtonElement) => void;
   focusEvidenceAction: boolean;
+  visualizer: VisualizerId;
 }) {
+  const split = coordinate.lastIndexOf("@");
+  const result: MetricResult | undefined =
+    slice === undefined
+      ? undefined
+      : {
+          metric_id: coordinate.slice(0, split),
+          metric_version: "2.0.0",
+          slices: [slice],
+        };
   return (
     <section aria-label={`${label} result`} className="compare-side">
       <h3 className="text-label">{label}</h3>
-      {slice !== undefined ? (
-        <MetricResultFrame
-          content={{ tag: "RESULT", slice }}
-          coordinate={coordinate}
+      {result !== undefined ? (
+        <MetricPanel
+          result={result}
+          visualizer={visualizer}
           focusEvidenceAction={focusEvidenceAction}
           onEvidence={onEvidence}
           onExplain={onExplain}
@@ -103,6 +116,7 @@ export function CompareResultFrame({
   focusEvidenceSide,
   onExplain,
   onEvidence,
+  visualizer = "numeric-card@1",
 }: {
   coordinate: string;
   before?: MetricSlice;
@@ -115,6 +129,7 @@ export function CompareResultFrame({
   focusEvidenceSide?: "left" | "right";
   onExplain?: (side: "left" | "right", trigger: HTMLButtonElement) => void;
   onEvidence?: (side: "left" | "right", trigger: HTMLButtonElement) => void;
+  visualizer?: VisualizerId;
 }) {
   return (
     <article aria-label={`Compare ${coordinate}`} className="compare-result">
@@ -136,6 +151,7 @@ export function CompareResultFrame({
         }
         onRetry={beforeError === undefined ? undefined : onRetryFailedSide}
         slice={before}
+        visualizer={visualizer}
       />
       <CompareSide
         coordinate={coordinate}
@@ -155,6 +171,7 @@ export function CompareResultFrame({
         }
         onRetry={afterError === undefined ? undefined : onRetryFailedSide}
         slice={after}
+        visualizer={visualizer}
       />
       <DeltaView delta={delta} />
     </article>
