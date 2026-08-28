@@ -10,6 +10,14 @@ type Focus = {
   side: "single" | "left" | "right";
 };
 
+type Selection =
+  | { tag: "SINGLE"; taskIds: string[] }
+  | {
+      tag: "COMPARE";
+      leftTaskIds: string[];
+      rightTaskIds: string[];
+    };
+
 export type EvaluationRoute =
   | { tag: "SELECT" }
   | { tag: "SINGLE"; taskIds: string[]; focus?: Focus }
@@ -18,6 +26,21 @@ export type EvaluationRoute =
       leftTaskIds: string[];
       rightTaskIds: string[];
       focus?: Focus;
+    }
+  | {
+      tag: "EVIDENCE";
+      selection: Selection;
+      metric: Focus["metric"];
+      side: Focus["side"];
+      scope: "result" | "related" | "read-set";
+      factId?: string;
+    }
+  | {
+      tag: "TRACE";
+      selection: Selection;
+      traceId: string;
+      spanId?: string;
+      side: Focus["side"];
     }
   | { tag: "INVALID"; reason: string };
 
@@ -63,11 +86,144 @@ function focus(
   return { metric: metric as Focus["metric"], side: side as Focus["side"] };
 }
 
+function identifier(value: string | null): string | undefined {
+  if (
+    value === null ||
+    value.length < 1 ||
+    value.length > 256 ||
+    Array.from(value).some((character) => {
+      const code = character.charCodeAt(0);
+      return code <= 31 || code === 127;
+    })
+  )
+    return undefined;
+  return value;
+}
+
+function decodedPathIdentifier(value: string): string | undefined {
+  try {
+    return identifier(decodeURIComponent(value));
+  } catch {
+    return undefined;
+  }
+}
+
+function selection(
+  params: URLSearchParams,
+):
+  { selection: Selection; allowedSides: readonly Focus["side"][] } | undefined {
+  const mode = params.get("mode");
+  if (mode === "compare") {
+    const leftTaskIds = taskIds(params, "left_task");
+    const rightTaskIds = taskIds(params, "right_task");
+    if (!leftTaskIds || !rightTaskIds) return undefined;
+    return {
+      selection: { tag: "COMPARE", leftTaskIds, rightTaskIds },
+      allowedSides: ["left", "right"],
+    };
+  }
+  if (mode !== null) return undefined;
+  const selectedTaskIds = taskIds(params, "task");
+  if (!selectedTaskIds) return undefined;
+  return {
+    selection: { tag: "SINGLE", taskIds: selectedTaskIds },
+    allowedSides: ["single"],
+  };
+}
+
+function hasOnlyParameters(
+  params: URLSearchParams,
+  allowed: ReadonlySet<string>,
+): boolean {
+  return (
+    ![...params.keys()].some((key) => !allowed.has(key)) &&
+    params.getAll("v").length === 1 &&
+    params.get("v") === "1" &&
+    params.getAll("mode").length <= 1 &&
+    [...allowed].every((key) =>
+      ["task", "left_task", "right_task"].includes(key)
+        ? true
+        : params.getAll(key).length <= 1,
+    )
+  );
+}
+
 export function parseEvaluationRoute(relativeUrl: string): EvaluationRoute {
   if (encoder.encode(relativeUrl).length > MAX_RELATIVE_URL_BYTES)
     return { tag: "INVALID", reason: "URL_BOUND_EXCEEDED" };
   const url = new URL(relativeUrl, "http://bi.local");
-  if (url.pathname !== "/evaluate" || url.hash !== "")
+  if (url.hash !== "") return { tag: "INVALID", reason: "UNKNOWN_ROUTE" };
+  if (url.pathname === "/evaluate/evidence") {
+    const params = url.searchParams;
+    const allowed = new Set([
+      "v",
+      "mode",
+      "task",
+      "left_task",
+      "right_task",
+      "metric",
+      "side",
+      "scope",
+      "fact",
+    ]);
+    const selected = selection(params);
+    const routeFocus = selected ? focus(params, selected.allowedSides) : null;
+    const scope = params.get("scope");
+    const factValue = params.get("fact");
+    const factId = factValue === null ? undefined : identifier(factValue);
+    if (
+      !hasOnlyParameters(params, allowed) ||
+      !selected ||
+      !routeFocus ||
+      !["result", "related", "read-set"].includes(scope ?? "") ||
+      (factValue !== null && factId === undefined)
+    )
+      return { tag: "INVALID", reason: "INVALID_EVIDENCE_FOCUS" };
+    return {
+      tag: "EVIDENCE",
+      selection: selected.selection,
+      metric: routeFocus.metric,
+      side: routeFocus.side,
+      scope: scope as "result" | "related" | "read-set",
+      factId,
+    };
+  }
+  if (url.pathname.startsWith("/evaluate/trace/")) {
+    const params = url.searchParams;
+    const traceId = decodedPathIdentifier(
+      url.pathname.slice("/evaluate/trace/".length),
+    );
+    const allowed = new Set([
+      "v",
+      "mode",
+      "task",
+      "left_task",
+      "right_task",
+      "span",
+      "side",
+    ]);
+    const selected = selection(params);
+    const side = params.get("side");
+    const spanValue = params.get("span");
+    const spanId = spanValue === null ? undefined : identifier(spanValue);
+    if (
+      !hasOnlyParameters(params, allowed) ||
+      !selected ||
+      !traceId ||
+      traceId.includes("/") ||
+      !selected.allowedSides.includes(side as Focus["side"]) ||
+      (spanValue !== null && spanId === undefined)
+    )
+      return { tag: "INVALID", reason: "INVALID_TRACE_FOCUS" };
+    return {
+      tag: "TRACE",
+      selection: selected.selection,
+      traceId,
+      spanId,
+      side: side as Focus["side"],
+    };
+  }
+  if (url.pathname !== "/evaluate")
     return { tag: "INVALID", reason: "UNKNOWN_ROUTE" };
   if (url.search === "") return { tag: "SELECT" };
   const params = url.searchParams;
@@ -95,8 +251,7 @@ export function parseEvaluationRoute(relativeUrl: string): EvaluationRoute {
       return { tag: "INVALID", reason: "INVALID_COMPARE_SELECTION" };
     return { tag: "COMPARE", leftTaskIds, rightTaskIds, focus: routeFocus };
   }
-  if (mode !== null)
-    return { tag: "INVALID", reason: "INVALID_MODE" };
+  if (mode !== null) return { tag: "INVALID", reason: "INVALID_MODE" };
   const selectedTaskIds = taskIds(params, "task");
   const routeFocus = focus(params, ["single"]);
   if (!selectedTaskIds || routeFocus === null)
@@ -106,14 +261,31 @@ export function parseEvaluationRoute(relativeUrl: string): EvaluationRoute {
 
 export function serializeEvaluationRoute(route: EvaluationRoute): string {
   if (route.tag === "SELECT") return "/evaluate";
-  if (route.tag === "INVALID") throw new Error("Cannot serialize invalid route");
+  if (route.tag === "INVALID")
+    throw new Error("Cannot serialize invalid route");
   const params = new URLSearchParams({ v: "1" });
-  if (route.tag === "SINGLE") {
-    for (const taskId of route.taskIds) params.append("task", taskId);
+  const selected =
+    route.tag === "EVIDENCE" || route.tag === "TRACE" ? route.selection : route;
+  if (selected.tag === "SINGLE") {
+    for (const taskId of selected.taskIds) params.append("task", taskId);
   } else {
     params.set("mode", "compare");
-    for (const taskId of route.leftTaskIds) params.append("left_task", taskId);
-    for (const taskId of route.rightTaskIds) params.append("right_task", taskId);
+    for (const taskId of selected.leftTaskIds)
+      params.append("left_task", taskId);
+    for (const taskId of selected.rightTaskIds)
+      params.append("right_task", taskId);
+  }
+  if (route.tag === "EVIDENCE") {
+    params.set("metric", route.metric);
+    params.set("side", route.side);
+    params.set("scope", route.scope);
+    if (route.factId) params.set("fact", route.factId);
+    return `/evaluate/evidence?${params.toString()}`;
+  }
+  if (route.tag === "TRACE") {
+    if (route.spanId) params.set("span", route.spanId);
+    params.set("side", route.side);
+    return `/evaluate/trace/${encodeURIComponent(route.traceId)}?${params.toString()}`;
   }
   if (route.focus) {
     params.set("metric", route.focus.metric);

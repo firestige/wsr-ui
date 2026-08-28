@@ -140,12 +140,13 @@ export const VISUALIZER_REGISTRY: Record<VisualizerId, VisualizerDeclaration> =
 
 export function compatibleVisualizerIds(
   slice: MetricSlice,
-  _context: {
+  context: {
     authoritativeDomain?: boolean;
     orderedDimension?: boolean;
     sharedNormalizedDomain?: boolean;
   } = {},
 ): VisualizerId[] {
+  void context;
   if (slice.value === undefined) return ["numeric-card@1", "table@1"];
   const ids: VisualizerId[] = [];
   if (slice.value.kind === "BOOLEAN") ids.push("badge@1");

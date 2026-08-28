@@ -259,6 +259,15 @@ export function ProductApp({
       </nav>
       {route.tag === "SELECT" ? (
         <TaskSelector onSelect={navigate} tasks={tasks} />
+      ) : route.tag === "EVIDENCE" || route.tag === "TRACE" ? (
+        <main className="evaluation-shell">
+          <h1 className="text-title">
+            {route.tag === "EVIDENCE" ? "Evidence Console" : "Recorded Trace"}
+          </h1>
+          <p aria-live="polite" className="loading-state" role="status">
+            Resolving evaluation context…
+          </p>
+        </main>
       ) : (
         <EvaluationWorkspace evolution={evolution} route={route} />
       )}
