@@ -141,6 +141,7 @@
   --selection-marker-size: 0.25rem;
   --layout-content: 78rem;
   --layout-inspector: 36rem;
+  --layout-table-cell-min: 10rem;
   --type-display-size: clamp(1.75rem, 4vw, 2.5rem);
   --type-heading-size: 1rem;
   --type-body-size: 0.9375rem;
@@ -636,6 +637,102 @@
   .inspector-header button {
     display: none;
   }
+}
+
+@utility evidence-console {
+  display: grid;
+  gap: var(--space-grid);
+  min-width: 0;
+}
+
+@utility scope-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-tight);
+}
+
+@utility scope-tab {
+  min-height: var(--density-control);
+  padding-inline: var(--space-cluster);
+  border: 1px solid var(--border-default);
+  border-radius: var(--shape-control);
+  background: var(--surface-panel);
+  color: var(--content-secondary);
+  font: inherit;
+
+  &[aria-selected="true"] {
+    border-color: var(--interaction-accent);
+    background: var(--interaction-selection);
+    color: var(--content-primary);
+    font-weight: 700;
+  }
+}
+
+@utility scope-note {
+  margin: 0;
+  color: var(--content-secondary);
+  font-size: var(--type-body-size);
+}
+
+@utility status-banner {
+  margin: 0;
+  padding: var(--space-cluster);
+  border: 1px solid currentColor;
+  border-radius: var(--shape-control);
+}
+
+@utility empty-state {
+  margin: 0;
+  padding: var(--space-page);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--shape-panel);
+  color: var(--content-secondary);
+}
+
+@utility table-scroll {
+  max-width: 100%;
+  overflow: auto;
+}
+
+@utility evidence-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--type-body-size);
+
+  & caption {
+    padding-block: var(--space-cluster);
+    color: var(--content-primary);
+    font-weight: 700;
+    text-align: start;
+  }
+
+  & th,
+  & td {
+    padding: var(--space-cluster);
+    border-block-end: 1px solid var(--border-default);
+    text-align: start;
+    vertical-align: top;
+  }
+
+  & td {
+    min-width: var(--layout-table-cell-min);
+  }
+
+  & td > * + * {
+    margin-block-start: var(--space-tight);
+  }
+}
+
+@utility link-control {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--interaction-accent);
+  font: inherit;
+  font-weight: 650;
+  text-align: start;
+  text-decoration: underline;
+  text-underline-offset: var(--space-tight);
 }
 
 @media (prefers-reduced-motion: reduce) {
