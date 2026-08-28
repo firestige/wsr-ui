@@ -128,6 +128,7 @@ function metrics() {
         ...available({ kind: "DURATION_MS", value: "1250", unit: "ms" }),
         state: "LOWER_BOUND",
         reading: "Recorded lower bound only",
+        coverage: null,
       };
     else if (index === 6)
       slice = withheld("INCOMPATIBLE", "INCOMPATIBLE_INPUT", {
