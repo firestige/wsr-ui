@@ -2,12 +2,17 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { MetricExplanationView, ReceiptView } from "./components/details";
 import { CompareResultFrame } from "./components/compare-result";
+import { DashboardComposer } from "./components/dashboard-composer";
 import { OwnedInspector } from "./components/inspector";
 import { MetricPanel } from "./components/result-visualizer";
 import { MetricNavigator } from "./components/metric-result";
 import { ScopedError } from "./components/status";
 import { METRIC_COPY } from "./domain/catalog/metric-copy";
-import { PRESET_LAYOUTS, type DashboardLayout } from "./domain/layout/layout";
+import {
+  decodeLayout,
+  PRESET_LAYOUTS,
+  type DashboardLayout,
+} from "./domain/layout/layout";
 import type { EvaluationRoute } from "./domain/navigation/evaluation-route";
 import type {
   CompareResponse,
@@ -35,6 +40,20 @@ type WorkspaceState =
   | { tag: "LOADING" }
   | { tag: "RESULT"; response: SingleResponse | CompareResponse }
   | { tag: "ERROR"; detail: string; retryable: boolean };
+
+const LOCAL_LAYOUT_KEY = "wsr.bi.dashboard-layout@1";
+type LayoutChoice = keyof typeof PRESET_LAYOUTS | "local@1";
+
+function storedLayout(): DashboardLayout | undefined {
+  try {
+    const stored = window.localStorage.getItem(LOCAL_LAYOUT_KEY);
+    if (stored === null) return undefined;
+    const decoded = decodeLayout(JSON.parse(stored));
+    return decoded.ok ? decoded.value : undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 function errorPresentation(error: EvolutionResult & { ok: false }): {
   detail: string;
@@ -261,8 +280,15 @@ export function EvaluationWorkspace({
     | { kind: "explanation"; coordinate: keyof typeof METRIC_COPY }
     | null
   >(null);
-  const [presetId, setPresetId] =
-    useState<keyof typeof PRESET_LAYOUTS>("default-overview@1");
+  const [layoutState, setLayoutState] = useState<{
+    choice: LayoutChoice;
+    local?: DashboardLayout;
+  }>(() => {
+    const local = storedLayout();
+    return local === undefined
+      ? { choice: "default-overview@1" }
+      : { choice: "local@1", local };
+  });
   const detailInvoker = useRef<HTMLButtonElement>(null);
 
   const run = useCallback(async () => {
@@ -320,6 +346,10 @@ export function EvaluationWorkspace({
                 ? state.response.right.receipt
                 : undefined,
           };
+  const activeLayout =
+    layoutState.choice === "local@1"
+      ? (layoutState.local ?? PRESET_LAYOUTS["default-overview@1"])
+      : PRESET_LAYOUTS[layoutState.choice];
 
   return (
     <main className="evaluation-shell">
@@ -371,20 +401,44 @@ export function EvaluationWorkspace({
               <select
                 className="control-field"
                 onChange={(event) =>
-                  setPresetId(event.target.value as keyof typeof PRESET_LAYOUTS)
+                  setLayoutState((current) => ({
+                    ...current,
+                    choice: event.target.value as LayoutChoice,
+                  }))
                 }
-                value={presetId}
+                value={layoutState.choice}
               >
                 {Object.entries(PRESET_LAYOUTS).map(([id, layout]) => (
                   <option key={id} value={id}>
                     {layout.name}
                   </option>
                 ))}
+                {layoutState.local === undefined ? null : (
+                  <option value="local@1">Local custom</option>
+                )}
               </select>
             </label>
           ) : null}
         </div>
       </header>
+
+      {state.tag === "RESULT" && state.response.mode === "SINGLE" ? (
+        <DashboardComposer
+          layout={activeLayout}
+          onApply={(layout) => {
+            try {
+              window.localStorage.setItem(
+                LOCAL_LAYOUT_KEY,
+                JSON.stringify(layout),
+              );
+            } catch {
+              // The in-memory local layout remains usable when storage is denied.
+            }
+            setLayoutState({ choice: "local@1", local: layout });
+          }}
+          results={state.response.result.metric_results}
+        />
+      ) : null}
 
       <div id="evaluation-results">
         {state.tag === "LOADING" ? (
@@ -402,7 +456,7 @@ export function EvaluationWorkspace({
         ) : state.response.mode === "SINGLE" ? (
           <SingleResults
             focusedCoordinate={route.focus?.metric}
-            layout={PRESET_LAYOUTS[presetId]}
+            layout={activeLayout}
             onEvidence={(coordinate) => {
               if (route.tag === "SINGLE")
                 onNavigate?.({
