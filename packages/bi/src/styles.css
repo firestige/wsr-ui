@@ -384,6 +384,14 @@
   margin-inline: auto;
 }
 
+@utility dashboard-panel {
+  min-width: 0;
+
+  &[data-size="WIDE"] {
+    grid-column: 1 / -1;
+  }
+}
+
 @utility compare-results {
   display: grid;
   gap: var(--space-section);

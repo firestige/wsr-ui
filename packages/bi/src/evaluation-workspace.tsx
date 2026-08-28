@@ -3,8 +3,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ReceiptView } from "./components/details";
 import { CompareResultFrame } from "./components/compare-result";
 import { OwnedInspector } from "./components/inspector";
-import { MetricResultFrame } from "./components/metric-result";
+import { MetricPanel } from "./components/result-visualizer";
 import { ScopedError } from "./components/status";
+import { PRESET_LAYOUTS, type DashboardLayout } from "./domain/layout/layout";
 import type { EvaluationRoute } from "./domain/navigation/evaluation-route";
 import type {
   CompareResponse,
@@ -47,18 +48,39 @@ function errorPresentation(error: EvolutionResult & { ok: false }): {
   return { detail: error.error.reason, retryable: false };
 }
 
-function SingleResults({ response }: { response: SingleResponse }) {
+function SingleResults({
+  response,
+  layout,
+}: {
+  response: SingleResponse;
+  layout: DashboardLayout;
+}) {
   return (
     <section aria-label="Metric Results" className="evaluation-results">
-      {response.result.metric_results.flatMap((metric) => {
-        const coordinate = `${metric.metric_id}@${metric.metric_version}`;
-        return metric.slices.map((slice) => (
-          <MetricResultFrame
-            content={{ tag: "RESULT", slice }}
-            coordinate={coordinate}
-            key={`${coordinate}:${JSON.stringify(slice.slice_key)}`}
-          />
-        ));
+      {layout.panels.map((panel) => {
+        const result = response.result.metric_results.find(
+          (metric) =>
+            `${metric.metric_id}@${metric.metric_version}` ===
+            panel.metric_coordinate,
+        );
+        return (
+          <section
+            className="dashboard-panel"
+            data-size={panel.size}
+            key={panel.panel_id}
+          >
+            {result === undefined ? (
+              <ScopedError
+                announce="polite"
+                detail={panel.metric_coordinate}
+                retryable={false}
+                title="Metric Result missing"
+              />
+            ) : (
+              <MetricPanel result={result} visualizer={panel.visualizer} />
+            )}
+          </section>
+        );
       })}
     </section>
   );
@@ -139,6 +161,8 @@ export function EvaluationWorkspace({
 }) {
   const [state, setState] = useState<WorkspaceState>({ tag: "LOADING" });
   const [receiptOpen, setReceiptOpen] = useState(false);
+  const [presetId, setPresetId] =
+    useState<keyof typeof PRESET_LAYOUTS>("default-overview@1");
   const receiptButton = useRef<HTMLButtonElement>(null);
 
   const run = useCallback(async () => {
@@ -203,6 +227,24 @@ export function EvaluationWorkspace({
               View receipt
             </button>
           )}
+          {state.tag === "RESULT" && state.response.mode === "SINGLE" ? (
+            <label className="control-label">
+              Layout preset
+              <select
+                className="control-field"
+                onChange={(event) =>
+                  setPresetId(event.target.value as keyof typeof PRESET_LAYOUTS)
+                }
+                value={presetId}
+              >
+                {Object.entries(PRESET_LAYOUTS).map(([id, layout]) => (
+                  <option key={id} value={id}>
+                    {layout.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
         </div>
       </header>
 
@@ -220,7 +262,10 @@ export function EvaluationWorkspace({
             title="Evaluation request failed"
           />
         ) : state.response.mode === "SINGLE" ? (
-          <SingleResults response={state.response} />
+          <SingleResults
+            layout={PRESET_LAYOUTS[presetId]}
+            response={state.response}
+          />
         ) : (
           <CompareResults onRetry={run} response={state.response} />
         )}
