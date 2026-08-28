@@ -48,6 +48,25 @@ function PublishedMeasures({ slice }: { slice: MetricSlice }) {
   );
 }
 
+function CompatibilityCoordinates({ slice }: { slice: MetricSlice }) {
+  const coordinates = Object.entries(slice.compatibility);
+  if (slice.state !== "INCOMPATIBLE" || coordinates.length === 0) return null;
+  return (
+    <section aria-label="Incompatible coordinates" className="status-reading">
+      <span>Mismatch coordinates</span>
+      <ul>
+        {coordinates.map(([name, value]) => (
+          <li key={name}>
+            <code className="text-code">
+              {name}={value}
+            </code>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 export function MetricResultFrame({
   coordinate,
   content,
@@ -94,6 +113,7 @@ export function MetricResultFrame({
           <ExactMetricValue slice={content.slice} />
           {content.slice.value === undefined ? null : visualization}
           <PublishedMeasures slice={content.slice} />
+          <CompatibilityCoordinates slice={content.slice} />
           <CoverageLabel coverage={content.slice.coverage} />
           {content.slice.missing_inputs.length === 0 ? null : (
             <p className="status-reading">
