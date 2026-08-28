@@ -201,6 +201,7 @@ function populationLabel(
 
 function CompareResults({
   response,
+  layout,
   onRetry,
   retrying,
   retryError,
@@ -211,6 +212,7 @@ function CompareResults({
   selectedSide,
 }: {
   response: CompareResponse;
+  layout: DashboardLayout;
   onRetry: () => void;
   retrying: boolean;
   retryError?: { detail: string; retryable: boolean };
@@ -241,6 +243,36 @@ function CompareResults({
     response.left.tag === "SIDE_ERROR" ? response.left : undefined;
   const afterError =
     response.right.tag === "SIDE_ERROR" ? response.right : undefined;
+  const panels = layout.panels.flatMap((panel) =>
+    response.deltas
+      .filter((delta) => delta.metric_coordinate === panel.metric_coordinate)
+      .map((delta) => ({ delta, panel })),
+  );
+  if (
+    selectedCoordinate !== undefined &&
+    !panels.some(({ delta }) => delta.metric_coordinate === selectedCoordinate)
+  ) {
+    const delta = response.deltas.find(
+      (candidate) => candidate.metric_coordinate === selectedCoordinate,
+    );
+    if (delta !== undefined)
+      panels.push({
+        delta,
+        panel: {
+          panel_id: "focused-result",
+          metric_coordinate:
+            delta.metric_coordinate as DashboardLayout["panels"][number]["metric_coordinate"],
+          visualizer: "table@1",
+          size: "WIDE",
+          channels: { "published-result": "slices" },
+          transforms: [
+            "DISPLAY_ROUNDING",
+            "RATIO_TO_PERCENT",
+            "STABLE_AUTHORITATIVE_SORT",
+          ],
+        },
+      });
+  }
   return (
     <section aria-label="Compared Metric Results" className="compare-results">
       <MetricNavigator
@@ -277,7 +309,7 @@ function CompareResults({
           title="Comparison retry failed"
         />
       )}
-      {response.deltas.map((delta, index) => (
+      {panels.map(({ delta, panel }, index) => (
         <CompareResultFrame
           after={after === undefined ? undefined : findSlice(after, delta)}
           afterError={afterError}
@@ -290,7 +322,7 @@ function CompareResults({
               ? selectedSide
               : undefined
           }
-          key={`${delta.metric_coordinate}:${sliceKey(delta.slice_key)}`}
+          key={`${panel.panel_id}:${delta.metric_coordinate}:${sliceKey(delta.slice_key)}`}
           onEvidence={(side, trigger) =>
             onEvidence(
               delta.metric_coordinate as keyof typeof METRIC_COPY,
@@ -308,6 +340,7 @@ function CompareResults({
             failed === undefined || retrying ? undefined : onRetry
           }
           ownsFailedSide={index === 0}
+          visualizer={panel.visualizer}
         />
       ))}
     </section>
@@ -465,7 +498,7 @@ export function EvaluationWorkspace({
               </button>
             ),
           )}
-          {state.tag === "RESULT" && state.response.mode === "SINGLE" ? (
+          {state.tag === "RESULT" ? (
             <label className="control-label">
               Layout preset
               <select
@@ -545,6 +578,7 @@ export function EvaluationWorkspace({
           />
         ) : (
           <CompareResults
+            layout={activeLayout}
             onEvidence={(coordinate, side) => {
               if (route.tag === "COMPARE")
                 onNavigate?.({

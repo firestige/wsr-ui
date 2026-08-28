@@ -397,9 +397,12 @@ describe("Evaluation workspace", () => {
       />,
     );
 
-    expect(await screen.findAllByText("Before")).toHaveLength(12);
-    expect(screen.getAllByText("After")).toHaveLength(12);
-    expect(screen.getAllByText("Delta")).toHaveLength(12);
+    expect(await screen.findAllByText("Before")).toHaveLength(6);
+    expect(screen.getAllByText("After")).toHaveLength(6);
+    expect(screen.getAllByText("Delta")).toHaveLength(6);
+    expect(
+      screen.getAllByRole("img", { name: "Ratio bar" }).length,
+    ).toBeGreaterThan(0);
     expect(computeCompare).toHaveBeenCalledWith(
       ["task-before"],
       ["task-after"],
@@ -512,10 +515,10 @@ describe("Evaluation workspace", () => {
     expect(screen.queryByText("No matching slice on this side.")).toBeNull();
     expect(
       screen.getAllByText("After side unresolved: QUERY_UNAVAILABLE"),
-    ).toHaveLength(11);
+    ).toHaveLength(5);
     expect(
       screen.getAllByText("Delta unavailable until both sides resolve"),
-    ).toHaveLength(12);
+    ).toHaveLength(6);
   });
 
   it("keeps the successful compare side visible while retrying", async () => {
@@ -549,7 +552,7 @@ describe("Evaluation workspace", () => {
     });
 
     expect(screen.queryByText("Retrying comparison")).toBeNull();
-    expect(screen.getAllByText("After")).toHaveLength(12);
+    expect(screen.getAllByText("After")).toHaveLength(6);
   });
 
   it("retains the successful compare side when its retry also fails", async () => {
