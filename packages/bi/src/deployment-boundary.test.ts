@@ -28,6 +28,7 @@ describe("Wave9 serving boundary", () => {
       expect(location).toContain(`if ($request_method != ${method})`);
       expect(location).toContain("return 405");
       expect(location).toContain(`proxy_pass http://\${${upstream}}`);
+      expect(location).toContain("proxy_connect_timeout 2s");
     },
   );
 
