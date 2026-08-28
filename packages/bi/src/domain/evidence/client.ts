@@ -21,6 +21,25 @@ const timestampPattern =
   /^[0-9]{4}-(0[1-9]|1[0-2])-([0-2][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]\.[0-9]{6}Z$/;
 const tracePattern = /^[a-f0-9]{32}$/;
 const spanPattern = /^[a-f0-9]{16}$/;
+const unsignedNanoPattern = /^(?:0|[1-9][0-9]{0,19})$/;
+const utf8Encoder = new TextEncoder();
+
+function boundedText(value: unknown, minimum: number, maximum: number) {
+  return (
+    typeof value === "string" &&
+    value.length >= minimum &&
+    utf8Encoder.encode(value).byteLength <= maximum
+  );
+}
+
+function uint32(value: unknown): value is number {
+  return (
+    typeof value === "number" &&
+    Number.isInteger(value) &&
+    value >= 0 &&
+    value <= 4_294_967_295
+  );
+}
 
 function scalar(value: unknown): value is Scalar {
   return (
@@ -199,6 +218,10 @@ function fact(value: unknown) {
       "completeness",
       "dimensions",
     ]) &&
+    (compatibility.family_schema === null ||
+      typeof compatibility.family_schema === "string") &&
+    (compatibility.event_name === null ||
+      typeof compatibility.event_name === "string") &&
     compatibility.completeness === value.truth.completeness &&
     Array.isArray(compatibility.dimensions) &&
     compatibility.dimensions.length <= 16 &&
@@ -265,20 +288,22 @@ function traceItem(value: unknown) {
       ]) &&
       typeof node.span_id === "string" &&
       spanPattern.test(node.span_id) &&
-      typeof node.span_name === "string" &&
+      boundedText(node.span_name, 1, 128) &&
       oneOf(node.span_kind, ["INTERNAL", "CLIENT"] as const) &&
       typeof node.start_time_unix_nano === "string" &&
-      /^\d+$/.test(node.start_time_unix_nano) &&
+      unsignedNanoPattern.test(node.start_time_unix_nano) &&
       typeof node.end_time_unix_nano === "string" &&
-      /^\d+$/.test(node.end_time_unix_nano) &&
+      unsignedNanoPattern.test(node.end_time_unix_nano) &&
       oneOf(node.span_status, ["UNSET", "OK", "ERROR"] as const) &&
-      Number.isInteger(node.span_flags) &&
+      uint32(node.span_flags) &&
+      (node.trace_state === null || boundedText(node.trace_state, 0, 512)) &&
       Array.isArray(node.fields) &&
+      node.fields.length <= 73 &&
       node.fields.every(field)
     );
   }
   const edge = value.edge;
-  return (
+  if (!(
     value.node === null &&
     record(edge) &&
     closed(
@@ -288,6 +313,13 @@ function traceItem(value: unknown) {
     ) &&
     traceEndpoint(edge.from) &&
     traceEndpoint(edge.to)
+  ))
+    return false;
+  if (value.kind === "PARENT_EDGE") return true;
+  return (
+    (!Object.hasOwn(edge, "trace_state") ||
+      boundedText(edge.trace_state, 0, 512)) &&
+    (!Object.hasOwn(edge, "flags") || uint32(edge.flags))
   );
 }
 
@@ -389,6 +421,22 @@ export function decodeEvidencePage(
     ) {
       return incompatible("invalid trace summary");
     }
+    const summaries = input.trace_summaries as Array<{ state: string }>;
+    const expectedState =
+      summaries.length === 0
+        ? "ABSENT"
+        : summaries.every((item) => item.state === "EXPIRED")
+          ? "EXPIRED"
+          : summaries.every((item) => item.state === "AVAILABLE")
+            ? "AVAILABLE"
+            : "PARTIAL";
+    if (input.trace_state !== expectedState)
+      return incompatible("trace state does not aggregate summaries");
+    if (
+      (input.trace_state === "ABSENT" || input.trace_state === "EXPIRED") &&
+      (input.items.length !== 0 || input.next_cursor !== null)
+    )
+      return incompatible("absent or expired trace traversal must be empty");
   }
   return { ok: true, value: input as unknown as EvidencePage };
 }
@@ -400,6 +448,53 @@ export interface EvidenceClientOptions {
   timeoutMs?: number;
   maximumBodyBytes?: number;
 }
+
+async function readBoundedBody(
+  response: Response,
+  maximumBytes: number,
+): Promise<EvidenceResult<Uint8Array>> {
+  const reader = response.body?.getReader();
+  if (reader === undefined) return { ok: true, value: new Uint8Array() };
+  const chunks: Uint8Array[] = [];
+  let length = 0;
+  try {
+    while (true) {
+      const item = await reader.read();
+      if (item.done) break;
+      length += item.value.byteLength;
+      if (length > maximumBytes) {
+        await reader.cancel("Evidence response exceeded configured byte bound");
+        return {
+          ok: false,
+          error: { kind: "RESPONSE_BOUND_EXCEEDED", maximumBytes },
+        };
+      }
+      chunks.push(item.value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  const bytes = new Uint8Array(length);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return { ok: true, value: bytes };
+}
+
+const upstreamStatus: Record<string, number> = {
+  INVALID_FILTER: 400,
+  INVALID_CURSOR: 400,
+  NOT_ACCEPTABLE: 406,
+  CURSOR_MISMATCH: 409,
+  CURSOR_EXPIRED: 410,
+  QUERY_BOUND_EXCEEDED: 413,
+  METHOD_NOT_ALLOWED: 405,
+  ROUTE_NOT_FOUND: 404,
+  QUERY_INTERNAL: 500,
+  QUERY_UNAVAILABLE: 503,
+};
 
 export class EvidenceClient {
   readonly #fetcher: typeof fetch;
@@ -446,26 +541,36 @@ export class EvidenceClient {
           },
         };
       }
-      const bytes = await response.arrayBuffer();
-      if (bytes.byteLength > this.#maximumBodyBytes) {
-        return {
-          ok: false,
-          error: {
-            kind: "RESPONSE_BOUND_EXCEEDED",
-            maximumBytes: this.#maximumBodyBytes,
-          },
-        };
-      }
+      const contentType = response.headers.get("content-type");
+      if (
+        contentType?.split(";", 1)[0]?.trim().toLowerCase() !==
+        "application/json"
+      )
+        return incompatible("response content type must be application/json");
+      const bounded = await readBoundedBody(response, this.#maximumBodyBytes);
+      if (!bounded.ok) return bounded;
       let body: unknown;
       try {
-        body = JSON.parse(new TextDecoder().decode(bytes));
+        body = JSON.parse(
+          new TextDecoder("utf-8", { fatal: true }).decode(bounded.value),
+        );
       } catch {
         return {
           ok: false,
           error: { kind: "ERROR", reason: "MALFORMED_BODY" },
         };
       }
-      return decodeEvidencePage(route, body, limit);
+      const decoded = decodeEvidencePage(route, body, limit);
+      if (response.ok) {
+        if (!decoded.ok && decoded.error.kind === "UPSTREAM")
+          return incompatible("HTTP success carried an error envelope");
+        return decoded;
+      }
+      if (decoded.ok || decoded.error.kind !== "UPSTREAM")
+        return incompatible("HTTP error lacked a valid error envelope");
+      if (upstreamStatus[decoded.error.code] !== response.status)
+        return incompatible("HTTP status does not match Evidence error code");
+      return decoded;
     } catch (error) {
       const reason =
         error instanceof DOMException && error.name === "AbortError"
