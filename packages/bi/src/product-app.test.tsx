@@ -38,7 +38,7 @@ const taskPage: TaskPage = {
 afterEach(() => window.history.replaceState(null, "", "/preview"));
 
 describe("BI product route", () => {
-  it("loads the complete recorded Trace route in Still mode", async () => {
+  it("keeps active records available while marking a partial Trace-level hole", async () => {
     const traceId = "a".repeat(32);
     const spanId = "b".repeat(16);
     const tracePage: TracesPage = {
@@ -47,8 +47,8 @@ describe("BI product route", () => {
       read_model_revision: "1.0.0",
       snapshot: "trace-snapshot",
       next_cursor: null,
-      trace_state: "AVAILABLE",
-      trace_summaries: [{ trace_id: traceId, state: "AVAILABLE" }],
+      trace_state: "PARTIAL",
+      trace_summaries: [{ trace_id: traceId, state: "PARTIAL" }],
       items: [
         {
           id: `node-${spanId}`,
@@ -95,6 +95,11 @@ describe("BI product route", () => {
       await screen.findByRole("button", { name: /Root invocation/ }),
     ).toBeVisible();
     expect(screen.getByText("Mode: Still")).toBeVisible();
+    expect(screen.getByText(/known data hole/i)).toBeVisible();
+    expect(screen.getByText("Available recorded detail")).toBeVisible();
+    expect(
+      screen.queryByText("Partial recorded detail"),
+    ).not.toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Back to Evidence" }),
     ).toBeVisible();
