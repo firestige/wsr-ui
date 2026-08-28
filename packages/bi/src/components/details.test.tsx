@@ -13,8 +13,17 @@ const receipt: ResolvedEvaluationContext = {
     {
       task_id: "task-a",
       display_name: "Checkout optimization",
-      memberships: [],
-      cohort_coordinates: {},
+      memberships: [
+        {
+          delivery_id: "delivery-a",
+          manifest_digest: "c".repeat(64),
+          accepted_digest: "d".repeat(64),
+          profile_version: "2.0.0",
+          source_identity: "source-a",
+          recorded_at: "2026-08-28T00:59:00.000000Z",
+        },
+      ],
+      cohort_coordinates: { workflow: "checkout@3.0.0" },
       exclusions: ["UNDEFINED_TASK_MEMBERSHIP"],
     },
     {
@@ -40,12 +49,43 @@ const receipt: ResolvedEvaluationContext = {
       read_model_revision: "2.0.0",
       route_snapshot: "task-snapshot-a",
       completion_state: "PARTIAL",
+      error_state: "UPSTREAM_PARTIAL",
     },
   ],
   input_refs: [
     { kind: "FACT", identity: "fact-a", provenance_ref: "b".repeat(64) },
   ],
-  workflow_resolutions: [],
+  workflow_resolutions: [
+    {
+      manifest_digest: "c".repeat(64),
+      manifest_projection_digest: "e".repeat(64),
+      accepted_digest: "d".repeat(64),
+      profile_version: "2.0.0",
+      source_identity: "source-a",
+      package_name: "checkout",
+      exact_package_version: "3.0.0",
+      package_digest: "f".repeat(64),
+      workflow_id: "workflow-checkout",
+      workflow_version: "3.0.0",
+      snapshot_id: "snapshot-checkout",
+      snapshot_digest: "1".repeat(64),
+      state: "AVAILABLE",
+      matched_source_id: "github-primary",
+      matched_source_index: 0,
+      matched_repository: "example/checkout",
+      validated_archive_digest: "2".repeat(64),
+      validated_package_digest: "3".repeat(64),
+      validated_snapshot_digest: "4".repeat(64),
+      attempts: [
+        {
+          source_id: "mirror",
+          source_index: 1,
+          code: "NOT_FOUND",
+          message: "Package was not present",
+        },
+      ],
+    },
+  ],
   population_state: "PARTIAL",
 };
 
@@ -80,6 +120,14 @@ describe("inspector detail content", () => {
     expect(screen.getByText("task-b").tagName).toBe("STRONG");
     expect(screen.getAllByText("PARTIAL").length).toBeGreaterThan(0);
     expect(screen.getByText("task-snapshot-a")).toBeVisible();
+    expect(screen.getByText("delivery-a")).toBeVisible();
+    expect(screen.getByText("workflow=checkout@3.0.0")).toBeVisible();
+    expect(screen.getByText("UPSTREAM_PARTIAL")).toBeVisible();
+    expect(screen.getByText("github-primary")).toBeVisible();
+    expect(screen.getByText("example/checkout")).toBeVisible();
+    expect(screen.getByText("NOT_FOUND")).toBeVisible();
+    expect(screen.getByText("Package was not present")).toBeVisible();
+    expect(screen.getAllByText("a".repeat(64)).length).toBeGreaterThan(0);
     expect(screen.getByText("fact-a")).toBeVisible();
     expect(screen.getByText(/response audit record/i)).toBeVisible();
     expect(screen.getByText(/not proof of causation/i)).toBeVisible();
