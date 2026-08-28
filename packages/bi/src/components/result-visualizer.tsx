@@ -147,7 +147,9 @@ export function MetricPanel({
 }) {
   const coordinate = `${result.metric_id}@${result.metric_version}`;
   const compatible = result.slices.every((slice) =>
-    compatibleVisualizerIds(slice).includes(visualizer),
+    slice.value === undefined
+      ? true
+      : compatibleVisualizerIds(slice).includes(visualizer),
   );
   if (!compatible)
     return (
