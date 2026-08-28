@@ -28,9 +28,23 @@ describe("BI component preview", () => {
       "Expired",
       "Incompatible",
     ]) {
-      expect(within(matrix).getByText(label)).toBeVisible();
+      expect(within(matrix).getAllByText(label).length).toBeGreaterThan(0);
     }
     expect(within(matrix).queryByText(/^Partial$/)).toBeNull();
+    for (const state of [
+      "available",
+      "lower-bound",
+      "not-applicable",
+      "unavailable",
+      "expired",
+      "incompatible",
+    ]) {
+      expect(
+        within(matrix).getByRole("article", {
+          name: `${state}-preview@2.0.0`,
+        }),
+      ).toBeVisible();
+    }
   });
 
   it("previews semantic D3 and recorded-structure foundations", () => {
@@ -40,12 +54,26 @@ describe("BI component preview", () => {
       screen.getByRole("img", { name: "Factual trend preview" }),
     ).toBeVisible();
     expect(
+      screen.getByRole("table", { name: "Factual trend data" }),
+    ).toBeVisible();
+    expect(
       screen.getByRole("img", { name: "Recorded trace preview" }),
     ).toBeVisible();
     expect(
       screen.getByRole("heading", { name: "Recorded structure" }),
     ).toBeVisible();
     expect(screen.getByText("Mode: Still")).toBeVisible();
+  });
+
+  it("keeps the Live preview finite", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(
+      screen.getByRole("button", { name: "Start Live reading" }),
+    );
+    expect(screen.getByText("Mode: COMPLETE")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Reset reading" })).toBeVisible();
   });
 
   it("opens both detail types in the single owned inspector", async () => {

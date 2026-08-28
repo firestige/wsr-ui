@@ -332,6 +332,29 @@
   height: var(--layout-visual-preview-height);
 }
 
+@utility visual-with-fallback {
+  display: grid;
+  gap: var(--space-cluster);
+}
+
+@utility visual-data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--type-label-size);
+
+  & caption {
+    color: var(--content-secondary);
+    text-align: start;
+  }
+
+  & th,
+  & td {
+    padding: var(--space-tight);
+    border-block-end: 1px solid var(--border-default);
+    text-align: start;
+  }
+}
+
 @utility status-stack {
   display: grid;
   gap: var(--space-tight);
