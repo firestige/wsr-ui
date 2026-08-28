@@ -317,6 +317,110 @@
   color: var(--status-attention);
 }
 
+@utility status-stack {
+  display: grid;
+  gap: var(--space-tight);
+}
+
+@utility status-label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-tight);
+  width: fit-content;
+  padding: var(--space-tight) var(--space-cluster);
+  border: 1px solid currentColor;
+  border-radius: var(--shape-pill);
+  font-size: var(--type-label-size);
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+@utility status-available {
+  background: var(--status-available-surface);
+  color: var(--status-available);
+}
+
+@utility status-attention {
+  background: var(--status-attention-surface);
+  color: var(--status-attention);
+}
+
+@utility status-unavailable {
+  background: var(--status-unavailable-surface);
+  color: var(--status-unavailable);
+}
+
+@utility status-expired {
+  background: var(--status-expired-surface);
+  color: var(--status-expired);
+}
+
+@utility status-incompatible {
+  background: var(--status-incompatible-surface);
+  color: var(--status-incompatible);
+}
+
+@utility status-reason {
+  color: var(--content-secondary);
+  font-size: var(--type-label-size);
+  font-weight: 650;
+}
+
+@utility status-reading {
+  color: var(--content-primary);
+  font-size: var(--type-body-size);
+}
+
+@utility coverage-label {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-cluster);
+}
+
+@utility numeric-exact {
+  color: var(--content-primary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: var(--type-code-size);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+@utility lifecycle-grid {
+  display: grid;
+  gap: var(--space-tight);
+  color: var(--content-secondary);
+  font-size: var(--type-label-size);
+}
+
+@utility scoped-error {
+  display: grid;
+  gap: var(--space-cluster);
+  padding: var(--space-page);
+  border: 1px solid var(--status-error);
+  border-radius: var(--shape-panel);
+  background: var(--status-error-surface);
+  color: var(--content-primary);
+}
+
+@utility text-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: var(--type-code-size);
+  overflow-wrap: anywhere;
+}
+
+@utility action-control {
+  min-height: var(--density-control);
+  width: fit-content;
+  padding-inline: var(--space-cluster);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--shape-control);
+  background: var(--surface-raised);
+  color: var(--content-primary);
+  font: inherit;
+  font-weight: 650;
+}
+
 @media (prefers-reduced-motion: reduce) {
   :root {
     --motion-finite-duration: 0ms;
