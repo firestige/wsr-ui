@@ -55,7 +55,7 @@ runtime program is the frozen Nginx base.
 | wsr-ui BI source      | `packages/bi/**`                                                                                   |
 | wsr-ui build/runtime  | `package*.json`, TypeScript/Vite/test config, `Dockerfile`, `.dockerignore`, `deployment/nginx/**` |
 | wsr-ui qualification  | `.github/workflows/ci.yml`, `scripts/**`, `tests/browser/**`, `docs/dependency-inventory.ndjson`   |
-| superproject assembly | `deployment/compose.iter5.yaml` (Wave 9), `qualification/iter5/**` (Wave 10), `wsr-ui` pin         |
+| superproject assembly | `deployment/compose.yaml` (introduced by Wave 9), `qualification/iter5/**` (Wave 10), `wsr-ui` pin |
 
 The complete `database + evidence + evolution + bi-app` Compose never lives in this repository (the
 Evidence migration job remains an operational prerequisite). The BI Dockerfile and Nginx configuration
@@ -80,14 +80,14 @@ projection stays private to Evolution. `EVIDENCE_UPSTREAM` defaults to `evidence
 ports. Unknown/write routes fail closed. Nginx computes no metric, stores no receipt and has no database
 client. `/healthz` is local infrastructure health, not Evolution or Evidence semantic health.
 
-The superproject-owned Compose path is frozen as `deployment/compose.iter5.yaml`. Its default host
+The superproject-owned product Compose path is `deployment/compose.yaml`. Its default host
 binding is `127.0.0.1:8080:80`; PostgreSQL, Evidence and Evolution expose no host port. Wave 9 owns its
 implementation and Wave 12 owns the clean full-Compose oracle:
 
 ```sh
-docker compose -f deployment/compose.iter5.yaml up --build --wait
+docker compose -f deployment/compose.yaml up --build --wait
 npm --prefix qualification/iter5 run e2e
-docker compose -f deployment/compose.iter5.yaml down --volumes
+docker compose -f deployment/compose.yaml down --volumes
 ```
 
 Distribution is source-build only. Users select source access, a local image tag, target platform and
@@ -157,7 +157,7 @@ UI production code.
 | local image                   | `npm run docker:build`                             |
 | live Nginx/source-build smoke | `npm run docker:smoke`                             |
 | component CI                  | `.github/workflows/ci.yml`                         |
-| future complete Compose       | superproject `deployment/compose.iter5.yaml`       |
+| future complete Compose       | superproject `deployment/compose.yaml`             |
 | future independence oracle    | superproject `qualification/iter5/independence/**` |
 
 Any need for a BI backend, database route, write proxy, registry publication, future-product abstraction,
