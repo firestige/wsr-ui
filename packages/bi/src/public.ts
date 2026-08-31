@@ -1,0 +1,61 @@
+import "./shared.css";
+
+export { BiSurface, type BiSurfaceProps } from "./components/bi-surface";
+export { CompareResultFrame } from "./components/compare-result";
+export { MetricExplanationView, ReceiptView } from "./components/details";
+export {
+  EvidenceConsoleFoundation,
+  type EvidenceConsoleRow,
+  type EvidenceReferenceRow,
+  type EvidenceScope,
+} from "./components/evidence-console";
+export {
+  MetricNavigator,
+  MetricResultFrame,
+  type MetricNavigatorItem,
+} from "./components/metric-result";
+export {
+  DEFAULT_MOTION_MODE,
+  MotionControl,
+  RecordedStructureFoundation,
+  type MotionMode,
+  type RecordedDetailState,
+  type RecordedNodeView,
+  type RecordedStructureViewModel,
+} from "./components/recorded-structure";
+export { MetricPanel } from "./components/result-visualizer";
+export {
+  CoverageLabel,
+  EvidenceLifecycleLabel,
+  MetricTruthLabel,
+  ScopedError,
+} from "./components/status";
+export type * from "./domain/evidence/types";
+export type * from "./domain/evolution/types";
+export {
+  type TracePagePort,
+  loadRecordedTrace,
+} from "./domain/trace/load-recorded-trace";
+export {
+  type RecordedNode,
+  type RecordedStructure,
+  type UnresolvedEndpoint,
+  projectRecordedStructure,
+} from "./domain/trace/recorded-structure";
+export { presentExactValue } from "./domain/visualization/presentation";
+export {
+  VISUALIZER_REGISTRY,
+  compatibleVisualizerIds,
+  type VisualizerId,
+} from "./domain/visualization/registry";
+
+export interface BiNavigationPort {
+  navigate(destination: {
+    kind: "receipt" | "fact" | "trace";
+    id: string;
+  }): void;
+}
+
+export interface BiHostErrorPort {
+  report(error: unknown, context: string): void;
+}

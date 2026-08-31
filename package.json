@@ -21,7 +21,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint .",
-    "test": "vitest run",
+    "package:verify": "npm run build --workspace @wsr/bi && node scripts/package-contract.mjs packages/bi && npm pack --dry-run --json --workspace @wsr/bi",
+    "test": "vitest run && node --test scripts/*.test.mjs",
     "typecheck": "tsc -b --pretty false"
   },
   "devDependencies": {

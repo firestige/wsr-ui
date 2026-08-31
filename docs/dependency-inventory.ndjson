@@ -1,4 +1,4 @@
-{"schema":"wsr-ui.dependency-inventory@0.1.0","packageLockSha256":"75ac8f5e892b7d31325a9236a7f00132471e247190cc27e5749024ad793f5134","dependencyCount":373}
+{"schema":"wsr-ui.dependency-inventory@0.1.0","packageLockSha256":"c43a03a2b1d2ebd6a44899dd24684cdb10a8412740c1bc50559986476f41a200","dependencyCount":371}
 {"path":"node_modules/@adobe/css-tools","version":"4.5.0","license":"MIT","development":true,"optional":false}
 {"path":"node_modules/@asamuzakjp/css-color","version":"5.1.11","license":"MIT","development":true,"optional":false}
 {"path":"node_modules/@asamuzakjp/dom-selector","version":"7.1.1","license":"MIT","development":true,"optional":false}
@@ -79,8 +79,6 @@
 {"path":"node_modules/@tailwindcss/oxide-linux-x64-gnu","version":"4.3.3","license":"MIT","development":true,"optional":true}
 {"path":"node_modules/@tailwindcss/oxide-linux-x64-musl","version":"4.3.3","license":"MIT","development":true,"optional":true}
 {"path":"node_modules/@tailwindcss/oxide-wasm32-wasi","version":"4.3.3","license":"MIT","development":true,"optional":true}
-{"path":"node_modules/@tailwindcss/oxide-wasm32-wasi/node_modules/@emnapi/core","version":"1.11.1","license":"MIT","development":true,"optional":true}
-{"path":"node_modules/@tailwindcss/oxide-wasm32-wasi/node_modules/@emnapi/runtime","version":"1.11.1","license":"MIT","development":true,"optional":true}
 {"path":"node_modules/@tailwindcss/oxide-wasm32-wasi/node_modules/@emnapi/wasi-threads","version":"1.2.2","license":"MIT","development":true,"optional":true}
 {"path":"node_modules/@tailwindcss/oxide-wasm32-wasi/node_modules/@napi-rs/wasm-runtime","version":"1.1.4","license":"MIT","development":true,"optional":true}
 {"path":"node_modules/@tailwindcss/oxide-wasm32-wasi/node_modules/@tybys/wasm-util","version":"0.10.2","license":"MIT","development":true,"optional":true}
@@ -306,8 +304,8 @@
 {"path":"node_modules/prettier","version":"3.9.6","license":"MIT","development":true,"optional":false}
 {"path":"node_modules/pretty-format","version":"27.5.1","license":"MIT","development":true,"optional":false}
 {"path":"node_modules/punycode","version":"2.3.1","license":"MIT","development":true,"optional":false}
-{"path":"node_modules/react","version":"19.2.8","license":"MIT","development":false,"optional":false}
-{"path":"node_modules/react-dom","version":"19.2.8","license":"MIT","development":false,"optional":false}
+{"path":"node_modules/react","version":"19.2.8","license":"MIT","development":true,"optional":false}
+{"path":"node_modules/react-dom","version":"19.2.8","license":"MIT","development":true,"optional":false}
 {"path":"node_modules/react-is","version":"17.0.2","license":"MIT","development":true,"optional":false}
 {"path":"node_modules/redent","version":"3.0.0","license":"MIT","development":true,"optional":false}
 {"path":"node_modules/require-from-string","version":"2.0.2","license":"MIT","development":true,"optional":false}
@@ -316,7 +314,7 @@
 {"path":"node_modules/rw","version":"1.3.3","license":"BSD-3-Clause","development":false,"optional":false}
 {"path":"node_modules/safer-buffer","version":"2.1.2","license":"MIT","development":false,"optional":false}
 {"path":"node_modules/saxes","version":"6.0.0","license":"ISC","development":true,"optional":false}
-{"path":"node_modules/scheduler","version":"0.27.0","license":"MIT","development":false,"optional":false}
+{"path":"node_modules/scheduler","version":"0.27.0","license":"MIT","development":true,"optional":false}
 {"path":"node_modules/semver","version":"6.3.1","license":"ISC","development":true,"optional":false}
 {"path":"node_modules/shebang-command","version":"2.0.0","license":"MIT","development":true,"optional":false}
 {"path":"node_modules/shebang-regex","version":"3.0.0","license":"MIT","development":true,"optional":false}
@@ -326,7 +324,7 @@
 {"path":"node_modules/std-env","version":"4.2.0","license":"MIT","development":true,"optional":false}
 {"path":"node_modules/strip-indent","version":"3.0.0","license":"MIT","development":true,"optional":false}
 {"path":"node_modules/symbol-tree","version":"3.2.4","license":"MIT","development":true,"optional":false}
-{"path":"node_modules/tailwindcss","version":"4.3.3","license":"MIT","development":false,"optional":false}
+{"path":"node_modules/tailwindcss","version":"4.3.3","license":"MIT","development":true,"optional":false}
 {"path":"node_modules/tapable","version":"2.3.3","license":"MIT","development":true,"optional":false}
 {"path":"node_modules/tinybench","version":"2.9.0","license":"MIT","development":true,"optional":false}
 {"path":"node_modules/tinyexec","version":"1.3.0","license":"MIT","development":true,"optional":false}
