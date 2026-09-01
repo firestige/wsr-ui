@@ -18,6 +18,7 @@
     "deps:check": "node scripts/dependency-inventory.mjs --check",
     "deps:write": "node scripts/dependency-inventory.mjs --write",
     "dev": "vite packages/bi",
+    "dev:test": "vite packages/bi --open /test.html",
     "docker:build": "docker build --tag wsr-ui-bi:local .",
     "docker:smoke": "./scripts/docker-smoke.sh",
     "format": "prettier --write .",
