@@ -48,6 +48,7 @@
   "chartPanels": [
     {
       "id": "metric-ratio-bar@1",
+      "rendererReadySelector": "svg[role=\"img\"]",
       "source": "packages/bi/src/components/result-visualizer.tsx",
       "initialRenderer": "svg",
       "dataContract": "MetricResult with exactly one RATIO slice in the inclusive [0,1] domain",
@@ -67,6 +68,7 @@
     },
     {
       "id": "recorded-trace-waterfall@1",
+      "rendererReadySelector": "[data-trace-renderer=\"waterfall\"] [role=\"treeitem\"]",
       "source": "packages/bi/src/components/trace-views.tsx",
       "initialRenderer": "semantic HTML and CSS shared timeline",
       "dataContract": "lossless wsr.trace-view@1 IR compiled from one traces/read page",
@@ -90,6 +92,7 @@
     },
     {
       "id": "recorded-trace-tree@1",
+      "rendererReadySelector": "[data-trace-renderer=\"tree\"] [role=\"treeitem\"]",
       "source": "packages/bi/src/components/trace-views.tsx",
       "initialRenderer": "semantic HTML call tree",
       "dataContract": "lossless wsr.trace-view@1 IR compiled from one traces/read page",

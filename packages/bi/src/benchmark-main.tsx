@@ -161,7 +161,7 @@ function BenchmarkHarness() {
           interactionFrame += 1;
           if (interactionFrame % 30 === 0) {
             const selectable = document.querySelectorAll<HTMLButtonElement>(
-              ".trace-view .recorded-node",
+              '[data-trace-renderer] [role="treeitem"] button',
             );
             selectable[interactionFrame % selectable.length]?.click();
           }

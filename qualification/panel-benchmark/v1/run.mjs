@@ -115,15 +115,10 @@ async function measureSample(browser, target) {
         throw new Error("UNAVAILABLE fixture rendered a chart");
       }
     } else if (
-      target.panel === "metric-ratio-bar@1" &&
-      (await page.locator('svg[role="img"]').count()) === 0
+      typeof target.rendererReadySelector !== "string" ||
+      (await page.locator(target.rendererReadySelector).count()) === 0
     ) {
-      throw new Error(`${target.panel} did not render its SVG chart`);
-    } else if (
-      target.panel.startsWith("recorded-trace-") &&
-      (await page.locator(".trace-view .recorded-node").count()) === 0
-    ) {
-      throw new Error(`${target.panel} did not render recorded spans`);
+      throw new Error(`${target.panel} did not satisfy renderer readiness`);
     }
     const frameDurations = target.interactive
       ? await page.evaluate(
@@ -165,12 +160,14 @@ async function measureSample(browser, target) {
 const targets = manifest.chartPanels.flatMap((panelDefinition) => [
   {
     panel: panelDefinition.id,
+    rendererReadySelector: panelDefinition.rendererReadySelector,
     fixture: "typical",
     fixtureId: panelDefinition.typicalFixture.id,
     interactive: panelDefinition.id.startsWith("recorded-trace-"),
   },
   {
     panel: panelDefinition.id,
+    rendererReadySelector: panelDefinition.rendererReadySelector,
     fixture: "upper-bound",
     fixtureId: panelDefinition.upperBoundFixture.id,
     interactive: panelDefinition.id.startsWith("recorded-trace-"),

@@ -26,6 +26,26 @@ test("Wave 2 performance targets the reusable metric, waterfall, and tree panels
     JSON.stringify(manifest).includes("recorded-trace-graph@1"),
     false,
   );
+  assert.deepEqual(
+    manifest.chartPanels.map(
+      ({ rendererReadySelector }) => rendererReadySelector,
+    ),
+    [
+      'svg[role="img"]',
+      '[data-trace-renderer="waterfall"] [role="treeitem"]',
+      '[data-trace-renderer="tree"] [role="treeitem"]',
+    ],
+  );
+
+  const harness = await readFile(
+    resolve(import.meta.dirname, "../../../packages/bi/src/benchmark-main.tsx"),
+    "utf8",
+  );
+  assert.match(
+    harness,
+    /\[data-trace-renderer\].*\[role=["']treeitem["']\] button/s,
+  );
+  assert.doesNotMatch(harness, /\.recorded-node/);
 });
 
 test("clips long tasks to the measured data-ready window", () => {
