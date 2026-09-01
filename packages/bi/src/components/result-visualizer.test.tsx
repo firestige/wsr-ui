@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 import type { MetricResult, MetricSlice } from "../domain/evolution/types";
-import { MetricPanel } from "./result-visualizer";
+import { DashboardMetricPanel, MetricPanel } from "./result-visualizer";
 
 const ratio: MetricSlice = {
   slice_key: {},
@@ -31,6 +31,65 @@ const result: MetricResult = {
 };
 
 describe("Metric panel visualization", () => {
+  it("renders a focused SMALL dashboard panel without detail-only coverage or actions", () => {
+    render(
+      <DashboardMetricPanel
+        onEvidence={vi.fn()}
+        result={result}
+        size="SMALL"
+        visualizer="numeric-card@1"
+      />,
+    );
+
+    const panel = screen.getByRole("article", {
+      name: "Delivery terminal outcome rate",
+    });
+    expect(panel).toHaveAttribute("data-presentation", "dashboard");
+    expect(panel).toHaveAttribute("data-panel-size", "SMALL");
+    expect(panel).toHaveTextContent("33.33%");
+    expect(panel).not.toHaveTextContent("Coverage");
+    expect(panel).not.toHaveTextContent("Metric explanation");
+    expect(screen.queryByRole("button", { name: "View evidence" })).toBeNull();
+  });
+
+  it("renders a MEDIUM dashboard ratio as one chart and one evidence action", () => {
+    render(
+      <DashboardMetricPanel
+        onEvidence={vi.fn()}
+        result={result}
+        size="MEDIUM"
+        visualizer="ratio-bar@1"
+      />,
+    );
+
+    expect(screen.getByRole("img", { name: /33.33%/i })).toBeVisible();
+    expect(screen.queryByRole("table", { name: /ratio bar data/i })).toBeNull();
+    expect(screen.getByRole("button", { name: "View evidence" })).toBeVisible();
+  });
+
+  it("renders a WIDE dashboard table as a focused three-column preview", () => {
+    render(
+      <DashboardMetricPanel
+        result={{
+          ...result,
+          slices: [ratio, { ...ratio, slice_key: { outcome: "failed" } }],
+        }}
+        size="WIDE"
+        visualizer="table@1"
+      />,
+    );
+
+    const table = screen.getByRole("table", {
+      name: /dashboard result preview/i,
+    });
+    expect(table).toHaveTextContent("Slice");
+    expect(table).toHaveTextContent("State");
+    expect(table).toHaveTextContent("Exact value");
+    expect(table).not.toHaveTextContent("Coverage");
+    expect(table).not.toHaveTextContent("Compatibility");
+    expect(table).not.toHaveTextContent("Provenance");
+  });
+
   it("renders a boolean badge with text and symbol redundancy", () => {
     render(
       <MetricPanel

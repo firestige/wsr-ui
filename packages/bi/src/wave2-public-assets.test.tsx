@@ -37,6 +37,18 @@ describe("Wave 2 public reusable BI assets", () => {
       mode: "dark",
       density: "compact",
       containerBorderStyle: "dashed",
+      surfaces: {
+        section: "var(--host-section)",
+        panel: "var(--host-panel)",
+        raised: "var(--host-raised)",
+        inset: "var(--host-inset)",
+      },
+      traceIndentGuides: [
+        "var(--host-depth-0)",
+        "var(--host-depth-1)",
+        "var(--host-depth-2)",
+        "var(--host-depth-3)",
+      ],
     });
 
     render(
@@ -51,6 +63,14 @@ describe("Wave 2 public reusable BI assets", () => {
     expect(surface).toHaveAttribute("data-theme", "dark");
     expect(surface).toHaveAttribute("data-density", "compact");
     expect(surface).toHaveStyle("--wsr-container-border-style: dashed");
+    expect(surface).toHaveStyle("--wsr-surface-section: var(--host-section)");
+    expect(surface).toHaveStyle("--wsr-surface-panel: var(--host-panel)");
+    expect(surface).toHaveStyle("--wsr-surface-raised: var(--host-raised)");
+    expect(surface).toHaveStyle("--wsr-surface-inset: var(--host-inset)");
+    expect(surface).toHaveStyle("--wsr-trace-indent-0: var(--host-depth-0)");
+    expect(surface).toHaveStyle("--wsr-trace-indent-1: var(--host-depth-1)");
+    expect(surface).toHaveStyle("--wsr-trace-indent-2: var(--host-depth-2)");
+    expect(surface).toHaveStyle("--wsr-trace-indent-3: var(--host-depth-3)");
     expect(
       screen.getByRole("region", { name: "Evaluation metrics" }),
     ).toContainElement(screen.getByText("Metric content"));

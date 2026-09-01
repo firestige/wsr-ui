@@ -23,6 +23,22 @@ export function BiSurface({
       ? undefined
       : ({
           "--wsr-container-border-style": theme.containerBorderStyle,
+          ...(theme.surfaces === undefined
+            ? {}
+            : {
+                "--wsr-surface-section": theme.surfaces.section,
+                "--wsr-surface-panel": theme.surfaces.panel,
+                "--wsr-surface-raised": theme.surfaces.raised,
+                "--wsr-surface-inset": theme.surfaces.inset,
+              }),
+          ...(theme.traceIndentGuides === undefined
+            ? {}
+            : {
+                "--wsr-trace-indent-0": theme.traceIndentGuides[0],
+                "--wsr-trace-indent-1": theme.traceIndentGuides[1],
+                "--wsr-trace-indent-2": theme.traceIndentGuides[2],
+                "--wsr-trace-indent-3": theme.traceIndentGuides[3],
+              }),
         } as CSSProperties);
   return (
     <div

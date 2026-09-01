@@ -1,4 +1,20 @@
 import "./shared.css";
+import "./primitives.css";
+
+export {
+  Button,
+  ButtonGroup,
+  Divider,
+  IconButton,
+  StatusBadge,
+  Surface,
+  TextInput,
+  Typography,
+} from "./components/design-system";
+export {
+  STUDIO_DESIGN_IR,
+  type StudioDesignIR,
+} from "./domain/studio-design-ir";
 
 export {
   BiCard,
@@ -29,7 +45,10 @@ export {
   type RecordedNodeView,
   type RecordedStructureViewModel,
 } from "./components/recorded-structure";
-export { MetricPanel } from "./components/result-visualizer";
+export {
+  DashboardMetricPanel,
+  MetricPanel,
+} from "./components/result-visualizer";
 export {
   SpanPassport,
   TraceStatistics,
@@ -44,6 +63,7 @@ export {
 } from "./components/status";
 export type * from "./domain/evidence/types";
 export type * from "./domain/evolution/types";
+export { CATALOG_COORDINATES } from "./domain/evolution/client";
 export { isMetricResult } from "./domain/evolution/validation";
 export {
   type TracePagePort,

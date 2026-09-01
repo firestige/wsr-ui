@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
@@ -97,9 +97,16 @@ describe("recorded Trace business panels", () => {
     });
     expect(waterfall).toHaveAttribute("data-motion", "finite-recorded-time");
     expect(waterfall).toHaveAttribute("data-trace-renderer", "waterfall");
-    expect(screen.getByText("100 ns recorded duration")).toBeVisible();
-    expect(screen.getByText("Recorded links: 1")).toBeVisible();
-    expect(screen.getByText("Recorded spans: 2")).toBeVisible();
+    expect(screen.getAllByText("100 ns").length).toBeGreaterThan(0);
+    expect(screen.getByText("Duration")).toBeVisible();
+    expect(screen.getByText("Start")).toBeVisible();
+    expect(screen.getByText("Spans")).toBeVisible();
+    expect(screen.getByText("Errors")).toBeVisible();
+    expect(
+      screen.getByText("Errors").closest(".trace-summary-stat"),
+    ).toHaveAttribute("data-tone", "success");
+    expect(screen.getByText("trace-1", { selector: "code" })).toBeVisible();
+    expect(screen.queryByText(/shared recorded-time domain/i)).toBeNull();
     expect(
       screen.getByRole("region", { name: "Recorded trace minimap" }),
     ).toBeVisible();
@@ -122,6 +129,106 @@ describe("recorded Trace business panels", () => {
     expect(passport).toHaveTextContent("vendor=value");
     expect(passport).toHaveTextContent('"tool":"shell"');
     expect(passport).toHaveTextContent("FINAL");
+  });
+
+  it("binds collapse controls, minimap zoom, and exact-time ticks to the same waterfall model", async () => {
+    const { container } = render(<TraceWaterfall trace={trace} />);
+
+    expect(container.querySelector(".trace-view-tools")).toBeNull();
+    expect(
+      screen.getByRole("button", { name: "Expand all spans" }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole("button", { name: "Collapse all spans" }),
+    ).toBeVisible();
+    expect(screen.getByRole("button", { name: "Reset focus" })).toHaveAttribute(
+      "data-icon-button",
+      "true",
+    );
+    expect(
+      screen
+        .getByRole("button", { name: "Expand all spans" })
+        .closest('[role="group"]'),
+    ).not.toHaveAttribute("data-segmented");
+    expect(
+      screen.getByRole("searchbox", { name: "Search recorded spans" }),
+    ).toBeVisible();
+    expect(screen.getByText("0 ns")).toBeVisible();
+    expect(screen.getByText("25 ns")).toBeVisible();
+    expect(screen.getByText("50 ns")).toBeVisible();
+    expect(screen.getByText("75 ns")).toBeVisible();
+    expect(screen.getAllByText("100 ns").length).toBeGreaterThan(0);
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "Collapse workflow.run descendants" }),
+    );
+    expect(screen.queryByRole("button", { name: /tool.execute/i })).toBeNull();
+    await userEvent.click(
+      screen.getByRole("button", { name: "Expand all spans" }),
+    );
+    expect(screen.getByRole("button", { name: /tool.execute/i })).toBeVisible();
+
+    const minimap = screen.getByRole("slider", {
+      name: "Trace minimap zoom window",
+    });
+    expect(container.querySelector(".trace-minimap-window")).toHaveAttribute(
+      "data-full",
+      "true",
+    );
+    expect(
+      container.querySelector(
+        '[data-timeline-span-id="root"] .trace-indent-spacer',
+      ),
+    ).toHaveAttribute("data-indent-depth", "1");
+    expect(
+      container.querySelector(
+        '[data-timeline-span-id="child"] .trace-indent-spacer',
+      ),
+    ).toHaveAttribute("data-indent-depth", "2");
+    expect(container.querySelectorAll(".trace-indent-segment")).toHaveLength(2);
+    expect(
+      container.querySelector('.trace-indent-segment[data-guide-depth="0"]'),
+    ).toHaveStyle({ gridRow: "1 / 3" });
+    expect(
+      container.querySelector('.trace-indent-segment[data-guide-depth="1"]'),
+    ).toHaveStyle({ gridRow: "2 / 3" });
+    expect(container.querySelector(".trace-timeline-grid")).toBeInTheDocument();
+    Object.defineProperty(minimap, "getBoundingClientRect", {
+      value: () => ({
+        left: 0,
+        right: 100,
+        top: 0,
+        bottom: 40,
+        width: 100,
+        height: 40,
+        x: 0,
+        y: 0,
+        toJSON: () => ({}),
+      }),
+    });
+    fireEvent.pointerDown(minimap, { clientX: 25, pointerId: 1 });
+    fireEvent.pointerMove(minimap, { clientX: 75, pointerId: 1 });
+    fireEvent.pointerUp(minimap, { clientX: 75, pointerId: 1 });
+
+    expect(minimap).toHaveAttribute("aria-valuetext", "25 ns to 75 ns");
+    expect(container.querySelector(".trace-minimap-window")).toHaveStyle({
+      insetInlineStart: "25%",
+      width: "50%",
+    });
+    expect(
+      container.querySelector(
+        '[data-timeline-span-id="child"] .trace-timeline-bar',
+      ),
+    ).toHaveStyle({ insetInlineStart: "0%", width: "30%" });
+
+    fireEvent.pointerDown(minimap, { clientX: 50, pointerId: 2 });
+    fireEvent.pointerMove(minimap, { clientX: 75, pointerId: 2 });
+    fireEvent.pointerUp(minimap, { clientX: 75, pointerId: 2 });
+    expect(
+      container.querySelector(
+        '[data-timeline-span-id="child"] .trace-timeline-bar',
+      ),
+    ).toHaveStyle({ display: "none" });
   });
 
   it("renders a call tree, keeping recorded LINK edges distinct", () => {
@@ -157,6 +264,14 @@ describe("recorded Trace business panels", () => {
     expect(
       screen.getByRole("region", { name: "Span passport" }),
     ).toHaveTextContent("root");
+    const passport = screen.getByRole("region", { name: "Span passport" });
+    expect(
+      passport.querySelector(":scope > .trace-passport-head"),
+    ).toHaveTextContent("Span PassportExact focus");
+    expect(
+      passport.querySelector(":scope > .trace-passport-body"),
+    ).not.toBeNull();
+    expect(passport.querySelector(".trace-passport-sigil")).toBeVisible();
     expect(screen.queryByText(/service map|architecture/i)).toBeNull();
   });
 
@@ -206,7 +321,12 @@ describe("recorded Trace business panels", () => {
   });
 
   it("renders bounded recorded statistics without inferring a service map or critical path", () => {
-    render(<TraceStatistics trace={trace} />);
+    render(
+      <TraceStatistics
+        trace={trace}
+        viewNavigation={<nav aria-label="Renderer navigation">views</nav>}
+      />,
+    );
 
     const region = screen.getByRole("region", {
       name: "Recorded trace statistics",
@@ -220,20 +340,67 @@ describe("recorded Trace business panels", () => {
     expect(region).toHaveTextContent("Recorded kind inventory");
     expect(region).toHaveTextContent("Recorded duration distribution");
     expect(region).not.toHaveTextContent(/critical path|service map/i);
+    expect(
+      region.querySelector(':scope > nav[aria-label="Renderer navigation"]'),
+    ).not.toBeNull();
+    expect(
+      screen.getByRole("heading", { name: "Trace statistics" }),
+    ).toHaveAttribute("data-variant", "sectionTitle");
+    expect(
+      screen.getByText(
+        "Exact inventory and recorded-time aggregates only; no inferred causality.",
+      ),
+    ).toHaveAttribute("data-variant", "caption");
+    expect(screen.getByText("Recorded spans")).toHaveAttribute(
+      "data-variant",
+      "label",
+    );
+    expect(screen.getByText("2", { selector: "dd" })).toHaveAttribute(
+      "data-variant",
+      "value",
+    );
+  });
+
+  it("places Host renderer navigation in the same top-level region for every Trace renderer", () => {
+    const navigation = <nav aria-label="Renderer navigation">views</nav>;
+
+    for (const Renderer of [TraceWaterfall, TraceTree, TraceStatistics]) {
+      const { unmount } = render(
+        <Renderer trace={trace} viewNavigation={navigation} />,
+      );
+      const region = screen.getByLabelText(
+        /Recorded trace (waterfall|tree|statistics)/i,
+      );
+      expect(
+        region.querySelector(':scope > nav[aria-label="Renderer navigation"]'),
+      ).not.toBeNull();
+      expect(
+        region.querySelector(
+          '.trace-view-tools nav[aria-label="Renderer navigation"]',
+        ),
+      ).toBeNull();
+      unmount();
+    }
   });
 
   it("applies deterministic ancestor and descendant lenses without changing recorded relationships", async () => {
     render(<TraceTree trace={trace} />);
 
-    await userEvent.click(screen.getByRole("treeitem", { name: /tool.execute/i }));
+    await userEvent.click(
+      screen.getByRole("treeitem", { name: /tool.execute/i }),
+    );
     await userEvent.click(screen.getByRole("button", { name: "Ancestors" }));
-    expect(screen.getByText(/Ancestors receipt · 2 exact Span identities/)).toBeVisible();
+    expect(
+      screen.getByText(/Ancestors receipt · 2 exact Span identities/),
+    ).toBeVisible();
     expect(
       screen.getByRole("region", { name: "Recorded trace tree" }),
     ).toHaveAttribute("data-lens", "ancestors");
 
     await userEvent.click(screen.getByRole("button", { name: "Descendants" }));
-    expect(screen.getByText(/Descendants receipt · 1 exact Span identity/)).toBeVisible();
+    expect(
+      screen.getByText(/Descendants receipt · 1 exact Span identity/),
+    ).toBeVisible();
     expect(
       screen.getByRole("region", { name: "Recorded trace tree" }),
     ).toHaveAttribute("data-lens", "descendants");
