@@ -147,6 +147,13 @@ describe("recorded Trace business panels", () => {
     expect(
       screen.getByRole("region", { name: "Semantic camera map" }),
     ).toBeVisible();
+    expect(screen.getByRole("button", { name: "Fit tree" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Ancestors" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Descendants" })).toBeVisible();
+    expect(screen.getByText(/Focus receipt/)).toBeVisible();
+    expect(
+      screen.getByRole("slider", { name: "Recorded time position" }),
+    ).toBeVisible();
     expect(
       screen.getByRole("region", { name: "Span passport" }),
     ).toHaveTextContent("root");
@@ -174,6 +181,26 @@ describe("recorded Trace business panels", () => {
     expect(region).toHaveTextContent("Recorded links1");
     expect(region).toHaveTextContent("ERROR spans0");
     expect(region).toHaveTextContent("Maximum recorded duration100 ns");
+    expect(region).toHaveTextContent("Recorded status inventory");
+    expect(region).toHaveTextContent("Recorded kind inventory");
+    expect(region).toHaveTextContent("Recorded duration distribution");
     expect(region).not.toHaveTextContent(/critical path|service map/i);
+  });
+
+  it("applies deterministic ancestor and descendant lenses without changing recorded relationships", async () => {
+    render(<TraceTree trace={trace} />);
+
+    await userEvent.click(screen.getByRole("treeitem", { name: /tool.execute/i }));
+    await userEvent.click(screen.getByRole("button", { name: "Ancestors" }));
+    expect(screen.getByText(/Ancestors receipt · 2 exact Span identities/)).toBeVisible();
+    expect(
+      screen.getByRole("region", { name: "Recorded trace tree" }),
+    ).toHaveAttribute("data-lens", "ancestors");
+
+    await userEvent.click(screen.getByRole("button", { name: "Descendants" }));
+    expect(screen.getByText(/Descendants receipt · 1 exact Span identity/)).toBeVisible();
+    expect(
+      screen.getByRole("region", { name: "Recorded trace tree" }),
+    ).toHaveAttribute("data-lens", "descendants");
   });
 });

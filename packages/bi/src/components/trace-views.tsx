@@ -1,4 +1,11 @@
-import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
 
 import type { TraceView, TraceViewNode } from "../domain/trace/trace-view";
 import { ScopedError } from "./status";
@@ -18,6 +25,10 @@ function displayNano(value: string): string {
   if (nano >= 1_000_000n) return `${Number(nano / 1_000n) / 1000} ms`;
   if (nano >= 1_000n) return `${Number(nano) / 1000} μs`;
   return `${value} ns`;
+}
+
+function compactIdentity(value: string): string {
+  return value.length <= 12 ? value : `${value.slice(0, 8)}…${value.slice(-4)}`;
 }
 
 function nodeChildren(trace: TraceView, node: TraceViewNode): TraceViewNode[] {
@@ -43,14 +54,16 @@ function useNarrowTraceView(): boolean {
 export function SpanPassport({
   node,
   trace,
+  children,
 }: {
   node: TraceViewNode;
   trace?: TraceView;
+  children?: ReactNode;
 }) {
   const fields = Object.fromEntries(
     node.fields.map(({ field, value }) => [field, value]),
   );
-  const children = trace === undefined ? [] : nodeChildren(trace, node);
+  const childNodes = trace === undefined ? [] : nodeChildren(trace, node);
   const links =
     trace === undefined
       ? []
@@ -80,7 +93,7 @@ export function SpanPassport({
         <dt>Status / truth</dt>
         <dd>{`${node.status} · ${node.truth.completeness ?? "UNKNOWN"} · ${node.truth.availability}`}</dd>
         <dt>Parent / children</dt>
-        <dd>{`${node.parentId ?? "root"} → ${children.map(({ label }) => label).join(", ") || "no recorded child"}`}</dd>
+        <dd>{`${node.parentId ?? "root"} → ${childNodes.map(({ label }) => label).join(", ") || "no recorded child"}`}</dd>
         <dt>Flags / trace state</dt>
         <dd className="text-code">{`${node.flags} · ${node.traceState ?? "none"}`}</dd>
         <dt>Recorded fields</dt>
@@ -91,6 +104,7 @@ export function SpanPassport({
           {`${links.length} independent recorded LINK${links.length === 1 ? "" : "s"}. LINK does not change tree depth.`}
         </p>
       )}
+      {children}
     </section>
   );
 }
@@ -230,7 +244,7 @@ const WaterfallRow = memo(function WaterfallRow({
         </span>
         <span className="trace-node-copy">
           <strong>{node.label}</strong>
-          <small>{`${node.kind} · ${node.id}`}</small>
+          <small>{`${node.kind} · ${compactIdentity(node.id)}`}</small>
         </span>
         <span
           className={node.status === "ERROR" ? "trace-error" : "numeric-exact"}
@@ -253,14 +267,17 @@ const WaterfallRow = memo(function WaterfallRow({
 export function TraceWaterfall({
   trace,
   reducedMotion = false,
+  viewNavigation,
 }: {
   trace: TraceView;
   reducedMotion?: boolean;
+  viewNavigation?: ReactNode;
 }) {
   const [selectedId, setSelectedId] = useState<string>();
   const [query, setQuery] = useState("");
   const [position, setPosition] = useState(0);
   const [playing, setPlaying] = useState(false);
+  const narrow = useNarrowTraceView();
   const selectNode = useCallback((id: string) => setSelectedId(id), []);
   useEffect(() => {
     if (!playing || reducedMotion) return undefined;
@@ -301,12 +318,13 @@ export function TraceWaterfall({
           <span className="trace-eyebrow">Exact recorded timeline</span>
           <strong>{trace.nodes[0]?.label ?? trace.traceId}</strong>
         </div>
-        <span>{`${trace.durationNano} ns recorded duration`}</span>
+        <span>{`${displayNano(trace.durationNano)} recorded duration`}</span>
         <span>{`Recorded spans: ${trace.nodes.length}`}</span>
         <span>{`Recorded links: ${trace.links.length}`}</span>
         <span>{`ERROR spans: ${errorCount}`}</span>
       </header>
       <div className="trace-view-tools">
+        {viewNavigation}
         <button type="button">Expand all</button>
         <button onClick={() => setSelectedId(trace.nodes[0]?.id)} type="button">
           Reset focus
@@ -336,7 +354,22 @@ export function TraceWaterfall({
         </div>
       </section>
       <div className="trace-workbench">
-        <section className="trace-waterfall-canvas">
+        {narrow ? (
+          <section className="trace-waterfall-mobile">
+            <header>Span tree · exact duration</header>
+            <div aria-label="Recorded waterfall span outline" role="tree">
+              {nodes.map((node) => (
+                <TreeOutlineRow
+                  key={node.id}
+                  node={node}
+                  onSelect={selectNode}
+                  trace={trace}
+                />
+              ))}
+            </div>
+          </section>
+        ) : (
+          <section className="trace-waterfall-canvas">
           <header className="trace-timeline-head">
             <span>Span tree</span>
             <span className="trace-ruler">0 · 25% · 50% · 75% · 100%</span>
@@ -368,7 +401,8 @@ export function TraceWaterfall({
             })}
           </div>
           <RecordedLinks trace={trace} />
-        </section>
+          </section>
+        )}
         <SpanPassport node={selected} trace={trace} />
       </div>
       <TraceMotion
@@ -405,8 +439,13 @@ function treeGeometry(trace: TraceView): GeometryNode[] {
       )
       .map((node, index) => ({
         node,
-        x: 35 + depth * 300,
-        y: 55 + index * (460 / Math.max(1, nodes.length)),
+        x: 60 + depth * 330,
+        y:
+          nodes.length === 1
+            ? 240
+            : nodes.length === 2
+              ? 110 + index * 245
+              : 47 + index * (368 / (nodes.length - 1)),
       })),
   );
 }
@@ -425,10 +464,16 @@ const TreeNodeGlyph = memo(function TreeNodeGlyph({
   x,
   y,
   selected,
+  lensHit,
+  current,
+  playing,
   traceDurationNano,
   onSelect,
 }: GeometryNode & {
   selected: boolean;
+  lensHit: boolean;
+  current: boolean;
+  playing: boolean;
   traceDurationNano: string;
   onSelect(id: string): void;
 }) {
@@ -437,7 +482,7 @@ const TreeNodeGlyph = memo(function TreeNodeGlyph({
     <g
       aria-label={`${node.label}, ${node.kind}, ${node.status}, ${displayNano(node.durationNano)}`}
       aria-level={node.depth + 1}
-      className={`trace-tree-node trace-kind-${node.kind.toLowerCase()}${selected ? " is-selected" : ""}${node.status === "ERROR" ? " trace-status-error" : ""}`}
+      className={`trace-tree-node trace-kind-${node.kind.toLowerCase()}${selected ? " is-selected" : ""}${lensHit ? " is-lens-hit" : " is-lens-muted"}${current && playing ? " is-time-current" : ""}${node.status === "ERROR" ? " trace-status-error" : ""}`}
       data-trace-node-id={node.id}
       onClick={select}
       onKeyDown={(event) => {
@@ -465,7 +510,7 @@ const TreeNodeGlyph = memo(function TreeNodeGlyph({
         className="trace-tree-meta"
         x="14"
         y="53"
-      >{`+${displayNano(node.startOffsetNano)} · ${node.id}`}</text>
+      >{`+${displayNano(node.startOffsetNano)} · ${compactIdentity(node.id)}`}</text>
       <text className="trace-tree-duration" textAnchor="end" x="176" y="53">
         {displayNano(node.durationNano)}
       </text>
@@ -520,36 +565,103 @@ const TreeOutlineRow = memo(function TreeOutlineRow({
   );
 });
 
-export function TraceTree({ trace }: { trace: TraceView }) {
+export function TraceTree({
+  trace,
+  viewNavigation,
+}: {
+  trace: TraceView;
+  viewNavigation?: ReactNode;
+}) {
   const [selectedId, setSelectedId] = useState<string>();
+  const [lens, setLens] = useState<"none" | "ancestors" | "descendants">(
+    "none",
+  );
+  const [position, setPosition] = useState(0);
+  const [playing, setPlaying] = useState(false);
   const selectNode = useCallback((id: string) => setSelectedId(id), []);
   const narrow = useNarrowTraceView();
   const geometry = useMemo(
     () => (trace.status === "READY" ? treeGeometry(trace) : []),
     [trace],
   );
+  useEffect(() => {
+    if (!playing) return undefined;
+    const timer = window.setInterval(() => {
+      setPosition((current) => {
+        if (current >= 100) {
+          setPlaying(false);
+          return 100;
+        }
+        return Math.min(100, current + 2);
+      });
+    }, 100);
+    return () => window.clearInterval(timer);
+  }, [playing]);
   if (trace.status !== "READY") return <InvalidTrace trace={trace} />;
   const byId = new Map(geometry.map((item) => [item.node.id, item]));
   const selected =
     trace.nodes.find((node) => node.id === selectedId) ?? trace.nodes[0]!;
-  const parentPath = geometry
-    .flatMap((child) => {
-      if (child.node.parentId === undefined) return [];
-      const parent = byId.get(child.node.parentId);
-      return parent === undefined ? [] : [edgePath(parent, child)];
-    })
-    .join(" ");
+  const lensIds = (() => {
+    const ids = new Set<string>([selected.id]);
+    if (lens === "ancestors") {
+      let cursor = selected;
+      while (cursor.parentId !== undefined) {
+        ids.add(cursor.parentId);
+        const parent = trace.nodes.find(({ id }) => id === cursor.parentId);
+        if (parent === undefined) break;
+        cursor = parent;
+      }
+    }
+    if (lens === "descendants") {
+      const queue = [selected.id];
+      while (queue.length > 0) {
+        const parentId = queue.shift()!;
+        for (const child of trace.nodes.filter(
+          ({ parentId: candidate }) => candidate === parentId,
+        )) {
+          ids.add(child.id);
+          queue.push(child.id);
+        }
+      }
+    }
+    return ids;
+  })();
+  const lensReceipt =
+    lens === "none"
+      ? "Focus receipt · exact PARENT_EDGE identity; choose a lens to inspect."
+      : `${lens === "ancestors" ? "Ancestors" : "Descendants"} receipt · ${lensIds.size} exact Span ${lensIds.size === 1 ? "identity" : "identities"} · recorded PARENT_EDGE only.`;
+  const duration = trace.durationNano ?? "0";
   return (
     <section
       aria-label="Recorded trace tree"
       className="trace-view trace-tree-graph"
+      data-lens={lens}
       data-trace-renderer="tree"
     >
+      <section className="trace-tree-context">
+        <div>
+          <strong>{trace.nodes[0]?.label ?? trace.traceId}</strong>
+          <code>{`trace ${trace.traceId} · ${trace.nodes.length} exact Spans · ${trace.parentEdges.length} PARENT_EDGE · ${trace.links.length} LINK`}</code>
+        </div>
+        <div className="trace-tree-toolbar">
+          <button onClick={() => setLens("none")} type="button">
+            Fit tree
+          </button>
+          <button
+            aria-pressed={playing}
+            onClick={() => setPlaying((value) => !value)}
+            type="button"
+          >
+            {playing ? "Motion: Live" : "Motion: Still"}
+          </button>
+        </div>
+      </section>
+      {viewNavigation}
       <div className="trace-workbench">
         <section className="trace-tree-canvas-shell">
           <header className="trace-timeline-head">
             <strong>Span call tree</strong>
-            <span>Deterministic depth · recorded time · exact identity</span>
+            <span>Click a Span or exact relationship · deterministic geometry</span>
           </header>
           {narrow ? (
             <div
@@ -572,6 +684,17 @@ export function TraceTree({ trace }: { trace: TraceView }) {
               className="trace-tree-canvas"
               role="tree"
             >
+              {[0, 1, 2].map((depth) => (
+                <span
+                  aria-hidden="true"
+                  className={`trace-depth-label trace-depth-${depth}`}
+                  key={depth}
+                >
+                  {`Depth ${depth}${depth === 0 ? " · root" : depth === 1 ? " · calls" : " · operations"}`}
+                </span>
+              ))}
+              <i aria-hidden="true" className="trace-depth-divider trace-depth-divider-1" />
+              <i aria-hidden="true" className="trace-depth-divider trace-depth-divider-2" />
               <svg
                 aria-label="Recorded span call tree graph"
                 className="trace-tree-svg"
@@ -602,13 +725,24 @@ export function TraceTree({ trace }: { trace: TraceView }) {
                     <path d="M0 0L8 4L0 8Z" />
                   </marker>
                 </defs>
-                {parentPath === "" ? null : (
-                  <path
-                    className="trace-tree-edge"
-                    d={parentPath}
-                    data-relationship="PARENT_EDGE"
-                  />
-                )}
+                {geometry.flatMap((child) => {
+                  if (child.node.parentId === undefined) return [];
+                  const parent = byId.get(child.node.parentId);
+                  if (parent === undefined) return [];
+                  const focused =
+                    lens !== "none" &&
+                    lensIds.has(parent.node.id) && lensIds.has(child.node.id);
+                  return [
+                    <path
+                      className={`trace-tree-edge${focused ? " is-focused" : lens === "none" ? "" : " is-muted"}`}
+                      d={edgePath(parent, child)}
+                      data-relationship="PARENT_EDGE"
+                      data-source={parent.node.id}
+                      data-target={child.node.id}
+                      key={`parent-${child.node.id}`}
+                    />,
+                  ];
+                })}
                 {trace.links.map((link) => {
                   const from = byId.get(link.from.span_id);
                   const to = byId.get(link.to.span_id);
@@ -620,9 +754,11 @@ export function TraceTree({ trace }: { trace: TraceView }) {
                         : edgePath(from, to);
                   return (
                     <path
-                      className="trace-tree-edge trace-tree-link"
+                      className={`trace-tree-edge trace-tree-link${lens === "none" ? "" : " is-muted"}`}
                       d={d}
                       data-relationship="LINK"
+                      data-source={link.from.span_id}
+                      data-target={link.to.span_id}
                       key={`link-${link.id}`}
                     />
                   );
@@ -630,10 +766,18 @@ export function TraceTree({ trace }: { trace: TraceView }) {
                 {geometry.map(({ node, x, y }) => (
                   <TreeNodeGlyph
                     key={node.id}
+                    current={
+                      position >= percentage(node.startOffsetNano, duration) &&
+                      position <=
+                        percentage(node.startOffsetNano, duration) +
+                          percentage(node.durationNano, duration)
+                    }
+                    lensHit={lens === "none" || lensIds.has(node.id)}
                     node={node}
                     onSelect={selectNode}
+                    playing={playing}
                     selected={selected.id === node.id}
-                    traceDurationNano={trace.durationNano ?? "0"}
+                    traceDurationNano={duration}
                     x={x}
                     y={y}
                   />
@@ -655,13 +799,40 @@ export function TraceTree({ trace }: { trace: TraceView }) {
           )}
           <RecordedLinks trace={trace} />
         </section>
-        <SpanPassport node={selected} trace={trace} />
+        <SpanPassport node={selected} trace={trace}>
+          <p className="trace-focus-receipt">{lensReceipt}</p>
+          <div className="trace-passport-actions">
+            <button onClick={() => setLens("ancestors")} type="button">
+              Ancestors
+            </button>
+            <button onClick={() => setLens("descendants")} type="button">
+              Descendants
+            </button>
+            <button onClick={() => setLens("none")} type="button">
+              Clear lens
+            </button>
+          </div>
+        </SpanPassport>
       </div>
+      <TraceMotion
+        durationNano={duration}
+        onPlayingChange={setPlaying}
+        onPositionChange={setPosition}
+        playing={playing}
+        position={position}
+        reducedMotion={false}
+      />
     </section>
   );
 }
 
-export function TraceStatistics({ trace }: { trace: TraceView }) {
+export function TraceStatistics({
+  trace,
+  viewNavigation,
+}: {
+  trace: TraceView;
+  viewNavigation?: ReactNode;
+}) {
   if (trace.status !== "READY" || trace.durationNano === undefined)
     return <InvalidTrace trace={trace} />;
   const errorCount = trace.nodes.filter(
@@ -678,17 +849,34 @@ export function TraceStatistics({ trace }: { trace: TraceView }) {
     ["ERROR spans", String(errorCount)],
     ["Maximum recorded duration", `${maximum} ns`],
   ];
+  const statusCounts = Object.entries(
+    trace.nodes.reduce<Record<string, number>>((counts, node) => {
+      counts[node.status] = (counts[node.status] ?? 0) + 1;
+      return counts;
+    }, {}),
+  );
+  const kindCounts = Object.entries(
+    trace.nodes.reduce<Record<string, number>>((counts, node) => {
+      counts[node.kind] = (counts[node.kind] ?? 0) + 1;
+      return counts;
+    }, {}),
+  );
   return (
     <section
       aria-label="Recorded trace statistics"
       className="trace-view trace-statistics"
       data-trace-renderer="statistics"
     >
-      <p>
+      <header className="trace-statistics-intro">
+        <span className="trace-eyebrow">Exact recorded inventory</span>
+        <h2>Trace statistics</h2>
+        <p>
         Exact inventory and recorded-time aggregates only; no inferred
         causality.
-      </p>
-      <dl>
+        </p>
+      </header>
+      {viewNavigation}
+      <dl className="trace-statistics-summary">
         {rows.map(([label, value]) => (
           <div className="panel-card" key={label}>
             <dt>{label}</dt>
@@ -696,6 +884,36 @@ export function TraceStatistics({ trace }: { trace: TraceView }) {
           </div>
         ))}
       </dl>
+      <div className="trace-statistics-grid">
+        <section className="panel-card">
+          <h3>Recorded status inventory</h3>
+          {statusCounts.map(([label, value]) => (
+            <div className="trace-stat-row" key={label}>
+              <span>{label}</span><strong>{value}</strong>
+              <i style={{ width: `${(value / trace.nodes.length) * 100}%` }} />
+            </div>
+          ))}
+        </section>
+        <section className="panel-card">
+          <h3>Recorded kind inventory</h3>
+          {kindCounts.map(([label, value]) => (
+            <div className="trace-stat-row" key={label}>
+              <span>{label}</span><strong>{value}</strong>
+              <i style={{ width: `${(value / trace.nodes.length) * 100}%` }} />
+            </div>
+          ))}
+        </section>
+        <section className="panel-card trace-duration-distribution">
+          <h3>Recorded duration distribution</h3>
+          {trace.nodes.map((node) => (
+            <div className="trace-duration-row" key={node.id}>
+              <span>{node.label}</span>
+              <i style={{ width: `${percentage(node.durationNano, maximum)}%` }} />
+              <code>{displayNano(node.durationNano)}</code>
+            </div>
+          ))}
+        </section>
+      </div>
     </section>
   );
 }
