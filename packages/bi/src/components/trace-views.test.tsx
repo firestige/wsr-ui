@@ -160,6 +160,38 @@ describe("recorded Trace business panels", () => {
     expect(screen.queryByText(/service map|architecture/i)).toBeNull();
   });
 
+  it("coalesces large parent-edge geometry without losing the exact relationship count", () => {
+    const children = Array.from({ length: 129 }, (_, index) => ({
+      ...trace.nodes[1]!,
+      id: `child-${index}`,
+      endpoint: { trace_id: "trace-1", span_id: `child-${index}` },
+      label: `tool.execute.${index}`,
+      startTimeUnixNano: String(1001 + index),
+      endTimeUnixNano: String(1002 + index),
+      durationNano: "1",
+      startOffsetNano: String(index + 1),
+      parentId: "root",
+    }));
+    const large: TraceView = {
+      ...trace,
+      nodes: [trace.nodes[0]!, ...children],
+      parentEdges: children.map((node, index) => ({
+        ...trace.parentEdges[0]!,
+        id: `parent-${index}`,
+        from: node.endpoint,
+      })),
+      links: [],
+    };
+
+    const { container } = render(<TraceTree trace={large} />);
+
+    const edges = container.querySelectorAll(
+      '[data-relationship="PARENT_EDGE"]',
+    );
+    expect(edges).toHaveLength(1);
+    expect(edges[0]).toHaveAttribute("data-relationship-count", "129");
+  });
+
   it("disables finite recorded-time motion when reduced motion is requested", () => {
     render(<TraceWaterfall reducedMotion trace={trace} />);
 

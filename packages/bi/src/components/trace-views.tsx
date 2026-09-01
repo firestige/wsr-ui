@@ -631,6 +631,13 @@ export function TraceTree({
       ? "Focus receipt · exact PARENT_EDGE identity; choose a lens to inspect."
       : `${lens === "ancestors" ? "Ancestors" : "Descendants"} receipt · ${lensIds.size} exact Span ${lensIds.size === 1 ? "identity" : "identities"} · recorded PARENT_EDGE only.`;
   const duration = trace.durationNano ?? "0";
+  const parentGeometry = geometry.flatMap((child) => {
+    if (child.node.parentId === undefined) return [];
+    const parent = byId.get(child.node.parentId);
+    if (parent === undefined) return [];
+    return [{ child, parent, path: edgePath(parent, child) }];
+  });
+  const coalescedParentGeometry = parentGeometry.length > 128;
   return (
     <section
       aria-label="Recorded trace tree"
@@ -725,24 +732,62 @@ export function TraceTree({
                     <path d="M0 0L8 4L0 8Z" />
                   </marker>
                 </defs>
-                {geometry.flatMap((child) => {
-                  if (child.node.parentId === undefined) return [];
-                  const parent = byId.get(child.node.parentId);
-                  if (parent === undefined) return [];
-                  const focused =
-                    lens !== "none" &&
-                    lensIds.has(parent.node.id) && lensIds.has(child.node.id);
-                  return [
-                    <path
-                      className={`trace-tree-edge${focused ? " is-focused" : lens === "none" ? "" : " is-muted"}`}
-                      d={edgePath(parent, child)}
-                      data-relationship="PARENT_EDGE"
-                      data-source={parent.node.id}
-                      data-target={child.node.id}
-                      key={`parent-${child.node.id}`}
-                    />,
-                  ];
-                })}
+                {coalescedParentGeometry
+                  ? [
+                      {
+                        key: "default",
+                        items: parentGeometry.filter(
+                          ({ child, parent }) =>
+                            lens === "none" ||
+                            (lensIds.has(parent.node.id) &&
+                              lensIds.has(child.node.id)),
+                        ),
+                        className: lens === "none" ? "" : " is-focused",
+                      },
+                      {
+                        key: "muted",
+                        items:
+                          lens === "none"
+                            ? []
+                            : parentGeometry.filter(
+                                ({ child, parent }) =>
+                                  !(
+                                    lensIds.has(parent.node.id) &&
+                                    lensIds.has(child.node.id)
+                                  ),
+                              ),
+                        className: " is-muted",
+                      },
+                    ].flatMap(({ key, items, className }) =>
+                      items.length === 0
+                        ? []
+                        : [
+                            <path
+                              className={`trace-tree-edge${className}`}
+                              d={items.map(({ path }) => path).join(" ")}
+                              data-relationship="PARENT_EDGE"
+                              data-relationship-count={items.length}
+                              key={`parent-coalesced-${key}`}
+                            />,
+                          ],
+                    )
+                  : parentGeometry.map(({ child, parent, path }) => {
+                      const focused =
+                        lens !== "none" &&
+                        lensIds.has(parent.node.id) &&
+                        lensIds.has(child.node.id);
+                      return (
+                        <path
+                          className={`trace-tree-edge${focused ? " is-focused" : lens === "none" ? "" : " is-muted"}`}
+                          d={path}
+                          data-relationship="PARENT_EDGE"
+                          data-relationship-count="1"
+                          data-source={parent.node.id}
+                          data-target={child.node.id}
+                          key={`parent-${child.node.id}`}
+                        />
+                      );
+                    })}
                 {trace.links.map((link) => {
                   const from = byId.get(link.from.span_id);
                   const to = byId.get(link.to.span_id);
