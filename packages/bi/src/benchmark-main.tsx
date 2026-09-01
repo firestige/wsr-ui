@@ -160,10 +160,12 @@ function BenchmarkHarness() {
           previous = now;
           interactionFrame += 1;
           if (interactionFrame % 30 === 0) {
-            const selectable = document.querySelectorAll<HTMLButtonElement>(
-              '[data-trace-renderer] [role="treeitem"] button',
+            const selectable = document.querySelectorAll<Element>(
+              "[data-trace-renderer] [data-trace-node-id]",
             );
-            selectable[interactionFrame % selectable.length]?.click();
+            selectable[interactionFrame % selectable.length]?.dispatchEvent(
+              new MouseEvent("click", { bubbles: true }),
+            );
           }
           if (interactionFrame % 150 === 0) setNarrow((value) => !value);
           if (now - started >= durationMs) resolveInteraction();

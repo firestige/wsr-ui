@@ -24,6 +24,22 @@ function nodeChildren(trace: TraceView, node: TraceViewNode): TraceViewNode[] {
   return trace.nodes.filter((candidate) => candidate.parentId === node.id);
 }
 
+function useNarrowTraceView(): boolean {
+  const query = "(max-width: 40rem)";
+  const [narrow, setNarrow] = useState(
+    () => typeof matchMedia === "function" && matchMedia(query).matches,
+  );
+  useEffect(() => {
+    if (typeof matchMedia !== "function") return undefined;
+    const media = matchMedia(query);
+    const update = () => setNarrow(media.matches);
+    update();
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
+  return narrow;
+}
+
 export function SpanPassport({
   node,
   trace,
@@ -204,6 +220,7 @@ const WaterfallRow = memo(function WaterfallRow({
       <button
         aria-label={`${node.label}, ${node.durationNano} nanoseconds`}
         className="recorded-node trace-node-label"
+        data-trace-node-id={node.id}
         onClick={() => onSelect(node.id)}
         style={{ paddingInlineStart: `${0.75 + node.depth * 1.15}rem` }}
         type="button"
@@ -419,7 +436,9 @@ const TreeNodeGlyph = memo(function TreeNodeGlyph({
   return (
     <g
       aria-label={`${node.label}, ${node.kind}, ${node.status}, ${displayNano(node.durationNano)}`}
+      aria-level={node.depth + 1}
       className={`trace-tree-node trace-kind-${node.kind.toLowerCase()}${selected ? " is-selected" : ""}${node.status === "ERROR" ? " trace-status-error" : ""}`}
+      data-trace-node-id={node.id}
       onClick={select}
       onKeyDown={(event) => {
         if (event.key === "Enter" || event.key === " ") {
@@ -427,7 +446,7 @@ const TreeNodeGlyph = memo(function TreeNodeGlyph({
           select();
         }
       }}
-      role="button"
+      role="treeitem"
       tabIndex={0}
       transform={`translate(${x} ${y})`}
     >
@@ -488,7 +507,11 @@ const TreeOutlineRow = memo(function TreeOutlineRow({
       role="treeitem"
       style={{ paddingInlineStart: `${node.depth * 1.5}rem` }}
     >
-      <button onClick={() => onSelect(node.id)} type="button">
+      <button
+        data-trace-node-id={node.id}
+        onClick={() => onSelect(node.id)}
+        type="button"
+      >
         <span>{node.label}</span>
         <span>{displayNano(node.durationNano)}</span>
       </button>
@@ -500,6 +523,7 @@ const TreeOutlineRow = memo(function TreeOutlineRow({
 export function TraceTree({ trace }: { trace: TraceView }) {
   const [selectedId, setSelectedId] = useState<string>();
   const selectNode = useCallback((id: string) => setSelectedId(id), []);
+  const narrow = useNarrowTraceView();
   const geometry = useMemo(
     () => (trace.status === "READY" ? treeGeometry(trace) : []),
     [trace],
@@ -527,101 +551,109 @@ export function TraceTree({ trace }: { trace: TraceView }) {
             <strong>Span call tree</strong>
             <span>Deterministic depth · recorded time · exact identity</span>
           </header>
-          <div className="trace-tree-canvas">
-            <svg
-              aria-label="Recorded span call tree graph"
-              className="trace-tree-svg"
-              role="img"
-              viewBox="0 0 980 560"
+          {narrow ? (
+            <div
+              aria-label="Recorded trace call tree"
+              className="trace-tree-outline"
+              role="tree"
             >
-              <defs>
-                <marker
-                  id="trace-parent-arrow"
-                  markerHeight="7"
-                  markerWidth="7"
-                  orient="auto"
-                  refX="7"
-                  refY="4"
-                  viewBox="0 0 8 8"
-                >
-                  <path d="M0 0L8 4L0 8Z" />
-                </marker>
-                <marker
-                  id="trace-link-arrow"
-                  markerHeight="7"
-                  markerWidth="7"
-                  orient="auto"
-                  refX="7"
-                  refY="4"
-                  viewBox="0 0 8 8"
-                >
-                  <path d="M0 0L8 4L0 8Z" />
-                </marker>
-              </defs>
-              {parentPath === "" ? null : (
-                <path
-                  className="trace-tree-edge"
-                  d={parentPath}
-                  data-relationship="PARENT_EDGE"
-                />
-              )}
-              {trace.links.map((link) => {
-                const from = byId.get(link.from.span_id);
-                const to = byId.get(link.to.span_id);
-                const d =
-                  from === undefined
-                    ? ""
-                    : to === undefined
-                      ? `M${from.x + 95} ${from.y + 70} C${from.x + 150} ${from.y + 115} 900 ${from.y + 115} 950 ${from.y + 80}`
-                      : edgePath(from, to);
-                return (
-                  <path
-                    className="trace-tree-edge trace-tree-link"
-                    d={d}
-                    data-relationship="LINK"
-                    key={`link-${link.id}`}
-                  />
-                );
-              })}
-              {geometry.map(({ node, x, y }) => (
-                <TreeNodeGlyph
+              {trace.nodes.map((node) => (
+                <TreeOutlineRow
                   key={node.id}
                   node={node}
                   onSelect={selectNode}
-                  selected={selected.id === node.id}
-                  traceDurationNano={trace.durationNano ?? "0"}
-                  x={x}
-                  y={y}
+                  trace={trace}
                 />
               ))}
-            </svg>
-            <aside
-              aria-label="Semantic camera map"
-              className="trace-camera-map"
-              role="region"
+            </div>
+          ) : (
+            <div
+              aria-label="Recorded trace call tree"
+              className="trace-tree-canvas"
+              role="tree"
             >
-              <strong>Semantic camera map</strong>
-              <div>
-                {geometry.map(({ node }) => (
-                  <i key={node.id} />
+              <svg
+                aria-label="Recorded span call tree graph"
+                className="trace-tree-svg"
+                role="img"
+                viewBox="0 0 980 560"
+              >
+                <defs>
+                  <marker
+                    id="trace-parent-arrow"
+                    markerHeight="7"
+                    markerWidth="7"
+                    orient="auto"
+                    refX="7"
+                    refY="4"
+                    viewBox="0 0 8 8"
+                  >
+                    <path d="M0 0L8 4L0 8Z" />
+                  </marker>
+                  <marker
+                    id="trace-link-arrow"
+                    markerHeight="7"
+                    markerWidth="7"
+                    orient="auto"
+                    refX="7"
+                    refY="4"
+                    viewBox="0 0 8 8"
+                  >
+                    <path d="M0 0L8 4L0 8Z" />
+                  </marker>
+                </defs>
+                {parentPath === "" ? null : (
+                  <path
+                    className="trace-tree-edge"
+                    d={parentPath}
+                    data-relationship="PARENT_EDGE"
+                  />
+                )}
+                {trace.links.map((link) => {
+                  const from = byId.get(link.from.span_id);
+                  const to = byId.get(link.to.span_id);
+                  const d =
+                    from === undefined
+                      ? ""
+                      : to === undefined
+                        ? `M${from.x + 95} ${from.y + 70} C${from.x + 150} ${from.y + 115} 900 ${from.y + 115} 950 ${from.y + 80}`
+                        : edgePath(from, to);
+                  return (
+                    <path
+                      className="trace-tree-edge trace-tree-link"
+                      d={d}
+                      data-relationship="LINK"
+                      key={`link-${link.id}`}
+                    />
+                  );
+                })}
+                {geometry.map(({ node, x, y }) => (
+                  <TreeNodeGlyph
+                    key={node.id}
+                    node={node}
+                    onSelect={selectNode}
+                    selected={selected.id === node.id}
+                    traceDurationNano={trace.durationNano ?? "0"}
+                    x={x}
+                    y={y}
+                  />
                 ))}
-              </div>
-            </aside>
-          </div>
-          <div
-            aria-label="Recorded trace call tree"
-            className="trace-tree-outline"
-            role="tree"
-          >
-            {trace.nodes.map((node) => (
-              <TreeOutlineRow
-                key={node.id}
-                node={node}
-                onSelect={selectNode}
-                trace={trace}
-              />
-            ))}
-          </div>
+              </svg>
+              <aside
+                aria-label="Semantic camera map"
+                className="trace-camera-map"
+                role="region"
+              >
+                <strong>Semantic camera map</strong>
+                <div>
+                  {geometry.map(({ node }) => (
+                    <i key={node.id} />
+                  ))}
+                </div>
+              </aside>
+            </div>
+          )}
+          <RecordedLinks trace={trace} />
         </section>
         <SpanPassport node={selected} trace={trace} />
       </div>
