@@ -30,6 +30,7 @@ function productionSources(directory: string): string {
 
 describe("host-neutral shared package boundary", () => {
   it("declares a publishable package with an explicit public surface", () => {
+    expect(packageJson.name).toBe("wsr-ui-core");
     expect(packageJson.private).not.toBe(true);
     expect(packageJson.version).toMatch(/^0\.1\.0-rc\.\d+$/);
     expect(packageJson.license).toBe("Apache-2.0");

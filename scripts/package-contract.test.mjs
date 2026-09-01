@@ -12,7 +12,7 @@ async function artifactFixture(indexSource) {
   await writeFile(
     join(root, "package.json"),
     JSON.stringify({
-      name: "@wsr/bi",
+      name: "wsr-ui-core",
       version: "0.1.0-rc.0",
       exports: {
         ".": { types: "./dist/index.d.ts", import: "./dist/index.js" },
@@ -38,7 +38,7 @@ test("accepts an external-React artifact with complete public files", async (t) 
 
   const result = await inspectPackageArtifact(root);
 
-  assert.equal(result.coordinate, "@wsr/bi@0.1.0-rc.0");
+  assert.equal(result.coordinate, "wsr-ui-core@0.1.0-rc.0");
   assert.deepEqual(result.files, [
     "dist/index.d.ts",
     "dist/index.js",

@@ -1,4 +1,4 @@
-{"schema":"wsr-ui.dependency-inventory@0.1.0","packageLockSha256":"8053f051dd5debd9b922b7ab543c6dfb335987cc910de0ddfc19d77c7dc35f7f","dependencyCount":373}
+{"schema":"wsr-ui.dependency-inventory@0.1.0","packageLockSha256":"b80f369e4e0cfa934fb5bf5fbaf49b231b27a57b7d3328e40644b4005a976aba","dependencyCount":373}
 {"path":"node_modules/@adobe/css-tools","version":"4.5.0","license":"MIT","development":true,"optional":false}
 {"path":"node_modules/@asamuzakjp/css-color","version":"5.1.11","license":"MIT","development":true,"optional":false}
 {"path":"node_modules/@asamuzakjp/dom-selector","version":"7.1.1","license":"MIT","development":true,"optional":false}

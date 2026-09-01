@@ -11,7 +11,7 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "npm run build --workspace @wsr/bi",
+    "build": "npm run build --workspace wsr-ui-core",
     "browser": "playwright test",
     "benchmark:full": "node qualification/panel-benchmark/v1/run-fixed.mjs",
     "benchmark:smoke": "node qualification/panel-benchmark/v1/run.mjs --mode=smoke",
@@ -23,8 +23,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint .",
-    "package:verify": "npm run build --workspace @wsr/bi && node scripts/package-contract.mjs packages/bi && npm pack --dry-run --json --workspace @wsr/bi",
-    "react18:verify": "npm run build --workspace @wsr/bi && node scripts/qualify-react18-consumer.mjs",
+    "package:verify": "npm run build --workspace wsr-ui-core && node scripts/package-contract.mjs packages/bi && npm pack --dry-run --json --workspace wsr-ui-core",
+    "react18:verify": "npm run build --workspace wsr-ui-core && node scripts/qualify-react18-consumer.mjs",
     "test": "vitest run && node --test scripts/*.test.mjs qualification/panel-benchmark/v1/*.test.mjs",
     "typecheck": "tsc -b --pretty false"
   },

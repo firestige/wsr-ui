@@ -6,7 +6,7 @@ COPY packages/bi/package.json packages/bi/package.json
 RUN npm ci --ignore-scripts --no-audit --no-fund
 
 COPY . .
-RUN npm run typecheck && npm run build:harness --workspace @wsr/bi
+RUN npm run typecheck && npm run build:harness --workspace wsr-ui-core
 
 FROM nginx:1.29.5-alpine3.23
 

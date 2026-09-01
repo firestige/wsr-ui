@@ -244,7 +244,7 @@ const result = {
   manifestSha256: createHash("sha256").update(manifestBytes).digest("hex"),
   providerCommit:
     process.env.WSR_BENCHMARK_PROVIDER_COMMIT ?? "working-tree-smoke",
-  packageCoordinate: "@wsr/bi",
+  packageCoordinate: "wsr-ui-core",
   packageVersion: "0.1.0-rc.0",
   createdAt: new Date().toISOString(),
   results,

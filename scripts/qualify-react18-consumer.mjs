@@ -36,7 +36,7 @@ export function assertReact18Markup(markup) {
 const renderSource = `
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { BiSurface, MetricPanel } from "@wsr/bi";
+import { BiSurface, MetricPanel } from "wsr-ui-core";
 
 const base = {
   slice_key: {},
@@ -77,7 +77,7 @@ export async function qualifyReact18Consumer() {
         "--pack-destination",
         workspace,
         "--workspace",
-        "@wsr/bi",
+        "wsr-ui-core",
       ],
       { cwd: repositoryRoot },
     );
@@ -87,7 +87,7 @@ export async function qualifyReact18Consumer() {
       private: true,
       type: "module",
       dependencies: {
-        "@wsr/bi": `file:./${basename(tarball)}`,
+        "wsr-ui-core": `file:./${basename(tarball)}`,
         react: "18.3.1",
         "react-dom": "18.3.1",
       },
@@ -108,7 +108,7 @@ export async function qualifyReact18Consumer() {
       await readFile(join(workspace, "package-lock.json"), "utf8"),
     );
     const result = {
-      package: lock.packages["node_modules/@wsr/bi"].version,
+      package: lock.packages["node_modules/wsr-ui-core"].version,
       react: lock.packages["node_modules/react"].version,
       reactDom: lock.packages["node_modules/react-dom"].version,
       hasAvailableSvg: rendered.stdout.includes('aria-label="Ratio bar"'),
