@@ -78,6 +78,20 @@ describe("host-neutral shared package boundary", () => {
     expect(source).not.toContain('@import "tailwindcss"');
   });
 
+  it("defines every design token consumed by the shared stylesheet", () => {
+    const source = readFileSync(resolve(sourceRoot, "shared.css"), "utf8");
+    const used = [...source.matchAll(/var\((--[\w-]+)/g)].map(
+      ([, token]) => token,
+    );
+    const defined = new Set(
+      [...source.matchAll(/(--[\w-]+)\s*:/g)].map(([, token]) => token),
+    );
+
+    expect(
+      [...new Set(used.filter((token) => !defined.has(token)))].sort(),
+    ).toEqual([]);
+  });
+
   it("keeps DSH dependencies and imports out of every shared source file", () => {
     expect(JSON.stringify(packageJson)).not.toMatch(/@deepseek-ai|dsh-/i);
     expect(productionSources(sourceRoot)).not.toMatch(

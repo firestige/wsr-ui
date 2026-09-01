@@ -32,6 +32,7 @@ export {
 export { MetricPanel } from "./components/result-visualizer";
 export {
   SpanPassport,
+  TraceStatistics,
   TraceTree,
   TraceWaterfall,
 } from "./components/trace-views";

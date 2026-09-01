@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
 import type { TraceView } from "../domain/trace/trace-view";
-import { TraceTree, TraceWaterfall } from "../public";
+import { TraceStatistics, TraceTree, TraceWaterfall } from "../public";
 
 const trace: TraceView = {
   schemaVersion: "wsr.trace-view@1",
@@ -92,11 +92,26 @@ describe("recorded Trace business panels", () => {
   it("renders a shared-scale waterfall and a lossless span passport", async () => {
     render(<TraceWaterfall trace={trace} />);
 
-    expect(
-      screen.getByRole("region", { name: "Recorded trace waterfall" }),
-    ).toHaveAttribute("data-motion", "finite-recorded-time");
+    const waterfall = screen.getByRole("region", {
+      name: "Recorded trace waterfall",
+    });
+    expect(waterfall).toHaveAttribute("data-motion", "finite-recorded-time");
+    expect(waterfall).toHaveAttribute("data-trace-renderer", "waterfall");
     expect(screen.getByText("100 ns recorded duration")).toBeVisible();
     expect(screen.getByText("Recorded links: 1")).toBeVisible();
+    expect(screen.getByText("Recorded spans: 2")).toBeVisible();
+    expect(
+      screen.getByRole("region", { name: "Recorded trace minimap" }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole("tree", { name: "Recorded waterfall span outline" }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole("slider", { name: "Recorded time position" }),
+    ).toHaveAttribute("aria-valuemax", "100");
+    expect(
+      screen.getByRole("region", { name: "Span passport" }),
+    ).toHaveTextContent("root");
 
     await userEvent.click(
       screen.getByRole("button", { name: /tool.execute/i }),
@@ -112,10 +127,29 @@ describe("recorded Trace business panels", () => {
   it("renders a call tree, keeping recorded LINK edges distinct", () => {
     render(<TraceTree trace={trace} />);
 
+    const region = screen.getByRole("region", {
+      name: "Recorded trace tree",
+    });
+    expect(region).toHaveAttribute("data-trace-renderer", "tree");
     const tree = screen.getByRole("tree", { name: "Recorded trace call tree" });
     expect(tree).toHaveTextContent("workflow.run");
     expect(tree).toHaveTextContent("tool.execute");
     expect(screen.getByText("Recorded LINK → trace-2:remote")).toBeVisible();
+    expect(
+      screen.getByRole("img", { name: "Recorded span call tree graph" }),
+    ).toBeVisible();
+    expect(
+      region.querySelectorAll('[data-relationship="PARENT_EDGE"]'),
+    ).toHaveLength(1);
+    expect(region.querySelectorAll('[data-relationship="LINK"]')).toHaveLength(
+      1,
+    );
+    expect(
+      screen.getByRole("region", { name: "Semantic camera map" }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole("region", { name: "Span passport" }),
+    ).toHaveTextContent("root");
     expect(screen.queryByText(/service map|architecture/i)).toBeNull();
   });
 
@@ -127,5 +161,19 @@ describe("recorded Trace business panels", () => {
     });
     expect(region).toHaveAttribute("data-motion", "off");
     expect(region).not.toHaveTextContent(/live/i);
+  });
+
+  it("renders bounded recorded statistics without inferring a service map or critical path", () => {
+    render(<TraceStatistics trace={trace} />);
+
+    const region = screen.getByRole("region", {
+      name: "Recorded trace statistics",
+    });
+    expect(region).toHaveAttribute("data-trace-renderer", "statistics");
+    expect(region).toHaveTextContent("Recorded spans2");
+    expect(region).toHaveTextContent("Recorded links1");
+    expect(region).toHaveTextContent("ERROR spans0");
+    expect(region).toHaveTextContent("Maximum recorded duration100 ns");
+    expect(region).not.toHaveTextContent(/critical path|service map/i);
   });
 });
