@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import { resolve } from "node:path";
 import test from "node:test";
 
 import {
@@ -7,6 +9,24 @@ import {
   nearestRank,
   validateCompleteResult,
 } from "./contract.mjs";
+
+test("Wave 2 performance targets the reusable metric, waterfall, and tree panels", async () => {
+  const manifest = JSON.parse(
+    await readFile(resolve(import.meta.dirname, "manifest.json"), "utf8"),
+  );
+  assert.deepEqual(
+    manifest.chartPanels.map(({ id }) => id),
+    [
+      "metric-ratio-bar@1",
+      "recorded-trace-waterfall@1",
+      "recorded-trace-tree@1",
+    ],
+  );
+  assert.equal(
+    JSON.stringify(manifest).includes("recorded-trace-graph@1"),
+    false,
+  );
+});
 
 test("clips long tasks to the measured data-ready window", () => {
   assert.deepEqual(

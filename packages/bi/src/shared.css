@@ -44,6 +44,7 @@
   --layout-table-max-height: 32rem;
   --layout-visual-preview-height: 6rem;
   --motion-finite-duration: 320ms;
+  --wsr-container-border-style: solid;
   box-sizing: border-box;
   min-width: 0;
   color: var(--content-primary);
@@ -108,15 +109,22 @@
 }
 
 .wsr-bi .panel-card,
-.wsr-bi .metric-frame {
+.wsr-bi .metric-frame,
+.wsr-bi .bi-card {
   display: flex;
   min-width: 0;
   flex-direction: column;
   gap: var(--space-grid);
   padding: var(--space-page);
-  border: 1px solid var(--border-default);
+  border: 1px var(--wsr-container-border-style) var(--border-default);
   border-radius: var(--shape-panel);
   background: var(--surface-panel);
+}
+
+.wsr-bi .bi-section {
+  display: grid;
+  min-width: 0;
+  gap: var(--space-grid);
 }
 
 .wsr-bi .metric-frame-header,
@@ -289,6 +297,94 @@
 .wsr-bi .recorded-graph-label {
   fill: var(--content-primary);
   font-size: var(--type-label-size);
+}
+
+.wsr-bi .trace-view,
+.wsr-bi .trace-timeline,
+.wsr-bi .trace-tree,
+.wsr-bi .trace-tree-row {
+  display: grid;
+  min-width: 0;
+  gap: var(--space-grid);
+}
+
+.wsr-bi .trace-summary,
+.wsr-bi .trace-waterfall-row,
+.wsr-bi .trace-node-label,
+.wsr-bi .trace-tree-row > .recorded-node {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-cluster);
+}
+
+.wsr-bi .trace-waterfall-row {
+  display: grid;
+  grid-template-columns: minmax(10rem, 0.35fr) minmax(16rem, 1fr);
+}
+
+.wsr-bi .trace-timeline-track {
+  position: relative;
+  min-height: var(--density-row);
+  overflow: hidden;
+  border: 1px solid var(--border-default);
+  border-radius: var(--shape-control);
+  background: var(--surface-inset);
+}
+
+.wsr-bi .trace-timeline-bar {
+  position: absolute;
+  inset-block: var(--space-tight);
+  min-width: 2px;
+  border-radius: var(--shape-control);
+  background: var(--data-series-1);
+  transform-origin: left center;
+  animation: trace-recorded-reveal var(--motion-finite-duration) ease-out both;
+}
+
+.wsr-bi [data-motion="off"] .trace-timeline-bar {
+  animation: none;
+}
+
+.wsr-bi .trace-passport-grid {
+  display: grid;
+  grid-template-columns: minmax(9rem, auto) minmax(0, 1fr);
+  gap: var(--space-tight) var(--space-grid);
+  margin: 0;
+}
+
+.wsr-bi .trace-passport-grid dt {
+  color: var(--content-secondary);
+  font-weight: 650;
+}
+
+.wsr-bi .trace-passport-grid dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.wsr-bi .trace-link-list {
+  margin: 0;
+  color: var(--content-secondary);
+}
+
+@keyframes trace-recorded-reveal {
+  from {
+    opacity: 0;
+    transform: scaleX(0);
+  }
+  to {
+    opacity: 1;
+    transform: scaleX(1);
+  }
+}
+
+@media (max-width: 40rem) {
+  .wsr-bi .trace-waterfall-row {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -4,12 +4,10 @@ import { useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 
 import { BiSurface } from "./components/bi-surface";
-import {
-  RecordedStructureFoundation,
-  type RecordedStructureViewModel,
-} from "./components/recorded-structure";
 import { MetricPanel } from "./components/result-visualizer";
+import { TraceTree, TraceWaterfall } from "./components/trace-views";
 import type { MetricResult } from "./domain/evolution/types";
+import type { TraceView } from "./domain/trace/trace-view";
 import "./shared.css";
 
 interface BenchmarkApi {
@@ -88,53 +86,65 @@ function unavailableResult(): MetricResult {
   };
 }
 
-function traceModel(): RecordedStructureViewModel {
+function traceModel(): TraceView {
   const upper = fixture === "upper-bound";
-  const nodeCount = upper ? 120 : 10;
-  const depthCount = upper ? 10 : 4;
-  const depthGroups = Array.from({ length: depthCount }, (_, depth) => ({
-    depth,
-    nodes: Array.from(
-      { length: Math.ceil(nodeCount / depthCount) },
-      (_, offset) => {
-        const index = depth * Math.ceil(nodeCount / depthCount) + offset;
-        return index >= nodeCount
-          ? null
-          : {
-              id: `node-${index.toString().padStart(3, "0")}`,
-              label: `Recorded ${index}`,
-              state: "AVAILABLE" as const,
-            };
-      },
-    ).filter((node) => node !== null),
+  const nodeCount = upper ? 200 : 15;
+  const duration = BigInt(nodeCount * 100);
+  const truth = {
+    availability: "AVAILABLE" as const,
+    completeness: "FINAL" as const,
+    expiry: "ACTIVE" as const,
+    expires_at: null,
+  };
+  const nodes = Array.from({ length: nodeCount }, (_, index) => ({
+    id: `node-${index.toString().padStart(3, "0")}`,
+    endpoint: { trace_id: "benchmark-trace", span_id: `span-${index}` },
+    label: `Recorded ${index}`,
+    kind: index % 3 === 0 ? ("CLIENT" as const) : ("INTERNAL" as const),
+    status: "OK" as const,
+    startTimeUnixNano: BigInt(index * 100).toString(),
+    endTimeUnixNano: BigInt(index * 100 + 80).toString(),
+    durationNano: "80",
+    startOffsetNano: BigInt(index * 100).toString(),
+    flags: 1,
+    traceState: index % 5 === 0 ? "benchmark=yes" : null,
+    fields: [{ field: "benchmark.index", value: index }],
+    truth,
+    depth: Math.min(index, 9),
+    ...(index === 0
+      ? {}
+      : { parentId: `node-${(index - 1).toString().padStart(3, "0")}` }),
   }));
-  const nodes = depthGroups.flatMap((group) => group.nodes);
-  const relationBudget = upper ? 80 : 5;
-  const parentCount = Math.max(0, relationBudget - 1);
   return {
-    depthGroups,
-    parentEdges: Array.from({ length: parentCount }, (_, index) => ({
+    schemaVersion: "wsr.trace-view@1",
+    status: "READY",
+    traceId: "benchmark-trace",
+    startTimeUnixNano: "0",
+    endTimeUnixNano: duration.toString(),
+    durationNano: duration.toString(),
+    nodes,
+    parentEdges: Array.from({ length: nodeCount - 1 }, (_, index) => ({
       id: `parent-${index}`,
-      sourceId: nodes[index % nodes.length]!.id,
-      targetId: nodes[(index + 1) % nodes.length]!.id,
+      from: nodes[index + 1]!.endpoint,
+      to: nodes[index]!.endpoint,
+      truth,
     })),
     links: [
       {
         id: "link-0",
-        sourceId: nodes[0]!.id,
-        targetId: nodes.at(-1)!.id,
-        state: "AVAILABLE",
+        from: nodes[0]!.endpoint,
+        to: { trace_id: "remote-trace", span_id: "remote-span" },
+        truth,
       },
     ],
-    orphans: [],
+    errors: [],
   };
 }
 
 function BenchmarkHarness() {
   const [narrow, setNarrow] = useState(false);
-  const [selectedId, setSelectedId] = useState<string>();
   const model = useMemo(
-    () => (panel === "recorded-trace-graph@1" ? traceModel() : undefined),
+    () => (panel.startsWith("recorded-trace-") ? traceModel() : undefined),
     [],
   );
 
@@ -150,18 +160,10 @@ function BenchmarkHarness() {
           previous = now;
           interactionFrame += 1;
           if (interactionFrame % 30 === 0) {
-            const selectable = model
-              ? [
-                  ...model.depthGroups
-                    .flatMap((group) => group.nodes)
-                    .map((node) => node.id),
-                  ...model.parentEdges.map((edge) => edge.id),
-                  ...model.links.map((link) => link.id),
-                ]
-              : [];
-            if (selectable.length > 0) {
-              setSelectedId(selectable[interactionFrame % selectable.length]!);
-            }
+            const selectable = document.querySelectorAll<HTMLButtonElement>(
+              ".trace-view .recorded-node",
+            );
+            selectable[interactionFrame % selectable.length]?.click();
           }
           if (interactionFrame % 150 === 0) setNarrow((value) => !value);
           if (now - started >= durationMs) resolveInteraction();
@@ -187,11 +189,10 @@ function BenchmarkHarness() {
   return (
     <div data-benchmark-panel={panel} style={{ width }}>
       <BiSurface>
-        {panel === "recorded-trace-graph@1" && model !== undefined ? (
-          <RecordedStructureFoundation
-            model={{ ...model, selectedId }}
-            onSelect={setSelectedId}
-          />
+        {panel === "recorded-trace-waterfall@1" && model !== undefined ? (
+          <TraceWaterfall trace={model} />
+        ) : panel === "recorded-trace-tree@1" && model !== undefined ? (
+          <TraceTree trace={model} />
         ) : (
           <MetricPanel
             result={

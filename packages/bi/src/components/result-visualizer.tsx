@@ -1,8 +1,10 @@
 import { scaleLinear } from "d3";
 
 import type { MetricResult, MetricSlice } from "../domain/evolution/types";
+import { isMetricResult } from "../domain/evolution/validation";
 import {
   compatibleVisualizerIds,
+  selectDefaultVisualizer,
   type VisualizerId,
 } from "../domain/visualization/registry";
 import { presentExactValue } from "../domain/visualization/presentation";
@@ -198,17 +200,29 @@ export function MetricPanel({
   focusEvidenceAction = false,
 }: {
   result: MetricResult;
-  visualizer: VisualizerId;
+  visualizer?: VisualizerId;
   onExplain?: (trigger: HTMLButtonElement) => void;
   onEvidence?: (trigger: HTMLButtonElement) => void;
   focusEvidenceAction?: boolean;
 }) {
+  if (!isMetricResult(result))
+    return (
+      <section className="panel-card">
+        <ScopedError
+          announce="assertive"
+          detail="The supplied value does not satisfy the formal Metric Result 2.0.0 contract."
+          retryable={false}
+          title="Metric Result incompatible"
+        />
+      </section>
+    );
+  const resolvedVisualizer = visualizer ?? selectDefaultVisualizer(result);
   const coordinate = `${result.metric_id}@${result.metric_version}`;
   const compatible = result.slices.every((slice) =>
     slice.value === undefined
       ? true
-      : compatibleVisualizerIds(slice).includes(visualizer) &&
-        (visualizer !== "ratio-bar@1" ||
+      : compatibleVisualizerIds(slice).includes(resolvedVisualizer) &&
+        (resolvedVisualizer !== "ratio-bar@1" ||
           (slice.value.kind === "RATIO" &&
             ratioInUnitDomain(slice.value.value))),
   );
@@ -217,7 +231,7 @@ export function MetricPanel({
       <section className="panel-card">
         <ScopedError
           announce="polite"
-          detail={`${visualizer} cannot consume the published Result shape without inventing a domain or value.`}
+          detail={`${resolvedVisualizer} cannot consume the published Result shape without inventing a domain or value.`}
           retryable={false}
           title="Visualizer binding incompatible"
         />
@@ -233,7 +247,7 @@ export function MetricPanel({
         />
       </section>
     );
-  if (visualizer === "table@1")
+  if (resolvedVisualizer === "table@1")
     return (
       <section className="panel-card">
         <ResultTable coordinate={coordinate} slices={result.slices} />
@@ -253,9 +267,9 @@ export function MetricPanel({
       onExplain={onExplain}
       focusEvidenceAction={focusEvidenceAction}
       visualization={
-        visualizer === "ratio-bar@1" ? (
+        resolvedVisualizer === "ratio-bar@1" ? (
           <RatioBar slice={slice} />
-        ) : visualizer === "badge@1" ? (
+        ) : resolvedVisualizer === "badge@1" ? (
           <BooleanBadge slice={slice} />
         ) : undefined
       }

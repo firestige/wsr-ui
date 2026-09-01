@@ -6,7 +6,7 @@
     "baselineCommit": "19148027762b6b951ca0e977f6aeae50aa0f746e",
     "cardinalitySources": [
       "packages/bi/src/domain/visualization/registry.ts",
-      "packages/bi/src/domain/trace/load-recorded-trace.ts",
+      "packages/bi/src/domain/trace/trace-view.ts",
       "workflow-self-recursive@f373c82dd709421e1c1ccfdd7a03b91118b9b6ea:docs/systems/evolution/evolution-system.md"
     ]
   },
@@ -66,28 +66,46 @@
       "applicableInteractions": ["resize"]
     },
     {
-      "id": "recorded-trace-graph@1",
-      "source": "packages/bi/src/components/recorded-structure.tsx",
-      "initialRenderer": "svg",
-      "dataContract": "RecordedStructureViewModel derived from a single traces/read page",
+      "id": "recorded-trace-waterfall@1",
+      "source": "packages/bi/src/components/trace-views.tsx",
+      "initialRenderer": "semantic HTML and CSS shared timeline",
+      "dataContract": "lossless wsr.trace-view@1 IR compiled from one traces/read page",
       "typicalFixture": {
-        "id": "recorded-trace-graph.typical@1",
+        "id": "recorded-trace-waterfall.typical@1",
         "source": "recorded product fixture",
-        "recordCount": 15,
-        "depthCount": 4
+        "nodeCount": 15,
+        "linkCount": 1
       },
       "upperBoundFixture": {
-        "id": "recorded-trace-graph.upper-bound@1",
+        "id": "recorded-trace-waterfall.upper-bound@1",
         "source": "load-recorded-trace product request cap",
-        "recordCount": 200,
-        "depthCount": 10
+        "nodeCount": 200,
+        "linkCount": 1
       },
       "applicableInteractions": [
         "resize",
         "select-node",
-        "select-relation",
-        "motion-control"
+        "finite-recorded-time-motion"
       ]
+    },
+    {
+      "id": "recorded-trace-tree@1",
+      "source": "packages/bi/src/components/trace-views.tsx",
+      "initialRenderer": "semantic HTML call tree",
+      "dataContract": "lossless wsr.trace-view@1 IR compiled from one traces/read page",
+      "typicalFixture": {
+        "id": "recorded-trace-tree.typical@1",
+        "source": "recorded product fixture",
+        "nodeCount": 15,
+        "depthCount": 4
+      },
+      "upperBoundFixture": {
+        "id": "recorded-trace-tree.upper-bound@1",
+        "source": "load-recorded-trace product request cap",
+        "nodeCount": 200,
+        "depthCount": 10
+      },
+      "applicableInteractions": ["resize", "select-node"]
     }
   ],
   "productScenarios": [
@@ -121,7 +139,7 @@
     }
   ],
   "commands": {
-    "validateManifest": "jq -e '.schemaVersion == \"panel-benchmark@1\" and (.chartPanels | length == 2) and (.absentChartTypes | length == 2)' qualification/panel-benchmark/v1/manifest.json",
+    "validateManifest": "jq -e '.schemaVersion == \"panel-benchmark@1\" and (.chartPanels | length == 3) and (.absentChartTypes | length == 2)' qualification/panel-benchmark/v1/manifest.json",
     "fullBenchmark": "npm run benchmark:full -- --manifest qualification/panel-benchmark/v1/manifest.json",
     "lightweightRegression": "npm run benchmark:smoke -- --manifest qualification/panel-benchmark/v1/manifest.json"
   },
