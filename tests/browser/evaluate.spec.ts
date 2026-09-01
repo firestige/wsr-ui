@@ -129,14 +129,15 @@ test("recorded Trace keeps siblings together and Live traversal stops", async ({
     `/evaluate/trace/${traceId}?v=1&task=task-browser&span=${spans[1]}&metric=delivery-cycle-time-ms%402.0.0&side=single&scope=result`,
   );
 
+  await expect(
+    page.getByRole("img", { name: "Recorded parent structure graph" }),
+  ).toBeVisible();
+  await page.getByText("Recorded structure exact details").click();
   const siblings = page.getByRole("group", { name: "Recorded depth 1" });
   await expect(siblings).toContainText("Writer");
   await expect(siblings).toContainText("Reviewer");
   await expect(
     page.getByText("LINK — independent recorded relation"),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("img", { name: "Recorded parent structure graph" }),
   ).toBeVisible();
   await expect(
     page.getByRole("button", { name: /Recorded parent relation/ }).first(),
@@ -174,6 +175,7 @@ test("switching to reduced motion stops an active traversal", async ({
   await page.getByRole("button", { name: "Start Live reading" }).click();
   await page.emulateMedia({ reducedMotion: "reduce" });
   await expect(page.getByText("Mode: Still")).toBeVisible();
+  await page.getByText("Recorded structure exact details").click();
   await expect(
     page.getByRole("group", { name: "Recorded depth 1" }),
   ).toBeVisible();
@@ -208,6 +210,7 @@ test("recorded Trace remains operable without horizontal overflow on narrow scre
   await page.goto(
     `/evaluate/trace/${traceId}?v=1&task=task-browser&metric=delivery-cycle-time-ms%402.0.0&side=single&scope=result`,
   );
+  await page.getByText("Recorded structure exact details").click();
   await expect(
     page.getByRole("group", { name: "Recorded depth 1" }),
   ).toContainText("Reviewer");

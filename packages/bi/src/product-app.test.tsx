@@ -109,6 +109,13 @@ describe("BI product route", () => {
       />,
     );
 
+    const user = userEvent.setup();
+    await user.click(
+      await screen.findByText("Recorded structure exact details", {
+        selector: "summary",
+      }),
+    );
+
     expect(
       await screen.findByRole("button", { name: /Root invocation/ }),
     ).toBeVisible();

@@ -146,10 +146,17 @@ function BenchmarkHarness() {
           previous = now;
           interactionFrame += 1;
           if (interactionFrame % 30 === 0) {
-            const nodes =
-              model?.depthGroups.flatMap((group) => group.nodes) ?? [];
-            if (nodes.length > 0) {
-              setSelectedId(nodes[interactionFrame % nodes.length]!.id);
+            const selectable = model
+              ? [
+                  ...model.depthGroups
+                    .flatMap((group) => group.nodes)
+                    .map((node) => node.id),
+                  ...model.parentEdges.map((edge) => edge.id),
+                  ...model.links.map((link) => link.id),
+                ]
+              : [];
+            if (selectable.length > 0) {
+              setSelectedId(selectable[interactionFrame % selectable.length]!);
             }
           }
           if (interactionFrame % 150 === 0) setNarrow((value) => !value);
