@@ -1,5 +1,9 @@
 # `@wsr/bi` Wave 1 qualification — `fbc75d2`
 
+> Superseded before publication: the human publication checkpoint selected the
+> unscoped coordinate `wsr-ui-core`. This result remains as the pre-decision
+> optimization history and was never published.
+
 ## Candidate identity
 
 - Provider commit: `fbc75d29a863056f61ef69ca8ed76bd93e75aa69`
