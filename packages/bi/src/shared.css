@@ -1049,6 +1049,22 @@
   .wsr-bi .trace-workbench { grid-template-columns: 1fr; }
 }
 @media (max-width: 40rem) {
+  .wsr-bi,
+  .wsr-bi .trace-view,
+  .wsr-bi .trace-view > * {
+    inline-size: 100%;
+    max-inline-size: 100%;
+    min-inline-size: 0;
+  }
+  .wsr-bi .trace-view,
+  .wsr-bi .trace-motion-copy {
+    overflow: hidden;
+  }
+  .wsr-bi .trace-motion-copy span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
   .wsr-bi .trace-tree-context { grid-template-columns: 1fr; }
   .wsr-bi .trace-timeline-head {
     display: flex;

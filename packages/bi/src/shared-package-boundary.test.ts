@@ -92,6 +92,14 @@ describe("host-neutral shared package boundary", () => {
     ).toEqual([]);
   });
 
+  it("contains trace renderer intrinsic width on narrow host canvases", () => {
+    const source = readFileSync(resolve(sourceRoot, "shared.css"), "utf8");
+
+    expect(source).toContain(".wsr-bi .trace-view > *");
+    expect(source).toContain("max-inline-size: 100%");
+    expect(source).toContain("min-inline-size: 0");
+  });
+
   it("keeps DSH dependencies and imports out of every shared source file", () => {
     expect(JSON.stringify(packageJson)).not.toMatch(/@deepseek-ai|dsh-/i);
     expect(productionSources(sourceRoot)).not.toMatch(
