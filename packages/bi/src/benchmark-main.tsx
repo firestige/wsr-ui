@@ -13,8 +13,9 @@ import type { MetricResult } from "./domain/evolution/types";
 import "./shared.css";
 
 interface BenchmarkApi {
+  dataReady: number;
   firstPaintMs?: number;
-  longTasks: number[];
+  longTasks: Array<{ startTime: number; duration: number }>;
   ready: boolean;
   runInteraction(durationMs: number): Promise<number[]>;
 }
@@ -29,13 +30,16 @@ const query = new URLSearchParams(window.location.search);
 const panel = query.get("panel") ?? "metric-ratio-bar@1";
 const fixture = query.get("fixture") ?? "typical";
 const dataReady = performance.now();
-const longTasks: number[] = [];
+const longTasks: Array<{ startTime: number; duration: number }> = [];
 const observer = new PerformanceObserver((list) => {
-  for (const entry of list.getEntries()) longTasks.push(entry.duration);
+  for (const entry of list.getEntries()) {
+    longTasks.push({ startTime: entry.startTime, duration: entry.duration });
+  }
 });
 observer.observe({ type: "longtask", buffered: true });
 
 window.__wsrBenchmark = {
+  dataReady,
   longTasks,
   ready: false,
   runInteraction: async () => [],

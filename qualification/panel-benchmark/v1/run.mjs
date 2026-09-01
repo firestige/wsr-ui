@@ -1,4 +1,4 @@
-/* global fetch, setTimeout, window */
+/* global fetch, performance, setTimeout, window */
 import { createHash } from "node:crypto";
 import { spawn } from "node:child_process";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
@@ -10,6 +10,7 @@ import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
 
 import {
+  clipLongTaskToWindow,
   evaluateRun,
   nearestRank,
   validateCompleteResult,
@@ -123,19 +124,29 @@ async function measureSample(browser, target) {
         )
       : [];
     const raw = await page.evaluate(() => ({
+      dataReady: window.__wsrBenchmark.dataReady,
       firstPaintMs: window.__wsrBenchmark.firstPaintMs,
       longTasks: [...window.__wsrBenchmark.longTasks],
+      measurementEnd: performance.now(),
     }));
     if (typeof raw.firstPaintMs !== "number") {
       throw new Error("renderer-ready first-paint mark is missing");
     }
+    const observedLongTasks = raw.longTasks.map((entry) =>
+      clipLongTaskToWindow(entry, {
+        startTime: raw.dataReady,
+        endTime: raw.measurementEnd,
+      }),
+    );
     return {
       firstPaintMs: raw.firstPaintMs,
       frameP95Ms:
         frameDurations.length === 0 ? null : nearestRank(frameDurations, 0.95),
       frameDurations,
-      longTasks: raw.longTasks.filter(
-        (duration) => duration >= manifest.budgets.longTaskThresholdMs,
+      observedLongTasks,
+      longTasks: observedLongTasks.filter(
+        (entry) =>
+          entry.measuredDuration >= manifest.budgets.longTaskThresholdMs,
       ),
     };
   } finally {

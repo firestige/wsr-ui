@@ -2,10 +2,28 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  clipLongTaskToWindow,
   evaluateRun,
   nearestRank,
   validateCompleteResult,
 } from "./contract.mjs";
+
+test("clips long tasks to the measured data-ready window", () => {
+  assert.deepEqual(
+    clipLongTaskToWindow(
+      { startTime: 10, duration: 60 },
+      { startTime: 30, endTime: 80 },
+    ),
+    { startTime: 10, duration: 60, measuredDuration: 40 },
+  );
+  assert.equal(
+    clipLongTaskToWindow(
+      { startTime: 30, duration: 50 },
+      { startTime: 30, endTime: 80 },
+    ).measuredDuration,
+    50,
+  );
+});
 
 test("nearest-rank selects ceil(P*N)-1 without interpolating", () => {
   const values = Array.from({ length: 30 }, (_, index) => index + 1);

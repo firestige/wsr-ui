@@ -1,3 +1,15 @@
+export function clipLongTaskToWindow(entry, window) {
+  const measuredStart = Math.max(entry.startTime, window.startTime);
+  const measuredEnd = Math.min(
+    entry.startTime + entry.duration,
+    window.endTime,
+  );
+  return {
+    ...entry,
+    measuredDuration: Math.max(0, measuredEnd - measuredStart),
+  };
+}
+
 export function nearestRank(values, percentile) {
   if (!Array.isArray(values) || values.length === 0) {
     throw new Error("nearest-rank requires at least one value");
