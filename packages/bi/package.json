@@ -21,6 +21,7 @@
   ],
   "scripts": {
     "build": "vite build && tsc -p tsconfig.lib.json && node scripts/finalize-package.mjs",
+    "build:harness": "vite build --config vite.harness.config.ts",
     "dev": "vite"
   },
   "dependencies": {

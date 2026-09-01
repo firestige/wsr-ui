@@ -15,4 +15,10 @@ export default defineConfig({
     },
   },
   plugins: [react(), tailwindcss()],
+  server: {
+    headers: {
+      "Cross-Origin-Embedder-Policy": "require-corp",
+      "Cross-Origin-Opener-Policy": "same-origin",
+    },
+  },
 });

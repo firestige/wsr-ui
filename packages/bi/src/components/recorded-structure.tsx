@@ -1,5 +1,5 @@
 import { scalePoint } from "d3";
-import { useId } from "react";
+import { memo, useId } from "react";
 
 export type RecordedDetailState = "AVAILABLE" | "UNRESOLVED";
 
@@ -29,7 +29,11 @@ const detailStateLabels: Record<RecordedDetailState, string> = {
   UNRESOLVED: "Unresolved recorded endpoint",
 };
 
-function RecordedGraph({ model }: { model: RecordedStructureViewModel }) {
+const RecordedGraph = memo(function RecordedGraph({
+  model,
+}: {
+  model: RecordedStructureViewModel;
+}) {
   const width = 960;
   const rowHeight = 120;
   const positions = new Map<string, { x: number; y: number }>();
@@ -95,6 +99,17 @@ function RecordedGraph({ model }: { model: RecordedStructureViewModel }) {
         )}
       </svg>
     </div>
+  );
+}, recordedGraphEqual);
+
+function recordedGraphEqual(
+  previous: { model: RecordedStructureViewModel },
+  next: { model: RecordedStructureViewModel },
+) {
+  return (
+    previous.model.depthGroups === next.model.depthGroups &&
+    previous.model.parentEdges === next.model.parentEdges &&
+    previous.model.links === next.model.links
   );
 }
 

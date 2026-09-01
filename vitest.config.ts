@@ -6,6 +6,7 @@ export default defineConfig({
     exclude: [
       "tests/browser/**",
       "scripts/**/*.test.mjs",
+      "qualification/**/*.test.mjs",
       "**/node_modules/**",
       "**/dist/**",
     ],
