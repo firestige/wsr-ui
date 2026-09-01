@@ -95,7 +95,8 @@ describe("recorded Trace business panels", () => {
     const waterfall = screen.getByRole("region", {
       name: "Recorded trace waterfall",
     });
-    expect(waterfall).toHaveAttribute("data-motion", "finite-recorded-time");
+    expect(screen.getByTestId("trace-waterfall")).toBe(waterfall);
+    expect(waterfall).toHaveAttribute("data-motion", "zoom-transition");
     expect(waterfall).toHaveAttribute("data-trace-renderer", "waterfall");
     expect(screen.getAllByText("100 ns").length).toBeGreaterThan(0);
     expect(screen.getByText("Duration")).toBeVisible();
@@ -114,14 +115,18 @@ describe("recorded Trace business panels", () => {
       screen.getByRole("tree", { name: "Recorded waterfall span outline" }),
     ).toBeVisible();
     expect(
-      screen.getByRole("slider", { name: "Recorded time position" }),
-    ).toHaveAttribute("aria-valuemax", "100");
+      screen.queryByRole("slider", { name: "Recorded time position" }),
+    ).toBeNull();
+    expect(waterfall.querySelector(".trace-motion")).toBeNull();
     expect(
       screen.getByRole("region", { name: "Span passport" }),
     ).toHaveTextContent("root");
+    expect(screen.getByTestId("span-passport")).toHaveTextContent("root");
 
     await userEvent.click(
-      screen.getByRole("button", { name: /tool.execute/i }),
+      screen
+        .getAllByTestId("trace-waterfall-node")
+        .find((node) => node.getAttribute("data-trace-node-id") === "child")!,
     );
     const passport = screen.getByRole("region", { name: "Span passport" });
     expect(passport).toHaveTextContent("1010");
@@ -153,11 +158,7 @@ describe("recorded Trace business panels", () => {
     expect(
       screen.getByRole("searchbox", { name: "Search recorded spans" }),
     ).toBeVisible();
-    expect(screen.getByText("0 ns")).toBeVisible();
-    expect(screen.getByText("25 ns")).toBeVisible();
-    expect(screen.getByText("50 ns")).toBeVisible();
-    expect(screen.getByText("75 ns")).toBeVisible();
-    expect(screen.getAllByText("100 ns").length).toBeGreaterThan(0);
+    expect(container.querySelector(".trace-timeline-head")).toBeNull();
 
     await userEvent.click(
       screen.getByRole("button", { name: "Collapse workflow.run descendants" }),
@@ -166,33 +167,108 @@ describe("recorded Trace business panels", () => {
     await userEvent.click(
       screen.getByRole("button", { name: "Expand all spans" }),
     );
-    expect(screen.getByRole("button", { name: /tool.execute/i })).toBeVisible();
+    expect(
+      screen
+        .getAllByTestId("trace-waterfall-node")
+        .find((node) => node.getAttribute("data-trace-node-id") === "child"),
+    ).toBeVisible();
 
     const minimap = screen.getByRole("slider", {
       name: "Trace minimap zoom window",
     });
-    expect(container.querySelector(".trace-minimap-window")).toHaveAttribute(
-      "data-full",
-      "true",
+    expect(screen.getByTestId("trace-waterfall-data-zoom")).toBe(minimap);
+    expect(
+      screen.queryByTestId("trace-waterfall-data-zoom-selection"),
+    ).toBeNull();
+    const minimapRuler = screen.getByTestId("trace-waterfall-data-zoom-ruler");
+    expect(
+      [...minimapRuler.querySelectorAll("span")].map(
+        (tick) => tick.textContent,
+      ),
+    ).toEqual(["0 ns", "25 ns", "50 ns", "75 ns", "100 ns"]);
+    expect(minimapRuler.querySelectorAll("span")[2]).toHaveStyle({
+      insetInlineStart: "50%",
+    });
+    const chart = screen.getByTestId("trace-waterfall-chart");
+    expect(chart.tagName.toLowerCase()).toBe("svg");
+    const axisTicks = screen.getAllByTestId("trace-waterfall-axis-tick");
+    expect(axisTicks).toHaveLength(11);
+    expect(axisTicks.map((tick) => tick.textContent)).toContain("30 ns");
+    expect(axisTicks[0]!.querySelector("line")).toHaveAttribute("y1", "0");
+    expect(axisTicks[0]!.querySelector("line")).toHaveAttribute("y2", "128");
+    expect(axisTicks[0]!.querySelector("text")).toHaveAttribute("x", "6");
+    expect(axisTicks[0]!.querySelector("text")).toHaveAttribute(
+      "text-anchor",
+      "start",
     );
+    expect(axisTicks.at(-1)!.querySelector("text")).toBeNull();
+    expect(
+      screen.getByTestId("trace-waterfall-data-zoom-window"),
+    ).toHaveAttribute("data-full", "true");
+    expect(screen.getByTestId("trace-waterfall-span-tree")).toHaveAttribute(
+      "role",
+      "tree",
+    );
+    const waterfallRows = screen.getAllByTestId("trace-waterfall-row");
+    expect(waterfallRows).toHaveLength(2);
+    expect(waterfallRows[0]).toHaveAttribute("data-trace-node-id", "root");
+    expect(waterfallRows[0]).toHaveAttribute("aria-selected", "true");
+    expect(screen.getAllByTestId("trace-waterfall-node")).toHaveLength(2);
+    const waterfallBars = screen.getAllByTestId("trace-waterfall-bar");
+    expect(waterfallBars).toHaveLength(2);
+    expect(waterfallBars[1]).toHaveAttribute("data-trace-node-id", "child");
+    expect(
+      screen
+        .getAllByTestId("trace-waterfall-label")
+        .map((label) => label.textContent),
+    ).toEqual(["workflow.run", "tool.execute"]);
+    expect(waterfallBars[0]!.querySelector("title")).toHaveTextContent(
+      "workflow.run",
+    );
+    expect(waterfallBars[1]!.querySelector("title")).toHaveTextContent(
+      "tool.execute",
+    );
+    const waterfallLanes = screen.getAllByTestId("trace-waterfall-lane");
+    expect(waterfallLanes).toHaveLength(2);
+    expect(waterfallLanes[0]).toHaveAttribute("data-selected", "true");
+    expect(waterfallLanes[0]).not.toHaveAttribute("data-row-parity");
+    expect(waterfallLanes[1]).not.toHaveAttribute("data-row-parity");
+    expect(
+      waterfallLanes.at(-1)!.compareDocumentPosition(axisTicks[0]!) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(screen.getByTestId("trace-waterfall-collapse")).toHaveAttribute(
+      "data-trace-node-id",
+      "root",
+    );
+    const indentGuides = screen.getAllByTestId("trace-waterfall-indent-guide");
+    expect(indentGuides).toHaveLength(1);
+    expect(indentGuides[0]).toHaveAttribute("data-guide-owner-id", "child");
+    expect(indentGuides[0]).toHaveAttribute("data-trace-depth", "0");
+    const rootLabelParts =
+      waterfallRows[0]!.querySelector(".trace-node-label")!.children;
+    expect(rootLabelParts[0]).toHaveClass("trace-collapse-control");
+    expect(rootLabelParts[1]).toHaveClass("trace-indent-items");
+    expect(rootLabelParts[2]).toHaveClass("trace-node-main");
+    const zoomWindow = screen.getByTestId("trace-waterfall-data-zoom-window");
+    expect(zoomWindow).toHaveAttribute("data-full", "true");
     expect(
       container.querySelector(
-        '[data-timeline-span-id="root"] .trace-indent-spacer',
+        '[data-timeline-span-id="root"] .trace-indent-items',
+      ),
+    ).toHaveAttribute("data-indent-depth", "0");
+    expect(
+      container.querySelector(
+        '[data-timeline-span-id="child"] .trace-indent-items',
       ),
     ).toHaveAttribute("data-indent-depth", "1");
-    expect(
-      container.querySelector(
-        '[data-timeline-span-id="child"] .trace-indent-spacer',
-      ),
-    ).toHaveAttribute("data-indent-depth", "2");
-    expect(container.querySelectorAll(".trace-indent-segment")).toHaveLength(2);
-    expect(
-      container.querySelector('.trace-indent-segment[data-guide-depth="0"]'),
-    ).toHaveStyle({ gridRow: "1 / 3" });
-    expect(
-      container.querySelector('.trace-indent-segment[data-guide-depth="1"]'),
-    ).toHaveStyle({ gridRow: "2 / 3" });
-    expect(container.querySelector(".trace-timeline-grid")).toBeInTheDocument();
+    expect(container.querySelector(".trace-timeline-grid")).toBeNull();
+
+    await userEvent.click(waterfallRows[0]!);
+    expect(waterfallLanes[0]).toHaveAttribute("data-selected", "true");
+    await userEvent.click(waterfallLanes[1]!);
+    expect(waterfallRows[1]).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByTestId("span-passport")).toHaveTextContent("child");
     Object.defineProperty(minimap, "getBoundingClientRect", {
       value: () => ({
         left: 0,
@@ -211,24 +287,215 @@ describe("recorded Trace business panels", () => {
     fireEvent.pointerUp(minimap, { clientX: 75, pointerId: 1 });
 
     expect(minimap).toHaveAttribute("aria-valuetext", "25 ns to 75 ns");
-    expect(container.querySelector(".trace-minimap-window")).toHaveStyle({
+    expect(
+      screen
+        .getAllByTestId("trace-waterfall-axis-tick")
+        .map((tick) => tick.textContent),
+    ).toEqual([
+      "25 ns",
+      "30 ns",
+      "35 ns",
+      "40 ns",
+      "45 ns",
+      "50 ns",
+      "55 ns",
+      "60 ns",
+      "65 ns",
+      "70 ns",
+      "",
+    ]);
+    expect(zoomWindow).toHaveStyle({
       insetInlineStart: "25%",
       width: "50%",
     });
-    expect(
-      container.querySelector(
-        '[data-timeline-span-id="child"] .trace-timeline-bar',
-      ),
-    ).toHaveStyle({ insetInlineStart: "0%", width: "30%" });
+    const leftZoomHandle = screen.getByTestId(
+      "trace-waterfall-data-zoom-handle-left",
+    );
+    const rightZoomHandle = screen.getByTestId(
+      "trace-waterfall-data-zoom-handle-right",
+    );
+    fireEvent.pointerDown(leftZoomHandle, { clientX: 25, pointerId: 4 });
+    fireEvent.pointerMove(minimap, { clientX: 15, pointerId: 4 });
+    fireEvent.pointerUp(minimap, { clientX: 15, pointerId: 4 });
+    expect(minimap).toHaveAttribute("aria-valuetext", "15 ns to 75 ns");
+    fireEvent.pointerDown(leftZoomHandle, { clientX: 15, pointerId: 5 });
+    fireEvent.pointerMove(minimap, { clientX: 25, pointerId: 5 });
+    fireEvent.pointerUp(minimap, { clientX: 25, pointerId: 5 });
+    fireEvent.pointerDown(rightZoomHandle, { clientX: 75, pointerId: 6 });
+    fireEvent.pointerMove(minimap, { clientX: 85, pointerId: 6 });
+    fireEvent.pointerUp(minimap, { clientX: 85, pointerId: 6 });
+    expect(minimap).toHaveAttribute("aria-valuetext", "25 ns to 85 ns");
+    fireEvent.pointerDown(rightZoomHandle, { clientX: 85, pointerId: 7 });
+    fireEvent.pointerMove(minimap, { clientX: 75, pointerId: 7 });
+    fireEvent.pointerUp(minimap, { clientX: 75, pointerId: 7 });
+    expect(minimap).toHaveAttribute("aria-valuetext", "25 ns to 75 ns");
+    const zoomedChildBar = screen
+      .getAllByTestId("trace-waterfall-bar")
+      .find((bar) => bar.getAttribute("data-trace-node-id") === "child");
+    expect(zoomedChildBar).toHaveAttribute("x", "0");
+    expect(zoomedChildBar).toHaveAttribute("width", "240");
 
-    fireEvent.pointerDown(minimap, { clientX: 50, pointerId: 2 });
-    fireEvent.pointerMove(minimap, { clientX: 75, pointerId: 2 });
-    fireEvent.pointerUp(minimap, { clientX: 75, pointerId: 2 });
-    expect(
-      container.querySelector(
-        '[data-timeline-span-id="child"] .trace-timeline-bar',
+    fireEvent.pointerDown(zoomWindow, { clientX: 40, pointerId: 2 });
+    fireEvent.pointerMove(minimap, { clientX: 60, pointerId: 2 });
+    fireEvent.pointerUp(minimap, { clientX: 60, pointerId: 2 });
+    expect(minimap).toHaveAttribute("aria-valuetext", "45 ns to 95 ns");
+    expect(zoomWindow).toHaveStyle({
+      insetInlineStart: "45%",
+      width: "50%",
+    });
+    const exitingChildTimeline = screen
+      .getAllByTestId("trace-waterfall-timeline")
+      .find((item) => item.getAttribute("data-trace-node-id") === "child");
+    expect(exitingChildTimeline).toHaveAttribute("data-visible", "false");
+    expect(exitingChildTimeline).toHaveAttribute("data-motion-phase", "exit");
+    expect(exitingChildTimeline).toHaveAttribute(
+      "data-motion-direction",
+      "left",
+    );
+
+    fireEvent.pointerDown(zoomWindow, { clientX: 60, pointerId: 3 });
+    fireEvent.pointerMove(minimap, { clientX: 30, pointerId: 3 });
+    fireEvent.pointerUp(minimap, { clientX: 30, pointerId: 3 });
+    expect(minimap).toHaveAttribute("aria-valuetext", "15 ns to 65 ns");
+    const enteringChildTimeline = screen
+      .getAllByTestId("trace-waterfall-timeline")
+      .find((item) => item.getAttribute("data-trace-node-id") === "child");
+    expect(enteringChildTimeline).toHaveAttribute("data-visible", "true");
+    expect(enteringChildTimeline).toHaveAttribute("data-motion-phase", "enter");
+    expect(enteringChildTimeline).toHaveAttribute(
+      "data-motion-direction",
+      "right",
+    );
+  });
+
+  it("clips long timeline labels with an ellipsis and keeps the full tooltip", () => {
+    const longLabel = "a.timeline.label.that.is.too.long.for.its.span";
+    const traceWithLongLabel: TraceView = {
+      ...trace,
+      nodes: trace.nodes.map((node) =>
+        node.id === "child"
+          ? { ...node, durationNano: "5", label: longLabel }
+          : node,
       ),
-    ).toHaveStyle({ display: "none" });
+    };
+
+    render(<TraceWaterfall trace={traceWithLongLabel} />);
+
+    const childLabel = screen
+      .getAllByTestId("trace-waterfall-label")
+      .find((label) => label.getAttribute("data-trace-node-id") === "child");
+    const childBar = screen
+      .getAllByTestId("trace-waterfall-bar")
+      .find((bar) => bar.getAttribute("data-trace-node-id") === "child");
+    expect(childLabel?.textContent).toMatch(/…$/);
+    expect(childLabel).toHaveAttribute("clip-path");
+    expect(childLabel?.textContent).not.toBe(longLabel);
+    expect(childBar?.querySelector("title")).toHaveTextContent(longLabel);
+  });
+
+  it("virtualizes large waterfalls from one left-hand scroll window", () => {
+    const denseNodes = Array.from({ length: 40 }, (_, index) => ({
+      ...trace.nodes[1]!,
+      id: `virtual-${index}`,
+      endpoint: { trace_id: "trace-1", span_id: `virtual-${index}` },
+      label: `virtual.${index}`,
+      startOffsetNano: String(index * 2),
+    }));
+    render(<TraceWaterfall trace={{ ...trace, nodes: denseNodes }} />);
+
+    const viewport = screen.getByTestId("trace-waterfall-scroll-viewport");
+    expect(viewport).toHaveAttribute("data-total-rows", "40");
+    expect(viewport).toHaveAttribute("data-virtual-start", "0");
+    expect(viewport).toHaveAttribute("data-virtual-end", "11");
+    expect(screen.getAllByTestId("trace-waterfall-row")).toHaveLength(11);
+    expect(screen.getAllByTestId("trace-waterfall-lane")).toHaveLength(11);
+
+    Object.defineProperty(viewport, "scrollTop", {
+      configurable: true,
+      value: 960,
+    });
+    fireEvent.scroll(viewport);
+
+    expect(viewport).toHaveAttribute("data-virtual-start", "17");
+    expect(viewport).toHaveAttribute("data-virtual-end", "31");
+    const rows = screen.getAllByTestId("trace-waterfall-row");
+    const lanes = screen.getAllByTestId("trace-waterfall-lane");
+    expect(rows).toHaveLength(14);
+    expect(lanes).toHaveLength(14);
+    expect(rows[0]).toHaveAttribute("data-trace-node-id", "virtual-17");
+    expect(rows[0]).toHaveAttribute("aria-posinset", "18");
+    expect(rows[0]).toHaveAttribute("aria-setsize", "40");
+    expect(lanes[0]).toHaveAttribute("data-trace-node-id", "virtual-17");
+  });
+
+  it("maps minimap span colors to the same kind and status as waterfall bars", () => {
+    const traceWithError: TraceView = {
+      ...trace,
+      nodes: trace.nodes.map((node) =>
+        node.id === "child" ? { ...node, status: "ERROR" } : node,
+      ),
+    };
+
+    const { rerender } = render(<TraceWaterfall trace={traceWithError} />);
+
+    const overview = screen.getByTestId("trace-waterfall-minimap-overview");
+    const overviewSpans = screen.getAllByTestId("trace-waterfall-minimap-span");
+    expect(overview.tagName.toLowerCase()).toBe("svg");
+    expect(overview).toHaveAttribute("viewBox", "0 0 100 2");
+    expect(overviewSpans[0]!.tagName.toLowerCase()).toBe("line");
+    expect(overviewSpans[0]).toHaveAttribute("y1", "0.5");
+    expect(overviewSpans[0]).toHaveAttribute("y2", "0.5");
+    expect(overviewSpans[1]).toHaveAttribute("y1", "1.5");
+    expect(overviewSpans[1]).toHaveAttribute("y2", "1.5");
+    expect(overviewSpans[1]).toHaveAttribute("x1", "10");
+    expect(overviewSpans[1]).toHaveAttribute("x2", "40");
+
+    for (const node of traceWithError.nodes) {
+      const selector = `[data-trace-node-id="${node.id}"]`;
+      const minimapSpan = screen
+        .getByTestId("trace-waterfall-data-zoom")
+        .querySelector(`.trace-minimap-span${selector}`);
+      const waterfallBar = screen
+        .getByTestId("trace-waterfall-chart")
+        .querySelector(`.trace-timeline-bar${selector}`);
+
+      expect(minimapSpan).toHaveAttribute(
+        "data-color-index",
+        String(node.depth % 4),
+      );
+      expect(waterfallBar).toHaveAttribute(
+        "data-color-index",
+        String(node.depth % 4),
+      );
+
+      expect(minimapSpan).toHaveClass(`trace-kind-${node.kind.toLowerCase()}`);
+      expect(waterfallBar).toHaveClass(`trace-kind-${node.kind.toLowerCase()}`);
+      if (node.status === "ERROR") {
+        expect(minimapSpan).toHaveClass("trace-status-error");
+        expect(waterfallBar).toHaveClass("trace-status-error");
+      } else {
+        expect(minimapSpan).not.toHaveClass("trace-status-error");
+        expect(waterfallBar).not.toHaveClass("trace-status-error");
+      }
+    }
+
+    const denseNodes = Array.from({ length: 40 }, (_, index) => ({
+      ...trace.nodes[1]!,
+      id: `dense-${index}`,
+      endpoint: { trace_id: "trace-1", span_id: `dense-${index}` },
+      label: `dense.${index}`,
+      startOffsetNano: String(index * 2),
+    }));
+    rerender(<TraceWaterfall trace={{ ...trace, nodes: denseNodes }} />);
+    expect(
+      screen.getByTestId("trace-waterfall-minimap-overview"),
+    ).toHaveAttribute("viewBox", "0 0 100 40");
+    const denseOverviewSpans = screen.getAllByTestId(
+      "trace-waterfall-minimap-span",
+    );
+    expect(denseOverviewSpans).toHaveLength(40);
+    expect(denseOverviewSpans[39]).toHaveAttribute("y1", "39.5");
+    expect(denseOverviewSpans[39]).toHaveAttribute("stroke-width", "0.5");
   });
 
   it("renders a call tree, keeping recorded LINK edges distinct", () => {
@@ -237,7 +504,9 @@ describe("recorded Trace business panels", () => {
     const region = screen.getByRole("region", {
       name: "Recorded trace tree",
     });
+    expect(screen.getByTestId("trace-tree")).toBe(region);
     expect(region).toHaveAttribute("data-trace-renderer", "tree");
+    expect(screen.getAllByTestId("trace-tree-node")).toHaveLength(2);
     const tree = screen.getByRole("tree", { name: "Recorded trace call tree" });
     expect(tree).toHaveTextContent("workflow.run");
     expect(tree).toHaveTextContent("tool.execute");
@@ -331,6 +600,7 @@ describe("recorded Trace business panels", () => {
     const region = screen.getByRole("region", {
       name: "Recorded trace statistics",
     });
+    expect(screen.getByTestId("trace-statistics")).toBe(region);
     expect(region).toHaveAttribute("data-trace-renderer", "statistics");
     expect(region).toHaveTextContent("Recorded spans2");
     expect(region).toHaveTextContent("Recorded links1");

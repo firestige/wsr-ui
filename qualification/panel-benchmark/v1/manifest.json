@@ -68,7 +68,7 @@
     },
     {
       "id": "recorded-trace-waterfall@1",
-      "rendererReadySelector": "[data-trace-renderer=\"waterfall\"] [role=\"treeitem\"]",
+      "rendererReadySelector": "[data-testid=\"trace-waterfall\"] [data-testid=\"trace-waterfall-row\"]",
       "source": "packages/bi/src/components/trace-views.tsx",
       "initialRenderer": "semantic HTML and CSS shared timeline",
       "dataContract": "lossless wsr.trace-view@1 IR compiled from one traces/read page",
@@ -84,15 +84,11 @@
         "nodeCount": 200,
         "linkCount": 1
       },
-      "applicableInteractions": [
-        "resize",
-        "select-node",
-        "finite-recorded-time-motion"
-      ]
+      "applicableInteractions": ["resize", "select-node", "zoom-transition"]
     },
     {
       "id": "recorded-trace-tree@1",
-      "rendererReadySelector": "[data-trace-renderer=\"tree\"] [role=\"treeitem\"]",
+      "rendererReadySelector": "[data-testid=\"trace-tree\"] [data-testid=\"trace-tree-node\"]",
       "source": "packages/bi/src/components/trace-views.tsx",
       "initialRenderer": "semantic HTML call tree",
       "dataContract": "lossless wsr.trace-view@1 IR compiled from one traces/read page",

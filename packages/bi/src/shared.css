@@ -11,10 +11,14 @@
   --wsr-type-caption: 0.5625rem;
   --wsr-type-label: 0.625rem;
   --wsr-type-code: 0.5625rem;
-  --wsr-trace-indent-0: var(--content-muted);
-  --wsr-trace-indent-1: var(--status-available);
-  --wsr-trace-indent-2: var(--status-warning);
-  --wsr-trace-indent-3: var(--status-error);
+  --wsr-waterfall-color-0: oklch(0.5 0.17 244);
+  --wsr-waterfall-color-1: oklch(0.58 0.15 185);
+  --wsr-waterfall-color-2: oklch(0.62 0.16 300);
+  --wsr-waterfall-color-3: oklch(0.65 0.16 75);
+  --wsr-trace-indent-0: var(--wsr-waterfall-color-0);
+  --wsr-trace-indent-1: var(--wsr-waterfall-color-1);
+  --wsr-trace-indent-2: var(--wsr-waterfall-color-2);
+  --wsr-trace-indent-3: var(--wsr-waterfall-color-3);
   --trace-indent-column: 0;
   --trace-indent-columns: 1;
   --surface-canvas: oklch(0.975 0.006 250);
@@ -84,6 +88,10 @@
 
 .wsr-bi[data-theme="dark"] {
   color-scheme: dark;
+  --wsr-waterfall-color-0: oklch(0.75 0.14 235);
+  --wsr-waterfall-color-1: oklch(0.77 0.12 185);
+  --wsr-waterfall-color-2: oklch(0.78 0.13 300);
+  --wsr-waterfall-color-3: oklch(0.82 0.13 80);
   --wsr-surface-panel: oklch(0.225 0.025 255);
   --wsr-surface-section: var(--wsr-surface-panel);
   --wsr-surface-raised: oklch(0.255 0.025 255);
@@ -534,25 +542,6 @@
   border-radius: var(--shape-control);
 }
 
-.wsr-bi .trace-minimap-track i {
-  position: absolute;
-  height: 0.22rem;
-  border-radius: 99px;
-  background: var(--data-series-1);
-}
-
-.wsr-bi .trace-minimap-track i:nth-child(3n + 1) {
-  inset-block-start: 0.35rem;
-}
-.wsr-bi .trace-minimap-track i:nth-child(3n + 2) {
-  inset-block-start: 0.8rem;
-  background: var(--data-series-2);
-}
-.wsr-bi .trace-minimap-track i:nth-child(3n) {
-  inset-block-start: 1.25rem;
-  background: var(--status-warning);
-}
-
 .wsr-bi .trace-workbench {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(16rem, 19rem);
@@ -570,35 +559,15 @@
   background: var(--surface-panel);
 }
 
-.wsr-bi .trace-timeline-head {
-  display: flex;
-  min-height: 2.75rem;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-grid);
-  padding: 0 var(--space-grid);
-  border-block-end: 1px solid var(--border-default);
-  color: var(--content-secondary);
-  font-size: var(--type-caption-size);
-  font-weight: 700;
-  text-transform: uppercase;
-}
-
 .wsr-bi .trace-waterfall-row {
-  display: grid;
-  grid-template-columns: minmax(16rem, 19rem) minmax(25rem, 1fr);
+  display: flex;
   min-height: 3rem;
-  gap: 0;
   border-block-end: 1px solid var(--border-default);
 }
 
 .wsr-bi .trace-waterfall-row.is-selected {
   background: var(--interaction-selection);
 }
-.wsr-bi .trace-waterfall-row.is-current {
-  filter: brightness(1.18);
-}
-
 .wsr-bi .trace-node-label {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
@@ -686,6 +655,8 @@
 
 .wsr-bi .trace-timeline-bar.trace-kind-client {
   border-color: var(--data-series-2);
+}
+.wsr-bi .trace-timeline-bar.trace-kind-client {
   background: color-mix(
     in srgb,
     var(--data-series-2) 40%,
@@ -694,6 +665,8 @@
 }
 .wsr-bi .trace-timeline-bar.trace-status-error {
   border-color: var(--status-error);
+}
+.wsr-bi .trace-timeline-bar.trace-status-error {
   background: color-mix(in srgb, var(--status-error) 35%, var(--surface-panel));
 }
 
@@ -1327,7 +1300,7 @@
   color: var(--status-available);
 }
 .wsr-bi .trace-minimap {
-  grid-template-columns: minmax(16rem, 19rem) minmax(25rem, 1fr);
+  grid-template-columns: minmax(8rem, 10rem) minmax(25rem, 1fr);
   min-height: 3.25rem;
   align-items: stretch;
   gap: 0;
@@ -1338,6 +1311,8 @@
   align-content: center;
   gap: 0.15rem;
   padding-inline: 0.85rem;
+  border-inline-end: 1px solid var(--border-default);
+  background: var(--surface-panel);
 }
 .wsr-bi .trace-minimap-copy > strong {
   font-size: var(--type-label-size);
@@ -1355,9 +1330,73 @@
   cursor: crosshair;
   touch-action: none;
 }
-.wsr-bi .trace-minimap-track .trace-minimap-span {
+.wsr-bi .trace-minimap-overview {
+  position: absolute;
   z-index: 1;
-  height: 0.22rem;
+  inset: 0.25rem 0 1rem;
+  width: 100%;
+  height: calc(100% - 1.25rem);
+  overflow: hidden;
+  pointer-events: none;
+}
+.wsr-bi .trace-minimap-overview .trace-minimap-span {
+  --trace-waterfall-color: var(--wsr-waterfall-color-0);
+  stroke: color-mix(
+    in srgb,
+    var(--trace-waterfall-color) 45%,
+    var(--surface-panel)
+  );
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+.wsr-bi .trace-minimap-overview .trace-minimap-span[data-color-index="1"] {
+  --trace-waterfall-color: var(--wsr-waterfall-color-1);
+}
+.wsr-bi .trace-minimap-overview .trace-minimap-span[data-color-index="2"] {
+  --trace-waterfall-color: var(--wsr-waterfall-color-2);
+}
+.wsr-bi .trace-minimap-overview .trace-minimap-span[data-color-index="3"] {
+  --trace-waterfall-color: var(--wsr-waterfall-color-3);
+}
+.wsr-bi .trace-minimap-overview .trace-minimap-span.trace-status-error {
+  stroke: color-mix(in srgb, var(--status-error) 35%, var(--surface-panel));
+}
+.wsr-bi .trace-minimap-ruler {
+  position: absolute;
+  z-index: 3;
+  inset: 0;
+  pointer-events: none;
+}
+.wsr-bi .trace-minimap-ruler > span {
+  position: absolute;
+  inset-block-end: 0.18rem;
+  padding-inline: 0.15rem;
+  background: color-mix(in srgb, var(--surface-inset) 86%, transparent);
+  color: var(--content-muted);
+  font: normal var(--type-caption-size) var(--type-code-family);
+  line-height: 1.2;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+.wsr-bi .trace-minimap-ruler > span::before {
+  position: absolute;
+  inset-block-end: calc(100% + 0.08rem);
+  inset-inline-start: 50%;
+  height: 0.24rem;
+  border-inline-start: 1px solid var(--border-strong);
+  content: "";
+}
+.wsr-bi .trace-minimap-ruler > span:first-child {
+  transform: none;
+}
+.wsr-bi .trace-minimap-ruler > span:first-child::before {
+  inset-inline-start: 0;
+}
+.wsr-bi .trace-minimap-ruler > span:last-child {
+  transform: translateX(-100%);
+}
+.wsr-bi .trace-minimap-ruler > span:last-child::before {
+  inset-inline-start: 100%;
 }
 .wsr-bi .trace-minimap-window {
   position: absolute;
@@ -1365,32 +1404,39 @@
   inset-block: 0.25rem;
   min-width: 2px;
   border-block: 1px solid
-    color-mix(in srgb, var(--interaction-accent) 65%, transparent);
-  background: color-mix(in srgb, var(--interaction-accent) 8%, transparent);
-  pointer-events: none;
+    color-mix(in srgb, var(--status-warning) 82%, transparent);
+  background: color-mix(in srgb, var(--status-warning) 14%, transparent);
+  box-shadow: inset 0 0 0 1px
+    color-mix(in srgb, var(--status-warning) 28%, transparent);
+  cursor: grab;
 }
-.wsr-bi .trace-minimap-window::before,
-.wsr-bi .trace-minimap-window::after {
+.wsr-bi .trace-minimap-resize-handle {
+  position: absolute;
+  z-index: 1;
+  inset-block: 0;
+  width: 0.75rem;
+  cursor: ew-resize;
+  pointer-events: auto;
+}
+.wsr-bi .trace-minimap-resize-handle::before {
   position: absolute;
   inset-block: 28%;
+  inset-inline-start: calc(50% - 1px);
   width: 2px;
   border-radius: 99px;
-  background: var(--interaction-accent);
+  background: var(--status-warning);
   content: "";
 }
-.wsr-bi .trace-minimap-window::before {
-  inset-inline-start: 2px;
+.wsr-bi .trace-minimap-resize-handle[data-edge="left"] {
+  inset-inline-start: -0.375rem;
 }
-.wsr-bi .trace-minimap-window::after {
-  inset-inline-end: 2px;
+.wsr-bi .trace-minimap-resize-handle[data-edge="right"] {
+  inset-inline-end: -0.375rem;
 }
 .wsr-bi .trace-minimap-window[data-full="true"] {
   border: 0;
   background: transparent;
-}
-.wsr-bi .trace-minimap-window[data-full="true"]::before,
-.wsr-bi .trace-minimap-window[data-full="true"]::after {
-  display: none;
+  pointer-events: none;
 }
 .wsr-bi .trace-waterfall-toolbar {
   display: grid;
@@ -1420,87 +1466,90 @@
 .wsr-bi .trace-waterfall-actions button {
   min-height: 1.65rem;
 }
+.wsr-bi
+  .trace-waterfall-actions
+  .wsr-button[data-icon-button="true"]:is(:hover, :focus-visible) {
+  border-color: var(--interaction-accent);
+  background: var(--interaction-selection);
+  color: var(--interaction-accent);
+}
 .wsr-bi .trace-waterfall-toolbar input {
   width: 100%;
   min-height: 2rem;
 }
-.wsr-bi .trace-timeline-head {
-  min-height: 2.2rem;
-  padding: 0;
+.wsr-bi .trace-waterfall-table {
+  display: grid;
+  grid-template-columns: minmax(16rem, 19rem) minmax(0, 1fr);
+  min-width: 0;
+  align-items: start;
 }
-.wsr-bi .trace-timeline-head > :first-child {
+.wsr-bi .trace-waterfall-label-pane {
+  min-width: 0;
+  border-inline-end: 1px solid var(--border-strong);
+}
+.wsr-bi .trace-waterfall-column-head {
+  display: flex;
+  height: 2rem;
+  align-items: center;
   padding-inline: 0.85rem;
+  border-block-end: 1px solid var(--border-default);
+  color: var(--content-secondary);
+  font-size: var(--type-caption-size);
+  font-weight: 700;
+  text-transform: uppercase;
 }
-.wsr-bi .trace-timeline-head > .trace-ruler {
-  position: relative;
-  height: 100%;
-  padding: 0;
-}
-.wsr-bi .trace-ruler > i {
+.wsr-bi .trace-waterfall-label-rows {
   position: absolute;
-  inset-block-start: 50%;
-  color: var(--content-muted);
-  font: normal var(--type-caption-size) var(--type-code-family);
-  text-transform: none;
-  transform: translate(-50%, -50%);
-  white-space: nowrap;
+  inset-block-start: 0;
+  inset-inline: 0;
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
 }
-.wsr-bi .trace-ruler > i:first-child {
-  transform: translate(0, -50%);
+.wsr-bi .trace-waterfall-scroll-viewport {
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
 }
-.wsr-bi .trace-ruler > i:last-child {
-  transform: translate(-100%, -50%);
+.wsr-bi .trace-waterfall-scroll-space {
+  position: relative;
+  min-width: 0;
+}
+.wsr-bi .trace-waterfall-row {
+  display: flex;
+  height: 3rem;
+  min-height: 3rem;
+  align-items: stretch;
+  cursor: pointer;
 }
 .wsr-bi .trace-node-label {
-  display: grid;
-  grid-template-columns: auto 1.25rem minmax(0, 1fr) auto;
+  display: flex;
+  width: 100%;
   align-items: stretch;
   gap: 0.3rem;
   min-width: 0;
   padding: 0 0.65rem 0 0;
 }
-.wsr-bi .trace-indent-spacer {
+.wsr-bi .trace-indent-items {
+  display: flex;
+  flex: 0 0 auto;
   align-self: stretch;
-  width: calc(var(--trace-indent-columns) * (0.65rem + 1px));
 }
-.wsr-bi .trace-indent-segment {
-  z-index: 3;
-  grid-column: 1;
-  align-self: stretch;
-  justify-self: start;
+.wsr-bi .trace-indent-item {
+  --trace-indent-color: var(--wsr-trace-indent-0, var(--content-muted));
+  display: block;
   width: 0.65rem;
-  margin-inline-start: calc(var(--trace-indent-column) * (0.65rem + 1px));
-  border-inline-start: 2px solid var(--wsr-trace-indent-0, var(--content-muted));
-  background: color-mix(
-    in srgb,
-    var(--wsr-trace-indent-0, var(--content-muted)) 12%,
-    transparent
-  );
-  pointer-events: none;
+  background: color-mix(in srgb, var(--trace-indent-color) 24%, transparent);
 }
-.wsr-bi .trace-indent-segment[data-guide-depth="1"] {
-  border-color: var(--wsr-trace-indent-1, var(--status-available));
-  background: color-mix(
-    in srgb,
-    var(--wsr-trace-indent-1, var(--status-available)) 12%,
-    transparent
-  );
+.wsr-bi .trace-indent-item[data-guide-depth="1"] {
+  --trace-indent-color: var(--wsr-trace-indent-1, var(--status-available));
 }
-.wsr-bi .trace-indent-segment[data-guide-depth="2"] {
-  border-color: var(--wsr-trace-indent-2, var(--status-warning));
-  background: color-mix(
-    in srgb,
-    var(--wsr-trace-indent-2, var(--status-warning)) 12%,
-    transparent
-  );
+.wsr-bi .trace-indent-item[data-guide-depth="2"] {
+  --trace-indent-color: var(--wsr-trace-indent-2, var(--status-warning));
 }
-.wsr-bi .trace-indent-segment[data-guide-depth="3"] {
-  border-color: var(--wsr-trace-indent-3, var(--status-error));
-  background: color-mix(
-    in srgb,
-    var(--wsr-trace-indent-3, var(--status-error)) 12%,
-    transparent
-  );
+.wsr-bi .trace-indent-item[data-guide-depth="3"] {
+  --trace-indent-color: var(--wsr-trace-indent-3, var(--status-error));
 }
 .wsr-bi .trace-collapse-control,
 .wsr-bi .trace-collapse-placeholder {
@@ -1521,6 +1570,7 @@
 .wsr-bi .trace-view .trace-node-main {
   display: grid;
   min-width: 0;
+  flex: 1 1 auto;
   align-content: center;
   gap: 0.15rem;
   padding: 0;
@@ -1563,37 +1613,157 @@
 .wsr-bi .trace-waterfall-row.is-selected {
   background: var(--interaction-selection);
 }
-.wsr-bi .trace-waterfall-row .trace-timeline-track {
-  border: 0;
-  border-radius: 0;
-  background-color: transparent;
-  background-image: none;
+.wsr-bi .trace-waterfall-chart {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  background: var(--surface-inset);
 }
-.wsr-bi .trace-timeline {
-  display: grid;
-  position: relative;
-  grid-auto-rows: minmax(3rem, auto);
-  gap: 0;
+.wsr-bi .trace-waterfall-axis-line,
+.wsr-bi .trace-waterfall-gridline {
+  stroke: var(--border-strong);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
 }
-.wsr-bi .trace-timeline-grid {
-  position: absolute;
-  z-index: 1;
-  inset-block: 0;
-  inset-inline: 19rem 0;
-  border-inline-start: 1px solid var(--border-strong);
-  border-inline-end: 1px solid var(--border-strong);
-  background-image: linear-gradient(
-    90deg,
-    var(--border-strong) 0 1px,
-    transparent 1px
-  );
-  background-repeat: repeat-x;
-  background-size: 25% 100%;
-  opacity: 0.72;
+.wsr-bi .trace-waterfall-gridline {
+  opacity: 0.64;
+}
+.wsr-bi .trace-waterfall-axis-tick {
   pointer-events: none;
 }
-.wsr-bi .trace-timeline-bar {
-  z-index: 2;
+.wsr-bi .trace-waterfall-axis-tick text {
+  fill: var(--content-muted);
+  font: normal var(--type-caption-size) var(--type-code-family);
+}
+.wsr-bi .trace-waterfall-lane {
+  cursor: pointer;
+  outline: none;
+}
+.wsr-bi .trace-waterfall-lane-hit-target {
+  fill: transparent;
+}
+.wsr-bi
+  .trace-waterfall-lane[data-selected="true"]
+  .trace-waterfall-lane-hit-target {
+  fill: var(--interaction-selection);
+}
+.wsr-bi .trace-waterfall-lane:focus-visible .trace-waterfall-lane-hit-target {
+  stroke: var(--focus-ring);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+.wsr-bi .trace-waterfall-chart .trace-timeline-bar {
+  --trace-waterfall-color: var(--wsr-waterfall-color-0);
+  fill: color-mix(
+    in srgb,
+    var(--trace-waterfall-color) 45%,
+    var(--surface-panel)
+  );
+  stroke: var(--trace-waterfall-color);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+.wsr-bi .trace-waterfall-chart .trace-timeline-bar[data-color-index="1"] {
+  --trace-waterfall-color: var(--wsr-waterfall-color-1);
+}
+.wsr-bi .trace-waterfall-chart .trace-timeline-bar[data-color-index="2"] {
+  --trace-waterfall-color: var(--wsr-waterfall-color-2);
+}
+.wsr-bi .trace-waterfall-chart .trace-timeline-bar[data-color-index="3"] {
+  --trace-waterfall-color: var(--wsr-waterfall-color-3);
+}
+.wsr-bi .trace-waterfall-chart .trace-timeline-bar.trace-status-error {
+  fill: color-mix(in srgb, var(--status-error) 35%, var(--surface-panel));
+  stroke: var(--status-error);
+}
+.wsr-bi .trace-waterfall-lane[data-selected="true"] .trace-timeline-bar {
+  stroke-width: 2;
+}
+.wsr-bi .trace-waterfall-chart .trace-timeline-label {
+  fill: var(--content-primary);
+  font-size: var(--type-label-size);
+  font-weight: 650;
+  pointer-events: none;
+}
+.wsr-bi
+  :is(.trace-waterfall-timeline, .trace-timeline-label)[data-motion-phase] {
+  animation-duration: 280ms;
+  animation-fill-mode: both;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.wsr-bi
+  :is(
+    .trace-waterfall-timeline,
+    .trace-timeline-label
+  )[data-motion-phase="enter"][data-motion-direction="right"] {
+  animation-name: trace-timeline-enter-right;
+}
+.wsr-bi
+  :is(
+    .trace-waterfall-timeline,
+    .trace-timeline-label
+  )[data-motion-phase="enter"][data-motion-direction="left"] {
+  animation-name: trace-timeline-enter-left;
+}
+.wsr-bi
+  :is(
+    .trace-waterfall-timeline,
+    .trace-timeline-label
+  )[data-motion-phase="exit"][data-motion-direction="right"] {
+  animation-name: trace-timeline-exit-right;
+}
+.wsr-bi
+  :is(
+    .trace-waterfall-timeline,
+    .trace-timeline-label
+  )[data-motion-phase="exit"][data-motion-direction="left"] {
+  animation-name: trace-timeline-exit-left;
+}
+.wsr-bi[data-motion="off"]
+  :is(.trace-waterfall-timeline, .trace-timeline-label) {
+  animation: none;
+}
+@keyframes trace-timeline-enter-right {
+  from {
+    opacity: 0;
+    transform: translateX(-1.5rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+@keyframes trace-timeline-enter-left {
+  from {
+    opacity: 0;
+    transform: translateX(1.5rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+@keyframes trace-timeline-exit-right {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(1.5rem);
+  }
+}
+@keyframes trace-timeline-exit-left {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(-1.5rem);
+  }
 }
 .wsr-bi .trace-node-label > .numeric-exact,
 .wsr-bi .trace-node-label > .trace-error {

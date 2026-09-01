@@ -161,7 +161,7 @@ function BenchmarkHarness() {
           interactionFrame += 1;
           if (interactionFrame % 30 === 0) {
             const selectable = document.querySelectorAll<Element>(
-              "[data-trace-renderer] [data-trace-node-id]",
+              '[data-testid="trace-waterfall-node"], [data-testid="trace-tree-node"]',
             );
             selectable[interactionFrame % selectable.length]?.dispatchEvent(
               new MouseEvent("click", { bubbles: true }),

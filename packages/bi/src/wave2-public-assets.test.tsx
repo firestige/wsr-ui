@@ -49,6 +49,12 @@ describe("Wave 2 public reusable BI assets", () => {
         "var(--host-depth-2)",
         "var(--host-depth-3)",
       ],
+      waterfallColors: [
+        "var(--host-waterfall-0)",
+        "var(--host-waterfall-1)",
+        "var(--host-waterfall-2)",
+        "var(--host-waterfall-3)",
+      ],
     });
 
     render(
@@ -71,6 +77,18 @@ describe("Wave 2 public reusable BI assets", () => {
     expect(surface).toHaveStyle("--wsr-trace-indent-1: var(--host-depth-1)");
     expect(surface).toHaveStyle("--wsr-trace-indent-2: var(--host-depth-2)");
     expect(surface).toHaveStyle("--wsr-trace-indent-3: var(--host-depth-3)");
+    expect(surface).toHaveStyle(
+      "--wsr-waterfall-color-0: var(--host-waterfall-0)",
+    );
+    expect(surface).toHaveStyle(
+      "--wsr-waterfall-color-1: var(--host-waterfall-1)",
+    );
+    expect(surface).toHaveStyle(
+      "--wsr-waterfall-color-2: var(--host-waterfall-2)",
+    );
+    expect(surface).toHaveStyle(
+      "--wsr-waterfall-color-3: var(--host-waterfall-3)",
+    );
     expect(
       screen.getByRole("region", { name: "Evaluation metrics" }),
     ).toContainElement(screen.getByText("Metric content"));

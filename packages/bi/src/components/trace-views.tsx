@@ -1,11 +1,12 @@
+import { scaleLinear } from "d3";
 import {
   memo,
   useCallback,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
-  type CSSProperties,
   type ReactNode,
 } from "react";
 
@@ -47,57 +48,12 @@ function displayRecordedStart(value: string): string {
   return new Date(Number(milliseconds)).toISOString().slice(11, 23);
 }
 
-function viewportGeometry(
-  start: number,
-  width: number,
-  viewportStart: number,
-  viewportEnd: number,
-) {
-  const clippedStart = Math.max(start, viewportStart);
-  const clippedEnd = Math.min(start + width, viewportEnd);
-  const viewportWidth = viewportEnd - viewportStart;
-  if (clippedEnd <= clippedStart || viewportWidth <= 0)
-    return { visible: false, start: 0, width: 0 };
-  return {
-    visible: true,
-    start: ((clippedStart - viewportStart) / viewportWidth) * 100,
-    width: ((clippedEnd - clippedStart) / viewportWidth) * 100,
-  };
-}
-
 function compactIdentity(value: string): string {
   return value.length <= 12 ? value : `${value.slice(0, 8)}…${value.slice(-4)}`;
 }
 
 function nodeChildren(trace: TraceView, node: TraceViewNode): TraceViewNode[] {
   return trace.nodes.filter((candidate) => candidate.parentId === node.id);
-}
-
-function indentSegments(nodes: TraceViewNode[]) {
-  const visibleIds = new Set(nodes.map(({ id }) => id));
-  const segments: Array<{
-    depth: number;
-    start: number;
-    end: number;
-    key: string;
-  }> = [];
-  nodes.forEach((node, start) => {
-    let end = start;
-    while (end + 1 < nodes.length && nodes[end + 1]!.depth > node.depth)
-      end += 1;
-    if (node.parentId === undefined || !visibleIds.has(node.parentId)) {
-      segments.push({ depth: node.depth, start, end, key: `${node.id}:root` });
-    }
-    if (end > start) {
-      segments.push({
-        depth: node.depth + 1,
-        start: start + 1,
-        end,
-        key: `${node.id}:children`,
-      });
-    }
-  });
-  return segments;
 }
 
 function useNarrowTraceView(): boolean {
@@ -114,6 +70,94 @@ function useNarrowTraceView(): boolean {
     return () => media.removeEventListener("change", update);
   }, []);
   return narrow;
+}
+
+const waterfallAxisHeight = 32;
+const waterfallRowHeight = 48;
+const waterfallFallbackWidth = 800;
+const waterfallViewportHeight = 384;
+const waterfallVirtualOverscan = 3;
+const waterfallAxisLabelGap = 6;
+const waterfallAxisLabelCharacterWidth = 7;
+const waterfallTimelineLabelPadding = 6;
+const waterfallTimelineLabelCharacterWidth = 7;
+const waterfallTimelineMotionDuration = 280;
+
+type TimelineMotionDirection = "left" | "right";
+type TimelineMotion = {
+  direction: TimelineMotionDirection;
+  phase: "enter" | "exit";
+  width: number;
+  x: number;
+};
+
+function waterfallAxisLabelFits(
+  label: string,
+  tickX: number,
+  availableUntilX: number,
+) {
+  return (
+    availableUntilX - tickX >=
+    waterfallAxisLabelGap + label.length * waterfallAxisLabelCharacterWidth
+  );
+}
+
+function truncateWaterfallTimelineLabel(label: string, width: number) {
+  const available = Math.max(0, width - waterfallTimelineLabelPadding * 2);
+  const visibleCharacters = Math.floor(
+    available / waterfallTimelineLabelCharacterWidth,
+  );
+  if (label.length <= visibleCharacters) return label;
+  if (visibleCharacters <= 0) return "";
+  if (visibleCharacters === 1) return "…";
+  return `${label.slice(0, visibleCharacters - 1)}…`;
+}
+
+function timelineGeometryAtZoom(
+  node: TraceViewNode,
+  durationNano: number,
+  zoom: [number, number],
+  chartWidth: number,
+) {
+  const domainStart = (durationNano * zoom[0]) / 100;
+  const domainEnd = (durationNano * zoom[1]) / 100;
+  const nodeStart = Number(node.startOffsetNano);
+  const nodeEnd = nodeStart + Number(node.durationNano);
+  const clippedStart = Math.max(nodeStart, domainStart);
+  const clippedEnd = Math.min(nodeEnd, domainEnd);
+  const visible = clippedEnd > clippedStart && domainEnd > domainStart;
+  const scale = scaleLinear([domainStart, domainEnd], [0, chartWidth]);
+  const x = visible ? scale(clippedStart) : 0;
+  return {
+    visible,
+    width: visible ? Math.max(1, scale(clippedEnd) - x) : 0,
+    x,
+  };
+}
+
+function minimapStrokeWidth(spanCount: number) {
+  if (spanCount > 32) return 0.5;
+  if (spanCount > 16) return 1;
+  return 2;
+}
+
+function useMeasuredWidth<T extends Element>(fallback: number) {
+  const ref = useRef<T | null>(null);
+  const [width, setWidth] = useState(fallback);
+  useEffect(() => {
+    const element = ref.current;
+    if (element === null) return undefined;
+    const update = () => {
+      const measured = element.getBoundingClientRect().width;
+      if (measured > 0) setWidth(measured);
+    };
+    update();
+    if (typeof ResizeObserver !== "function") return undefined;
+    const observer = new ResizeObserver(update);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+  return [ref, width] as const;
 }
 
 export function SpanPassport({
@@ -137,7 +181,11 @@ export function SpanPassport({
             link.from.span_id === node.id || link.to.span_id === node.id,
         );
   return (
-    <section aria-label="Span passport" className="span-passport">
+    <section
+      aria-label="Span passport"
+      className="span-passport"
+      data-testid="span-passport"
+    >
       <header className="trace-passport-head">
         <strong>Span Passport</strong>
         <span>Exact focus</span>
@@ -281,53 +329,51 @@ function TraceMotion({
   );
 }
 
-const WaterfallRow = memo(function WaterfallRow({
+const WaterfallLabelRow = memo(function WaterfallLabelRow({
   node,
   selected,
-  current,
-  playing,
-  start,
-  width,
-  visible,
-  row,
   hasChildren,
   collapsed,
   onToggle,
   onSelect,
+  positionInSet,
+  setSize,
 }: {
   node: TraceViewNode;
   selected: boolean;
-  current: boolean;
-  playing: boolean;
-  start: number;
-  width: number;
-  visible: boolean;
-  row: number;
   hasChildren: boolean;
   collapsed: boolean;
   onToggle(id: string): void;
   onSelect(id: string): void;
+  positionInSet: number;
+  setSize: number;
 }) {
   return (
     <div
       aria-level={node.depth + 1}
-      className={`trace-waterfall-row${selected ? " is-selected" : ""}${current && playing ? " is-current" : ""}`}
+      aria-posinset={positionInSet}
+      aria-selected={selected}
+      aria-setsize={setSize}
+      className={`trace-waterfall-row${selected ? " is-selected" : ""}`}
+      data-testid="trace-waterfall-row"
       data-timeline-span-id={node.id}
+      data-trace-node-id={node.id}
+      data-virtual-row={positionInSet - 1}
+      onClick={() => onSelect(node.id)}
       role="treeitem"
-      style={{ gridRow: row }}
     >
       <div className="trace-node-label">
-        <span
-          aria-hidden="true"
-          className="trace-indent-spacer"
-          data-indent-depth={node.depth + 1}
-          style={{ "--trace-indent-columns": node.depth + 1 } as CSSProperties}
-        />
         {hasChildren ? (
           <button
             aria-label={`${collapsed ? "Expand" : "Collapse"} ${node.label} descendants`}
             className="trace-collapse-control"
-            onClick={() => onToggle(node.id)}
+            data-testid="trace-waterfall-collapse"
+            data-trace-node-id={node.id}
+            onClick={(event) => {
+              event.stopPropagation();
+              onSelect(node.id);
+              onToggle(node.id);
+            }}
             type="button"
           >
             {collapsed ? "▸" : "▾"}
@@ -335,11 +381,31 @@ const WaterfallRow = memo(function WaterfallRow({
         ) : (
           <span aria-hidden="true" className="trace-collapse-placeholder" />
         )}
+        <span
+          aria-hidden="true"
+          className="trace-indent-items"
+          data-indent-depth={node.depth}
+        >
+          {Array.from({ length: node.depth }, (_, depth) => (
+            <i
+              className="trace-indent-item"
+              data-guide-depth={depth % 4}
+              data-guide-owner-id={node.id}
+              data-testid="trace-waterfall-indent-guide"
+              data-trace-depth={depth}
+              key={`${node.id}:indent:${depth}`}
+            />
+          ))}
+        </span>
         <button
           aria-label={`${node.label}, ${node.durationNano} nanoseconds`}
           className="recorded-node trace-node-main"
+          data-testid="trace-waterfall-node"
           data-trace-node-id={node.id}
-          onClick={() => onSelect(node.id)}
+          onClick={(event) => {
+            event.stopPropagation();
+            onSelect(node.id);
+          }}
           type="button"
         >
           <span className="trace-node-title-line">
@@ -358,18 +424,6 @@ const WaterfallRow = memo(function WaterfallRow({
           {displayNano(node.durationNano)}
         </span>
       </div>
-      <div aria-hidden="true" className="trace-timeline-track">
-        <span
-          className={`trace-timeline-bar trace-kind-${node.kind.toLowerCase()}${node.status === "ERROR" ? " trace-status-error" : ""}`}
-          style={{
-            display: visible ? undefined : "none",
-            insetInlineStart: `${start}%`,
-            width: `${width}%`,
-          }}
-        >
-          {node.label}
-        </span>
-      </div>
     </div>
   );
 });
@@ -385,28 +439,42 @@ export function TraceWaterfall({
 }) {
   const [selectedId, setSelectedId] = useState<string>();
   const [query, setQuery] = useState("");
-  const [position, setPosition] = useState(0);
-  const [playing, setPlaying] = useState(false);
+  const [waterfallScrollTop, setWaterfallScrollTop] = useState(0);
   const [collapsedIds, setCollapsedIds] = useState<Set<string>>(
     () => new Set(),
   );
   const [zoom, setZoom] = useState<[number, number]>([0, 100]);
-  const dragStart = useRef<number | undefined>(undefined);
+  const zoomValue = useRef<[number, number]>([0, 100]);
+  const [timelineMotions, setTimelineMotions] = useState(
+    () => new Map<string, TimelineMotion>(),
+  );
+  const timelineMotionTimers = useRef(new Map<string, number>());
+  const timelineClipPrefix = useId().replace(/[^a-zA-Z0-9_-]/g, "");
+  const zoomDrag = useRef<
+    | { mode: "select"; anchor: number }
+    | {
+        mode: "move";
+        pointerStart: number;
+        zoomStart: [number, number];
+      }
+    | {
+        mode: "resize-left" | "resize-right";
+        zoomStart: [number, number];
+      }
+    | undefined
+  >(undefined);
   const narrow = useNarrowTraceView();
+  const [chartRef, chartWidth] = useMeasuredWidth<SVGSVGElement>(
+    waterfallFallbackWidth,
+  );
   const selectNode = useCallback((id: string) => setSelectedId(id), []);
-  useEffect(() => {
-    if (!playing || reducedMotion) return undefined;
-    const timer = window.setInterval(() => {
-      setPosition((current) => {
-        if (current >= 100) {
-          setPlaying(false);
-          return 100;
-        }
-        return Math.min(100, current + 2);
-      });
-    }, 100);
-    return () => window.clearInterval(timer);
-  }, [playing, reducedMotion]);
+  useEffect(
+    () => () => {
+      for (const timer of timelineMotionTimers.current.values())
+        window.clearTimeout(timer);
+    },
+    [],
+  );
   if (trace.status !== "READY" || trace.durationNano === undefined)
     return <InvalidTrace trace={trace} />;
   const normalized = query.trim().toLocaleLowerCase();
@@ -435,30 +503,164 @@ export function TraceWaterfall({
       .filter((node) => nodeChildren(trace, node).length > 0)
       .map(({ id }) => id),
   );
+  const applyZoom = (next: [number, number], animateMovement: boolean) => {
+    const previous = zoomValue.current;
+    if (animateMovement && next[0] !== previous[0] && !reducedMotion) {
+      const direction: TimelineMotionDirection =
+        next[0] < previous[0] ? "right" : "left";
+      const motionUpdates: Array<[string, TimelineMotion]> = [];
+      trace.nodes.forEach((node, row) => {
+        const before = timelineGeometryAtZoom(
+          node,
+          Number(trace.durationNano),
+          previous,
+          chartWidth,
+        );
+        const after = timelineGeometryAtZoom(
+          node,
+          Number(trace.durationNano),
+          next,
+          chartWidth,
+        );
+        if (before.visible === after.visible) return;
+        const phase = after.visible ? "enter" : "exit";
+        const geometry = phase === "enter" ? after : before;
+        motionUpdates.push([
+          node.id,
+          {
+            direction,
+            phase,
+            width: geometry.width,
+            x: geometry.x,
+          },
+        ]);
+        const activeTimer = timelineMotionTimers.current.get(node.id);
+        if (activeTimer !== undefined) window.clearTimeout(activeTimer);
+        const timer = window.setTimeout(
+          () => {
+            timelineMotionTimers.current.delete(node.id);
+            setTimelineMotions((current) => {
+              if (!current.has(node.id)) return current;
+              const updated = new Map(current);
+              updated.delete(node.id);
+              return updated;
+            });
+          },
+          waterfallTimelineMotionDuration + row * 18 + 80,
+        );
+        timelineMotionTimers.current.set(node.id, timer);
+      });
+      if (motionUpdates.length > 0)
+        setTimelineMotions((current) => {
+          const updated = new Map(current);
+          for (const [id, motion] of motionUpdates) updated.set(id, motion);
+          return updated;
+        });
+    }
+    zoomValue.current = next;
+    setZoom(next);
+  };
   const updateZoom = (
     event: React.PointerEvent<HTMLDivElement>,
     commit: boolean,
   ) => {
-    if (dragStart.current === undefined) return;
+    const drag = zoomDrag.current;
+    if (drag === undefined) return;
     const bounds = event.currentTarget.getBoundingClientRect();
     const current = Math.max(
       0,
       Math.min(100, ((event.clientX - bounds.left) / bounds.width) * 100),
     );
-    const next: [number, number] = [
-      Math.min(dragStart.current, current),
-      Math.max(dragStart.current, current),
-    ];
-    if (next[1] - next[0] >= 1) setZoom(next);
-    if (commit) dragStart.current = undefined;
+    if (drag.mode === "move") {
+      const width = drag.zoomStart[1] - drag.zoomStart[0];
+      const start = Math.max(
+        0,
+        Math.min(100 - width, drag.zoomStart[0] + current - drag.pointerStart),
+      );
+      applyZoom([start, start + width], true);
+    } else if (drag.mode === "resize-left") {
+      applyZoom(
+        [Math.min(current, drag.zoomStart[1] - 1), drag.zoomStart[1]],
+        false,
+      );
+    } else if (drag.mode === "resize-right") {
+      applyZoom(
+        [drag.zoomStart[0], Math.max(current, drag.zoomStart[0] + 1)],
+        false,
+      );
+    } else if (drag.mode === "select") {
+      const next: [number, number] = [
+        Math.min(drag.anchor, current),
+        Math.max(drag.anchor, current),
+      ];
+      if (next[1] - next[0] >= 1) applyZoom(next, false);
+    }
+    if (commit) zoomDrag.current = undefined;
   };
   const tickPercents = [0, 25, 50, 75, 100];
-  const guides = indentSegments(nodes);
+  const durationNano = Number(trace.durationNano);
+  const domainStart = (durationNano * zoom[0]) / 100;
+  const domainEnd = (durationNano * zoom[1]) / 100;
+  const timelineScale = scaleLinear([domainStart, domainEnd], [0, chartWidth]);
+  const timelineTicks = timelineScale.ticks(
+    Math.max(2, Math.floor(chartWidth / 96)),
+  );
+  const totalWaterfallHeight = nodes.length * waterfallRowHeight;
+  const waterfallBodyHeight = Math.min(
+    waterfallViewportHeight,
+    totalWaterfallHeight,
+  );
+  const effectiveScrollTop = Math.min(
+    waterfallScrollTop,
+    Math.max(0, totalWaterfallHeight - waterfallBodyHeight),
+  );
+  const visibleStart = Math.max(
+    0,
+    Math.floor(effectiveScrollTop / waterfallRowHeight) -
+      waterfallVirtualOverscan,
+  );
+  const visibleEnd = Math.min(
+    nodes.length,
+    Math.ceil((effectiveScrollTop + waterfallBodyHeight) / waterfallRowHeight) +
+      waterfallVirtualOverscan,
+  );
+  const virtualNodes = nodes
+    .slice(visibleStart, visibleEnd)
+    .map((node, row) => ({
+      node,
+      row: visibleStart + row,
+    }));
+  const chartHeight = waterfallAxisHeight + waterfallBodyHeight;
+  const timelineItems = virtualNodes.map(({ node, row }) => {
+    const geometry = timelineGeometryAtZoom(
+      node,
+      durationNano,
+      zoom,
+      chartWidth,
+    );
+    const motion = timelineMotions.get(node.id);
+    const displayedGeometry =
+      !geometry.visible && motion?.phase === "exit" ? motion : geometry;
+    return {
+      ...geometry,
+      displayedWidth: displayedGeometry.width,
+      displayedX: displayedGeometry.x,
+      label: truncateWaterfallTimelineLabel(
+        node.label,
+        displayedGeometry.width,
+      ),
+      motion,
+      node,
+      row,
+      y: waterfallAxisHeight + row * waterfallRowHeight - effectiveScrollTop,
+    };
+  });
   return (
     <section
       aria-label="Recorded trace waterfall"
       className="trace-view trace-waterfall"
-      data-motion={reducedMotion ? "off" : "finite-recorded-time"}
+      data-motion={reducedMotion ? "off" : "zoom-transition"}
+      data-testid="trace-waterfall"
       data-trace-renderer="waterfall"
     >
       {viewNavigation}
@@ -517,48 +719,126 @@ export function TraceWaterfall({
           aria-valuemin={0}
           aria-valuetext={`${displayNano(nanoAtPercent(trace.durationNano, zoom[0]))} to ${displayNano(nanoAtPercent(trace.durationNano, zoom[1]))}`}
           className="trace-minimap-track"
+          data-testid="trace-waterfall-data-zoom"
           onPointerDown={(event) => {
             const bounds = event.currentTarget.getBoundingClientRect();
-            dragStart.current = Math.max(
+            const pointerStart = Math.max(
               0,
               Math.min(
                 100,
                 ((event.clientX - bounds.left) / bounds.width) * 100,
               ),
             );
-            setZoom([dragStart.current, dragStart.current]);
+            const movingWindow =
+              event.target instanceof Element &&
+              event.target.closest(".trace-minimap-window") !== null;
+            const resizeHandle =
+              event.target instanceof Element
+                ? event.target.closest<HTMLElement>(
+                    ".trace-minimap-resize-handle",
+                  )
+                : null;
+            const resizeEdge = resizeHandle?.dataset.edge;
+            zoomDrag.current =
+              resizeEdge === "left" || resizeEdge === "right"
+                ? { mode: `resize-${resizeEdge}`, zoomStart: zoom }
+                : movingWindow
+                  ? { mode: "move", pointerStart, zoomStart: zoom }
+                  : { mode: "select", anchor: pointerStart };
+            if (!movingWindow) applyZoom([pointerStart, pointerStart], false);
+            event.currentTarget.setPointerCapture?.(event.pointerId);
           }}
           onPointerMove={(event) => updateZoom(event, false)}
           onPointerUp={(event) => updateZoom(event, true)}
           role="slider"
           tabIndex={0}
         >
-          {trace.nodes.map((node) => (
-            <i
-              className="trace-minimap-span"
-              key={node.id}
-              style={{
-                insetInlineStart: `${percentage(node.startOffsetNano, trace.durationNano!)}%`,
-                insetBlockStart: `${0.58 + node.depth * 0.42}rem`,
-                width: `${percentage(node.durationNano, trace.durationNano!)}%`,
-              }}
-            />
-          ))}
+          <span
+            aria-hidden="true"
+            className="trace-minimap-ruler"
+            data-testid="trace-waterfall-data-zoom-ruler"
+          >
+            {tickPercents.map((tick) => (
+              <span
+                data-time-percent={tick}
+                key={tick}
+                style={{ insetInlineStart: `${tick}%` }}
+              >
+                {displayNano(nanoAtPercent(trace.durationNano!, tick))}
+              </span>
+            ))}
+          </span>
+          <svg
+            aria-hidden="true"
+            className="trace-minimap-overview"
+            data-testid="trace-waterfall-minimap-overview"
+            preserveAspectRatio="none"
+            viewBox={`0 0 100 ${Math.max(1, trace.nodes.length)}`}
+          >
+            {trace.nodes.map((node, row) => {
+              const start = percentage(
+                node.startOffsetNano,
+                trace.durationNano!,
+              );
+              const end = Math.min(
+                100,
+                start + percentage(node.durationNano, trace.durationNano!),
+              );
+              const y = row + 0.5;
+              return (
+                <line
+                  className={`trace-minimap-span trace-kind-${node.kind.toLowerCase()}${node.status === "ERROR" ? " trace-status-error" : ""}`}
+                  data-color-index={node.depth % 4}
+                  data-minimap-row={row}
+                  data-testid="trace-waterfall-minimap-span"
+                  data-trace-node-id={node.id}
+                  key={node.id}
+                  strokeWidth={minimapStrokeWidth(trace.nodes.length)}
+                  x1={start}
+                  x2={end}
+                  y1={y}
+                  y2={y}
+                />
+              );
+            })}
+          </svg>
           <span
             className="trace-minimap-window"
             data-full={zoom[0] === 0 && zoom[1] === 100 ? "true" : "false"}
+            data-testid="trace-waterfall-data-zoom-window"
             style={{
               insetInlineStart: `${zoom[0]}%`,
               width: `${zoom[1] - zoom[0]}%`,
             }}
-          />
+          >
+            <span
+              aria-label="Resize trace zoom start"
+              className="trace-minimap-resize-handle"
+              data-edge="left"
+              data-testid="trace-waterfall-data-zoom-handle-left"
+              role="separator"
+              tabIndex={0}
+            />
+            <span
+              aria-label="Resize trace zoom end"
+              className="trace-minimap-resize-handle"
+              data-edge="right"
+              data-testid="trace-waterfall-data-zoom-handle-right"
+              role="separator"
+              tabIndex={0}
+            />
+          </span>
         </div>
       </section>
       <div className="trace-workbench">
         {narrow ? (
           <section className="trace-waterfall-mobile">
             <header>Span tree · exact duration</header>
-            <div aria-label="Recorded waterfall span outline" role="tree">
+            <div
+              aria-label="Recorded waterfall span outline"
+              data-testid="trace-waterfall-span-tree"
+              role="tree"
+            >
               {nodes.map((node) => (
                 <TreeOutlineRow
                   key={node.id}
@@ -613,7 +893,8 @@ export function TraceWaterfall({
                   aria-label="Reset focus"
                   onClick={() => {
                     setSelectedId(trace.nodes[0]?.id);
-                    setZoom([0, 100]);
+                    setTimelineMotions(new Map());
+                    applyZoom([0, 100], false);
                   }}
                   type="button"
                 >
@@ -623,94 +904,241 @@ export function TraceWaterfall({
                 </IconButton>
               </ButtonGroup>
             </header>
-            <div className="trace-timeline-head">
-              <span>Span / exact identity</span>
-              <span className="trace-ruler">
-                {tickPercents.map((tick) => {
-                  const domainPercent =
-                    zoom[0] + ((zoom[1] - zoom[0]) * tick) / 100;
+            <div className="trace-waterfall-table">
+              <div className="trace-waterfall-label-pane">
+                <div className="trace-waterfall-column-head">
+                  Span / exact identity
+                </div>
+                <div
+                  className="trace-waterfall-scroll-viewport"
+                  data-testid="trace-waterfall-scroll-viewport"
+                  data-total-rows={nodes.length}
+                  data-virtual-end={visibleEnd}
+                  data-virtual-start={visibleStart}
+                  onScroll={(event) =>
+                    setWaterfallScrollTop(event.currentTarget.scrollTop)
+                  }
+                  style={{ height: waterfallBodyHeight }}
+                >
+                  <div
+                    className="trace-waterfall-scroll-space"
+                    style={{ height: totalWaterfallHeight }}
+                  >
+                    <div
+                      aria-label="Recorded waterfall span outline"
+                      className="trace-waterfall-label-rows"
+                      data-testid="trace-waterfall-span-tree"
+                      role="tree"
+                      style={{
+                        transform: `translateY(${visibleStart * waterfallRowHeight}px)`,
+                      }}
+                    >
+                      {virtualNodes.map(({ node, row }) => {
+                        return (
+                          <WaterfallLabelRow
+                            collapsed={collapsedIds.has(node.id)}
+                            hasChildren={nodesWithChildren.has(node.id)}
+                            key={node.id}
+                            node={node}
+                            onSelect={selectNode}
+                            onToggle={(id) =>
+                              setCollapsedIds((current) => {
+                                const next = new Set(current);
+                                if (next.has(id)) next.delete(id);
+                                else next.add(id);
+                                return next;
+                              })
+                            }
+                            positionInSet={row + 1}
+                            selected={selected.id === node.id}
+                            setSize={nodes.length}
+                          />
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <svg
+                aria-label="Recorded waterfall timeline chart"
+                className="trace-waterfall-chart"
+                data-total-rows={nodes.length}
+                data-testid="trace-waterfall-chart"
+                data-virtual-end={visibleEnd}
+                data-virtual-start={visibleStart}
+                height={chartHeight}
+                ref={chartRef}
+                role="img"
+                width="100%"
+              >
+                <defs>
+                  {timelineItems.map(
+                    ({ displayedWidth, displayedX, node, row, y }) => (
+                      <clipPath
+                        id={`${timelineClipPrefix}-timeline-label-${row}`}
+                        key={`${node.id}:label-clip`}
+                      >
+                        <rect
+                          height={18}
+                          rx={4}
+                          width={displayedWidth}
+                          x={displayedX}
+                          y={y + 15}
+                        />
+                      </clipPath>
+                    ),
+                  )}
+                </defs>
+                <line
+                  className="trace-waterfall-axis-line"
+                  x1={0}
+                  x2={chartWidth}
+                  y1={waterfallAxisHeight - 1}
+                  y2={waterfallAxisHeight - 1}
+                />
+                {timelineItems.map(
+                  ({
+                    displayedWidth,
+                    displayedX,
+                    motion,
+                    node,
+                    row,
+                    visible,
+                    y,
+                  }) => {
+                    const isSelected = selected.id === node.id;
+                    return (
+                      <g
+                        aria-label={`${node.label}, ${displayNano(node.durationNano)}`}
+                        aria-pressed={isSelected}
+                        className="trace-waterfall-lane"
+                        data-selected={isSelected}
+                        data-testid="trace-waterfall-lane"
+                        data-trace-node-id={node.id}
+                        data-virtual-row={row}
+                        key={node.id}
+                        onClick={() => selectNode(node.id)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault();
+                            selectNode(node.id);
+                          }
+                        }}
+                        role="button"
+                        tabIndex={0}
+                      >
+                        <rect
+                          className="trace-waterfall-lane-hit-target"
+                          height={waterfallRowHeight}
+                          width={chartWidth}
+                          x={0}
+                          y={y}
+                        />
+                        <g
+                          className="trace-waterfall-timeline"
+                          data-motion-direction={motion?.direction}
+                          data-motion-phase={motion?.phase}
+                          data-testid="trace-waterfall-timeline"
+                          data-trace-node-id={node.id}
+                          data-visible={visible}
+                          style={{
+                            animationDelay: `${(row - visibleStart) * 18}ms`,
+                          }}
+                        >
+                          <rect
+                            className={`trace-timeline-bar trace-kind-${node.kind.toLowerCase()}${node.status === "ERROR" ? " trace-status-error" : ""}`}
+                            data-color-index={node.depth % 4}
+                            data-testid="trace-waterfall-bar"
+                            data-trace-node-id={node.id}
+                            height={18}
+                            rx={4}
+                            width={displayedWidth}
+                            x={displayedX}
+                            y={y + 15}
+                          >
+                            <title>{node.label}</title>
+                          </rect>
+                        </g>
+                      </g>
+                    );
+                  },
+                )}
+                {timelineTicks.map((tick, index) => {
+                  const x = timelineScale(tick);
+                  const label = displayNano(String(Math.round(tick)));
+                  const nextTick = timelineTicks[index + 1];
+                  const availableUntilX =
+                    nextTick === undefined
+                      ? chartWidth
+                      : timelineScale(nextTick);
+                  const showLabel = waterfallAxisLabelFits(
+                    label,
+                    x,
+                    availableUntilX,
+                  );
                   return (
-                    <i key={tick} style={{ insetInlineStart: `${tick}%` }}>
-                      {displayNano(
-                        nanoAtPercent(trace.durationNano!, domainPercent),
-                      )}
-                    </i>
+                    <g
+                      className="trace-waterfall-axis-tick"
+                      data-testid="trace-waterfall-axis-tick"
+                      key={tick}
+                      transform={`translate(${x} 0)`}
+                    >
+                      <line
+                        className="trace-waterfall-gridline"
+                        y1={0}
+                        y2={chartHeight}
+                      />
+                      {showLabel ? (
+                        <text
+                          textAnchor="start"
+                          x={waterfallAxisLabelGap}
+                          y={waterfallAxisHeight - 10}
+                        >
+                          {label}
+                        </text>
+                      ) : null}
+                    </g>
                   );
                 })}
-              </span>
-            </div>
-            <div
-              aria-label="Recorded waterfall span outline"
-              className="trace-timeline"
-              role="tree"
-            >
-              <div aria-hidden="true" className="trace-timeline-grid" />
-              {guides.map((guide) => (
-                <i
-                  aria-hidden="true"
-                  className="trace-indent-segment"
-                  data-guide-depth={guide.depth % 4}
-                  key={guide.key}
-                  style={
-                    {
-                      "--trace-indent-column": guide.depth,
-                      gridRow: `${guide.start + 1} / ${guide.end + 2}`,
-                    } as CSSProperties
-                  }
-                />
-              ))}
-              {nodes.map((node, row) => {
-                const start = percentage(
-                  node.startOffsetNano,
-                  trace.durationNano!,
-                );
-                const end =
-                  start + percentage(node.durationNano, trace.durationNano!);
-                const geometry = viewportGeometry(
-                  start,
-                  percentage(node.durationNano, trace.durationNano!),
-                  zoom[0],
-                  zoom[1],
-                );
-                return (
-                  <WaterfallRow
-                    collapsed={collapsedIds.has(node.id)}
-                    current={position >= start && position <= end}
-                    hasChildren={nodesWithChildren.has(node.id)}
-                    key={node.id}
-                    node={node}
-                    onSelect={selectNode}
-                    onToggle={(id) =>
-                      setCollapsedIds((current) => {
-                        const next = new Set(current);
-                        if (next.has(id)) next.delete(id);
-                        else next.add(id);
-                        return next;
-                      })
-                    }
-                    playing={playing}
-                    row={row + 1}
-                    selected={selected.id === node.id}
-                    start={geometry.start}
-                    width={geometry.width}
-                    visible={geometry.visible}
-                  />
-                );
-              })}
+                {timelineItems.map(
+                  ({
+                    displayedWidth,
+                    displayedX,
+                    label,
+                    motion,
+                    node,
+                    row,
+                    y,
+                  }) => {
+                    if (displayedWidth <= 0) return null;
+                    return (
+                      <text
+                        clipPath={`url(#${timelineClipPrefix}-timeline-label-${row})`}
+                        className="trace-timeline-label"
+                        data-motion-direction={motion?.direction}
+                        data-motion-phase={motion?.phase}
+                        data-testid="trace-waterfall-label"
+                        data-trace-node-id={node.id}
+                        dominantBaseline="middle"
+                        key={`${node.id}:label`}
+                        style={{
+                          animationDelay: `${(row - visibleStart) * 18}ms`,
+                        }}
+                        x={displayedX + waterfallTimelineLabelPadding}
+                        y={y + waterfallRowHeight / 2}
+                      >
+                        {label}
+                      </text>
+                    );
+                  },
+                )}
+              </svg>
             </div>
             <RecordedLinks trace={trace} />
           </section>
         )}
         <SpanPassport node={selected} trace={trace} />
       </div>
-      <TraceMotion
-        durationNano={trace.durationNano}
-        onPlayingChange={setPlaying}
-        onPositionChange={setPosition}
-        playing={playing}
-        position={position}
-        reducedMotion={reducedMotion}
-      />
     </section>
   );
 }
@@ -784,6 +1212,7 @@ const TreeNodeGlyph = memo(function TreeNodeGlyph({
       aria-level={node.depth + 1}
       className={`trace-tree-node trace-kind-${node.kind.toLowerCase()}${selected ? " is-selected" : ""}${lensHit ? " is-lens-hit" : " is-lens-muted"}${current && playing ? " is-time-current" : ""}${node.status === "ERROR" ? " trace-status-error" : ""}`}
       data-render-detail={summary ? "summary" : "complete"}
+      data-testid="trace-tree-node"
       data-trace-node-id={node.id}
       onClick={select}
       onKeyDown={(event) => {
@@ -867,6 +1296,7 @@ const TreeOutlineRow = memo(function TreeOutlineRow({
       style={{ paddingInlineStart: `${node.depth * 1.5}rem` }}
     >
       <button
+        data-testid="trace-tree-node"
         data-trace-node-id={node.id}
         onClick={() => onSelect(node.id)}
         type="button"
@@ -957,6 +1387,7 @@ export const TraceTree = memo(function TraceTree({
       aria-label="Recorded trace tree"
       className="trace-view trace-tree-graph"
       data-lens={lens}
+      data-testid="trace-tree"
       data-trace-renderer="tree"
     >
       <section className="trace-tree-context">
@@ -1233,6 +1664,7 @@ export function TraceStatistics({
     <section
       aria-label="Recorded trace statistics"
       className="trace-view trace-statistics"
+      data-testid="trace-statistics"
       data-trace-renderer="statistics"
     >
       <header className="trace-statistics-intro">

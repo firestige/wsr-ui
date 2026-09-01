@@ -39,6 +39,14 @@ export function BiSurface({
                 "--wsr-trace-indent-2": theme.traceIndentGuides[2],
                 "--wsr-trace-indent-3": theme.traceIndentGuides[3],
               }),
+          ...(theme.waterfallColors === undefined
+            ? {}
+            : {
+                "--wsr-waterfall-color-0": theme.waterfallColors[0],
+                "--wsr-waterfall-color-1": theme.waterfallColors[1],
+                "--wsr-waterfall-color-2": theme.waterfallColors[2],
+                "--wsr-waterfall-color-3": theme.waterfallColors[3],
+              }),
         } as CSSProperties);
   return (
     <div

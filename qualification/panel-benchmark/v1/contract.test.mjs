@@ -32,8 +32,8 @@ test("Wave 2 performance targets the reusable metric, waterfall, and tree panels
     ),
     [
       'svg[role="img"]',
-      '[data-trace-renderer="waterfall"] [role="treeitem"]',
-      '[data-trace-renderer="tree"] [role="treeitem"]',
+      '[data-testid="trace-waterfall"] [data-testid="trace-waterfall-row"]',
+      '[data-testid="trace-tree"] [data-testid="trace-tree-node"]',
     ],
   );
 
@@ -41,7 +41,7 @@ test("Wave 2 performance targets the reusable metric, waterfall, and tree panels
     resolve(import.meta.dirname, "../../../packages/bi/src/benchmark-main.tsx"),
     "utf8",
   );
-  assert.match(harness, /\[data-trace-renderer\].*\[data-trace-node-id\]/s);
+  assert.match(harness, /trace-waterfall-node.*trace-tree-node/s);
   assert.doesNotMatch(harness, /\.recorded-node/);
 });
 
