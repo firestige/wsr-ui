@@ -467,6 +467,7 @@ const TreeNodeGlyph = memo(function TreeNodeGlyph({
   lensHit,
   current,
   playing,
+  summary,
   traceDurationNano,
   onSelect,
 }: GeometryNode & {
@@ -474,6 +475,7 @@ const TreeNodeGlyph = memo(function TreeNodeGlyph({
   lensHit: boolean;
   current: boolean;
   playing: boolean;
+  summary: boolean;
   traceDurationNano: string;
   onSelect(id: string): void;
 }) {
@@ -483,6 +485,7 @@ const TreeNodeGlyph = memo(function TreeNodeGlyph({
       aria-label={`${node.label}, ${node.kind}, ${node.status}, ${displayNano(node.durationNano)}`}
       aria-level={node.depth + 1}
       className={`trace-tree-node trace-kind-${node.kind.toLowerCase()}${selected ? " is-selected" : ""}${lensHit ? " is-lens-hit" : " is-lens-muted"}${current && playing ? " is-time-current" : ""}${node.status === "ERROR" ? " trace-status-error" : ""}`}
+      data-render-detail={summary ? "summary" : "complete"}
       data-trace-node-id={node.id}
       onClick={select}
       onKeyDown={(event) => {
@@ -497,6 +500,22 @@ const TreeNodeGlyph = memo(function TreeNodeGlyph({
     >
       <rect className="trace-tree-card" height="70" rx="9" width="190" />
       <rect className="trace-tree-kind-rail" height="70" rx="3" width="4" />
+      {summary ? (
+        <>
+          <text className="trace-tree-name" x="14" y="31">
+            {node.label}
+          </text>
+          <text
+            className="trace-tree-duration"
+            textAnchor="end"
+            x="176"
+            y="50"
+          >
+            {displayNano(node.durationNano)}
+          </text>
+        </>
+      ) : (
+        <>
       <text className="trace-tree-kind" x="14" y="17">
         {node.kind}
       </text>
@@ -533,6 +552,8 @@ const TreeNodeGlyph = memo(function TreeNodeGlyph({
         x={14 + percentage(node.startOffsetNano, traceDurationNano) * 1.6}
         y="61"
       />
+        </>
+      )}
     </g>
   );
 });
@@ -565,7 +586,7 @@ const TreeOutlineRow = memo(function TreeOutlineRow({
   );
 });
 
-export function TraceTree({
+export const TraceTree = memo(function TraceTree({
   trace,
   viewNavigation,
 }: {
@@ -822,6 +843,7 @@ export function TraceTree({
                     onSelect={selectNode}
                     playing={playing}
                     selected={selected.id === node.id}
+                    summary={coalescedParentGeometry}
                     traceDurationNano={duration}
                     x={x}
                     y={y}
@@ -869,7 +891,7 @@ export function TraceTree({
       />
     </section>
   );
-}
+});
 
 export function TraceStatistics({
   trace,

@@ -190,6 +190,9 @@ describe("recorded Trace business panels", () => {
     );
     expect(edges).toHaveLength(1);
     expect(edges[0]).toHaveAttribute("data-relationship-count", "129");
+    expect(
+      container.querySelectorAll('[data-render-detail="summary"]'),
+    ).toHaveLength(130);
   });
 
   it("disables finite recorded-time motion when reduced motion is requested", () => {
