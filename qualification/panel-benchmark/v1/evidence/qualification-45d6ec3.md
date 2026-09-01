@@ -78,7 +78,22 @@ rendered both an AVAILABLE ratio SVG and an UNAVAILABLE semantic state.
 
 ## Publication boundary
 
-Human approval covers publishing this exact prerelease coordinate. Registry
-authentication and Web 2FA must complete before publication. After publishing,
-registry resolution, version, integrity, and shasum must match this candidate;
-otherwise Wave 1 remains open.
+Human approval covered publishing this exact prerelease coordinate. npm Web
+authentication and the publish-specific Web 2FA challenge completed
+successfully.
+
+Post-publication registry verification:
+
+- Published package: `wsr-ui-core@0.1.0-rc.0`
+- Tarball: `https://registry.npmjs.org/wsr-ui-core/-/wsr-ui-core-0.1.0-rc.0.tgz`
+- Registry integrity: `sha512-jHK1jASNAw0WqNMrzgOK9KWZls/DiA7q8J2shE96/Gatb2mTw+lzG7UY+8rWuh1PWfyTFuvqnS3u/hVfyCrOBw==`
+- Registry shasum: `9cec13b79de92a207e2bcc21729516d742297739`
+- `next` dist-tag: `0.1.0-rc.0`
+- `latest` dist-tag: `0.1.0-rc.0`, automatically created by npm for this
+  first package publication; authenticated removal returned HTTP 400, so no
+  synthetic stable version was introduced to work around registry behavior.
+
+A new temporary consumer installed the exact version through normal registry
+resolution. Its lockfile resolved the registry tarball with the exact integrity
+above, selected React and React DOM `18.3.1`, rendered the AVAILABLE SVG and
+UNAVAILABLE semantic state, and did not render JSON as the primary surface.
