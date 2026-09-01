@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
 
 import type { TraceView, TraceViewNode } from "../domain/trace/trace-view";
 import { ScopedError } from "./status";
@@ -178,6 +178,61 @@ function TraceMotion({
   );
 }
 
+const WaterfallRow = memo(function WaterfallRow({
+  node,
+  selected,
+  current,
+  playing,
+  start,
+  width,
+  onSelect,
+}: {
+  node: TraceViewNode;
+  selected: boolean;
+  current: boolean;
+  playing: boolean;
+  start: number;
+  width: number;
+  onSelect(id: string): void;
+}) {
+  return (
+    <div
+      aria-level={node.depth + 1}
+      className={`trace-waterfall-row${selected ? " is-selected" : ""}${current && playing ? " is-current" : ""}`}
+      role="treeitem"
+    >
+      <button
+        aria-label={`${node.label}, ${node.durationNano} nanoseconds`}
+        className="recorded-node trace-node-label"
+        onClick={() => onSelect(node.id)}
+        style={{ paddingInlineStart: `${0.75 + node.depth * 1.15}rem` }}
+        type="button"
+      >
+        <span className={`trace-glyph trace-kind-${node.kind.toLowerCase()}`}>
+          {node.kind === "CLIENT" ? "↗" : "◆"}
+        </span>
+        <span className="trace-node-copy">
+          <strong>{node.label}</strong>
+          <small>{`${node.kind} · ${node.id}`}</small>
+        </span>
+        <span
+          className={node.status === "ERROR" ? "trace-error" : "numeric-exact"}
+        >
+          {displayNano(node.durationNano)}
+        </span>
+      </button>
+      <div aria-hidden="true" className="trace-timeline-track">
+        <span
+          className={`trace-timeline-bar trace-kind-${node.kind.toLowerCase()}${node.status === "ERROR" ? " trace-status-error" : ""}`}
+          style={{ insetInlineStart: `${start}%`, width: `${width}%` }}
+        >
+          {node.label}
+        </span>
+      </div>
+    </div>
+  );
+});
+
 export function TraceWaterfall({
   trace,
   reducedMotion = false,
@@ -189,6 +244,7 @@ export function TraceWaterfall({
   const [query, setQuery] = useState("");
   const [position, setPosition] = useState(0);
   const [playing, setPlaying] = useState(false);
+  const selectNode = useCallback((id: string) => setSelectedId(id), []);
   useEffect(() => {
     if (!playing || reducedMotion) return undefined;
     const timer = window.setInterval(() => {
@@ -280,54 +336,17 @@ export function TraceWaterfall({
               );
               const end =
                 start + percentage(node.durationNano, trace.durationNano!);
-              const current = position >= start && position <= end;
               return (
-                <div
-                  aria-level={node.depth + 1}
-                  className={`trace-waterfall-row${selected.id === node.id ? " is-selected" : ""}${current && playing ? " is-current" : ""}`}
+                <WaterfallRow
+                  current={position >= start && position <= end}
                   key={node.id}
-                  role="treeitem"
-                >
-                  <button
-                    aria-label={`${node.label}, ${node.durationNano} nanoseconds`}
-                    className="recorded-node trace-node-label"
-                    onClick={() => setSelectedId(node.id)}
-                    style={{
-                      paddingInlineStart: `${0.75 + node.depth * 1.15}rem`,
-                    }}
-                    type="button"
-                  >
-                    <span
-                      className={`trace-glyph trace-kind-${node.kind.toLowerCase()}`}
-                    >
-                      {node.kind === "CLIENT" ? "↗" : "◆"}
-                    </span>
-                    <span className="trace-node-copy">
-                      <strong>{node.label}</strong>
-                      <small>{`${node.kind} · ${node.id}`}</small>
-                    </span>
-                    <span
-                      className={
-                        node.status === "ERROR"
-                          ? "trace-error"
-                          : "numeric-exact"
-                      }
-                    >
-                      {displayNano(node.durationNano)}
-                    </span>
-                  </button>
-                  <div aria-hidden="true" className="trace-timeline-track">
-                    <span
-                      className={`trace-timeline-bar trace-kind-${node.kind.toLowerCase()}${node.status === "ERROR" ? " trace-status-error" : ""}`}
-                      style={{
-                        insetInlineStart: `${start}%`,
-                        width: `${percentage(node.durationNano, trace.durationNano!)}%`,
-                      }}
-                    >
-                      {node.label}
-                    </span>
-                  </div>
-                </div>
+                  node={node}
+                  onSelect={selectNode}
+                  playing={playing}
+                  selected={selected.id === node.id}
+                  start={start}
+                  width={percentage(node.durationNano, trace.durationNano!)}
+                />
               );
             })}
           </div>
@@ -384,8 +403,103 @@ function edgePath(from: GeometryNode, to: GeometryNode): string {
   return `M${startX} ${startY} C${middle} ${startY} ${middle} ${endY} ${endX} ${endY}`;
 }
 
+const TreeNodeGlyph = memo(function TreeNodeGlyph({
+  node,
+  x,
+  y,
+  selected,
+  traceDurationNano,
+  onSelect,
+}: GeometryNode & {
+  selected: boolean;
+  traceDurationNano: string;
+  onSelect(id: string): void;
+}) {
+  const select = () => onSelect(node.id);
+  return (
+    <g
+      aria-label={`${node.label}, ${node.kind}, ${node.status}, ${displayNano(node.durationNano)}`}
+      className={`trace-tree-node trace-kind-${node.kind.toLowerCase()}${selected ? " is-selected" : ""}${node.status === "ERROR" ? " trace-status-error" : ""}`}
+      onClick={select}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          select();
+        }
+      }}
+      role="button"
+      tabIndex={0}
+      transform={`translate(${x} ${y})`}
+    >
+      <rect className="trace-tree-card" height="70" rx="9" width="190" />
+      <rect className="trace-tree-kind-rail" height="70" rx="3" width="4" />
+      <text className="trace-tree-kind" x="14" y="17">
+        {node.kind}
+      </text>
+      <text className="trace-tree-status" textAnchor="end" x="176" y="17">
+        {node.status}
+      </text>
+      <text className="trace-tree-name" x="14" y="37">
+        {node.label}
+      </text>
+      <text
+        className="trace-tree-meta"
+        x="14"
+        y="53"
+      >{`+${displayNano(node.startOffsetNano)} · ${node.id}`}</text>
+      <text className="trace-tree-duration" textAnchor="end" x="176" y="53">
+        {displayNano(node.durationNano)}
+      </text>
+      <rect
+        className="trace-tree-micro-bg"
+        height="3"
+        rx="2"
+        width="160"
+        x="14"
+        y="61"
+      />
+      <rect
+        className="trace-tree-micro"
+        height="3"
+        rx="2"
+        width={Math.max(
+          2,
+          percentage(node.durationNano, traceDurationNano) * 1.6,
+        )}
+        x={14 + percentage(node.startOffsetNano, traceDurationNano) * 1.6}
+        y="61"
+      />
+    </g>
+  );
+});
+
+const TreeOutlineRow = memo(function TreeOutlineRow({
+  node,
+  trace,
+  onSelect,
+}: {
+  node: TraceViewNode;
+  trace: TraceView;
+  onSelect(id: string): void;
+}) {
+  return (
+    <div
+      aria-level={node.depth + 1}
+      role="treeitem"
+      style={{ paddingInlineStart: `${node.depth * 1.5}rem` }}
+    >
+      <button onClick={() => onSelect(node.id)} type="button">
+        <span>{node.label}</span>
+        <span>{displayNano(node.durationNano)}</span>
+      </button>
+      <RecordedLinks node={node} trace={trace} />
+    </div>
+  );
+});
+
 export function TraceTree({ trace }: { trace: TraceView }) {
   const [selectedId, setSelectedId] = useState<string>();
+  const selectNode = useCallback((id: string) => setSelectedId(id), []);
   const geometry = useMemo(
     () => (trace.status === "READY" ? treeGeometry(trace) : []),
     [trace],
@@ -394,6 +508,13 @@ export function TraceTree({ trace }: { trace: TraceView }) {
   const byId = new Map(geometry.map((item) => [item.node.id, item]));
   const selected =
     trace.nodes.find((node) => node.id === selectedId) ?? trace.nodes[0]!;
+  const parentPath = geometry
+    .flatMap((child) => {
+      if (child.node.parentId === undefined) return [];
+      const parent = byId.get(child.node.parentId);
+      return parent === undefined ? [] : [edgePath(parent, child)];
+    })
+    .join(" ");
   return (
     <section
       aria-label="Recorded trace tree"
@@ -437,20 +558,13 @@ export function TraceTree({ trace }: { trace: TraceView }) {
                   <path d="M0 0L8 4L0 8Z" />
                 </marker>
               </defs>
-              {geometry.flatMap((child) => {
-                if (child.node.parentId === undefined) return [];
-                const parent = byId.get(child.node.parentId);
-                return parent === undefined
-                  ? []
-                  : [
-                      <path
-                        className="trace-tree-edge"
-                        d={edgePath(parent, child)}
-                        data-relationship="PARENT_EDGE"
-                        key={`parent-${child.node.id}`}
-                      />,
-                    ];
-              })}
+              {parentPath === "" ? null : (
+                <path
+                  className="trace-tree-edge"
+                  d={parentPath}
+                  data-relationship="PARENT_EDGE"
+                />
+              )}
               {trace.links.map((link) => {
                 const from = byId.get(link.from.span_id);
                 const to = byId.get(link.to.span_id);
@@ -470,81 +584,15 @@ export function TraceTree({ trace }: { trace: TraceView }) {
                 );
               })}
               {geometry.map(({ node, x, y }) => (
-                <g
-                  className={`trace-tree-node trace-kind-${node.kind.toLowerCase()}${selected.id === node.id ? " is-selected" : ""}${node.status === "ERROR" ? " trace-status-error" : ""}`}
+                <TreeNodeGlyph
                   key={node.id}
-                  onClick={() => setSelectedId(node.id)}
-                  role="button"
-                  tabIndex={0}
-                  transform={`translate(${x} ${y})`}
-                >
-                  <rect
-                    className="trace-tree-card"
-                    height="70"
-                    rx="9"
-                    width="190"
-                  />
-                  <rect
-                    className="trace-tree-kind-rail"
-                    height="70"
-                    rx="3"
-                    width="4"
-                  />
-                  <text className="trace-tree-kind" x="14" y="17">
-                    {node.kind}
-                  </text>
-                  <text
-                    className="trace-tree-status"
-                    textAnchor="end"
-                    x="176"
-                    y="17"
-                  >
-                    {node.status}
-                  </text>
-                  <text className="trace-tree-name" x="14" y="37">
-                    {node.label}
-                  </text>
-                  <text
-                    className="trace-tree-meta"
-                    x="14"
-                    y="53"
-                  >{`+${displayNano(node.startOffsetNano)} · ${node.id}`}</text>
-                  <text
-                    className="trace-tree-duration"
-                    textAnchor="end"
-                    x="176"
-                    y="53"
-                  >
-                    {displayNano(node.durationNano)}
-                  </text>
-                  <rect
-                    className="trace-tree-micro-bg"
-                    height="3"
-                    rx="2"
-                    width="160"
-                    x="14"
-                    y="61"
-                  />
-                  <rect
-                    className="trace-tree-micro"
-                    height="3"
-                    rx="2"
-                    width={Math.max(
-                      2,
-                      percentage(node.durationNano, trace.durationNano ?? "0") *
-                        1.6,
-                    )}
-                    x={
-                      14 +
-                      percentage(
-                        node.startOffsetNano,
-                        trace.durationNano ?? "0",
-                      ) *
-                        1.6
-                    }
-                    y="61"
-                  />
-                </g>
+                  node={node}
+                  onSelect={selectNode}
+                  selected={selected.id === node.id}
+                  traceDurationNano={trace.durationNano ?? "0"}
+                  x={x}
+                  y={y}
+                />
               ))}
             </svg>
             <aside
@@ -566,18 +614,12 @@ export function TraceTree({ trace }: { trace: TraceView }) {
             role="tree"
           >
             {trace.nodes.map((node) => (
-              <div
-                aria-level={node.depth + 1}
+              <TreeOutlineRow
                 key={node.id}
-                role="treeitem"
-                style={{ paddingInlineStart: `${node.depth * 1.5}rem` }}
-              >
-                <button onClick={() => setSelectedId(node.id)} type="button">
-                  <span>{node.label}</span>
-                  <span>{displayNano(node.durationNano)}</span>
-                </button>
-                <RecordedLinks node={node} trace={trace} />
-              </div>
+                node={node}
+                onSelect={selectNode}
+                trace={trace}
+              />
             ))}
           </div>
         </section>
