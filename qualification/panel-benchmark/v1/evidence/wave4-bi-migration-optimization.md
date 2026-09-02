@@ -84,3 +84,14 @@ batched Canvas paths and nodes use bounded summary geometry; exact labels and
 relationships remain in the accessible tree and lossless IR. The focused
 upper-bound microbenchmark returned to zero long tasks before the next fixed
 rerun.
+
+After Canvas batching, the next fixed result still found one exact-threshold
+50 ms task among 90 Tree upper-bound first-paint samples; all other samples,
+P95 budgets, and interaction windows passed. It is retained at
+`results/full-2026-09-02T10-23-18-464Z/result.json` (SHA-256
+`9afcd3dbe322d04b21fec42bbc7ab6a22fffaa289b01ec93df5e79964e285a93`).
+Desktop Canvas mode was still constructing 200 hidden multi-element outline
+rows. It now retains one exact accessible `treeitem` per Span with a compact
+DOM representation; narrow mode retains the complete visible row layout. The
+focused upper-bound result improved to 38.19 ms first-paint P95 with zero long
+tasks before the next fixed rerun.

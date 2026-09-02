@@ -1308,28 +1308,41 @@ const TreeOutlineRow = memo(function TreeOutlineRow({
   onSelect,
   layout,
   showLinks = true,
+  compact = false,
 }: {
   node: TraceViewNode;
   trace: TraceView;
   onSelect(id: string): void;
   layout?: GeometryNode;
   showLinks?: boolean;
+  compact?: boolean;
 }) {
+  const button = (
+    <button
+      aria-label={`${node.label}, ${displayNano(node.durationNano)}`}
+      aria-level={(layout?.column ?? node.depth) + 1}
+      data-tree-x={layout?.x}
+      data-tree-y={layout?.y}
+      data-testid="trace-tree-node"
+      data-trace-node-id={node.id}
+      onClick={() => onSelect(node.id)}
+      role="treeitem"
+      type="button"
+    >
+      {compact ? (
+        node.label
+      ) : (
+        <>
+          <span>{node.label}</span>
+          <span>{displayNano(node.durationNano)}</span>
+        </>
+      )}
+    </button>
+  );
+  if (compact) return button;
   return (
     <div style={{ paddingInlineStart: `${node.depth * 1.5}rem` }}>
-      <button
-        aria-level={(layout?.column ?? node.depth) + 1}
-        data-tree-x={layout?.x}
-        data-tree-y={layout?.y}
-        data-testid="trace-tree-node"
-        data-trace-node-id={node.id}
-        onClick={() => onSelect(node.id)}
-        role="treeitem"
-        type="button"
-      >
-        <span>{node.label}</span>
-        <span>{displayNano(node.durationNano)}</span>
-      </button>
+      {button}
       {showLinks ? <RecordedLinks node={node} trace={trace} /> : null}
     </div>
   );
@@ -1975,11 +1988,13 @@ export const TraceTree = memo(function TraceTree({
             <div
               aria-label="Recorded trace call tree"
               className="trace-tree-outline"
+              data-detail={narrow ? "rows" : "compact"}
               role="tree"
             >
               {trace.nodes.map((node) => (
                 <TreeOutlineRow
                   key={node.id}
+                  compact={!narrow}
                   layout={byId.get(node.id)}
                   node={node}
                   onSelect={selectNode}

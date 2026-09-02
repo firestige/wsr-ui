@@ -734,6 +734,9 @@ describe("recorded Trace business panels", () => {
       "batched",
     );
     expect(screen.getAllByTestId("trace-tree-node")).toHaveLength(130);
+    expect(
+      screen.getByRole("tree", { name: "Recorded trace call tree" }),
+    ).toHaveAttribute("data-detail", "compact");
   });
 
   it("disables finite recorded-time motion when reduced motion is requested", () => {
