@@ -18,36 +18,54 @@ export function BiSurface({
   const resolvedTheme = typeof theme === "string" ? theme : theme.mode;
   const resolvedDensity =
     density ?? (typeof theme === "string" ? "comfortable" : theme.density);
-  const style =
-    typeof theme === "string"
-      ? undefined
-      : ({
-          "--wsr-container-border-style": theme.containerBorderStyle,
-          ...(theme.surfaces === undefined
-            ? {}
-            : {
-                "--wsr-surface-section": theme.surfaces.section,
-                "--wsr-surface-panel": theme.surfaces.panel,
-                "--wsr-surface-raised": theme.surfaces.raised,
-                "--wsr-surface-inset": theme.surfaces.inset,
-              }),
-          ...(theme.traceIndentGuides === undefined
-            ? {}
-            : {
-                "--wsr-trace-indent-0": theme.traceIndentGuides[0],
-                "--wsr-trace-indent-1": theme.traceIndentGuides[1],
-                "--wsr-trace-indent-2": theme.traceIndentGuides[2],
-                "--wsr-trace-indent-3": theme.traceIndentGuides[3],
-              }),
-          ...(theme.waterfallColors === undefined
-            ? {}
-            : {
-                "--wsr-waterfall-color-0": theme.waterfallColors[0],
-                "--wsr-waterfall-color-1": theme.waterfallColors[1],
-                "--wsr-waterfall-color-2": theme.waterfallColors[2],
-                "--wsr-waterfall-color-3": theme.waterfallColors[3],
-              }),
-        } as CSSProperties);
+  let style: CSSProperties | undefined;
+  if (typeof theme !== "string") {
+    const themeStyle: Record<string, string> = {
+      "--wsr-container-border-style": theme.containerBorderStyle,
+    };
+    const setToken = (name: string, value: string | undefined) => {
+      if (value !== undefined) themeStyle[name] = value;
+    };
+    const palette = theme.palette;
+    setToken("--wsr-surface-section", palette?.surface?.section);
+    setToken("--wsr-surface-panel", palette?.surface?.panel);
+    setToken("--wsr-surface-raised", palette?.surface?.raised);
+    setToken("--wsr-surface-inset", palette?.surface?.inset);
+    setToken("--content-primary", palette?.content?.primary);
+    setToken("--content-secondary", palette?.content?.secondary);
+    setToken("--content-muted", palette?.content?.muted);
+    setToken("--content-inverse", palette?.content?.inverse);
+    setToken("--border-default", palette?.border?.default);
+    setToken("--border-strong", palette?.border?.strong);
+    setToken("--interaction-accent", palette?.interaction?.accent);
+    setToken("--interaction-selection", palette?.interaction?.selection);
+    setToken("--interaction-disabled", palette?.interaction?.disabled);
+    setToken("--focus-ring", palette?.interaction?.focusRing);
+    setToken("--status-available", palette?.status?.available);
+    setToken("--status-attention", palette?.status?.attention);
+    setToken("--status-warning", palette?.status?.attention);
+    setToken("--status-unavailable", palette?.status?.unavailable);
+    setToken("--status-expired", palette?.status?.expired);
+    setToken("--status-incompatible", palette?.status?.incompatible);
+    setToken("--status-error", palette?.status?.error);
+    if (palette?.data !== undefined)
+      Array.from({ length: 6 }, (_, index) =>
+        setToken(
+          `--data-series-${index + 1}`,
+          palette.data?.[index % palette.data.length],
+        ),
+      );
+    setToken("--wsr-font-family", theme.typography?.fontFamily);
+    setToken("--wsr-code-font-family", theme.typography?.codeFontFamily);
+    setToken("--wsr-type-h1", theme.typography?.h1);
+    setToken("--wsr-type-h2", theme.typography?.h2);
+    setToken("--wsr-type-subtitle1", theme.typography?.subtitle1);
+    setToken("--wsr-type-body1", theme.typography?.body1);
+    setToken("--wsr-type-body2", theme.typography?.body2);
+    setToken("--wsr-type-caption", theme.typography?.caption);
+    setToken("--wsr-type-overline", theme.typography?.overline);
+    style = themeStyle as CSSProperties;
+  }
   return (
     <div
       className={["wsr-bi", className].filter(Boolean).join(" ")}

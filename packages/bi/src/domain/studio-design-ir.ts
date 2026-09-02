@@ -1,42 +1,41 @@
 export const STUDIO_DESIGN_IR = Object.freeze({
   schemaVersion: "wsr.studio-design@1",
   typography: Object.freeze({
-    pageTitle: Object.freeze({
-      level: "page",
+    h1: Object.freeze({
+      size: "4xl",
       family: "sans",
-      emphasis: "strong",
+      weight: "semibold",
     }),
-    sectionTitle: Object.freeze({
-      level: "section",
+    h2: Object.freeze({
+      size: "xl",
       family: "sans",
-      emphasis: "strong",
+      weight: "semibold",
     }),
-    body: Object.freeze({ level: "body", family: "sans", emphasis: "regular" }),
-    label: Object.freeze({
-      level: "label",
+    subtitle1: Object.freeze({
+      size: "lg",
       family: "sans",
-      emphasis: "strong",
+      weight: "semibold",
+    }),
+    body1: Object.freeze({
+      size: "base",
+      family: "sans",
+      weight: "regular",
+    }),
+    body2: Object.freeze({
+      size: "sm",
+      family: "sans",
+      weight: "regular",
     }),
     caption: Object.freeze({
-      level: "caption",
+      size: "xs",
       family: "sans",
-      emphasis: "regular",
+      weight: "regular",
     }),
-    eyebrow: Object.freeze({
-      level: "micro",
+    overline: Object.freeze({
+      size: "2xs",
       family: "sans",
-      emphasis: "strong",
+      weight: "bold",
       transform: "uppercase",
-    }),
-    code: Object.freeze({
-      level: "caption",
-      family: "mono",
-      emphasis: "regular",
-    }),
-    value: Object.freeze({
-      level: "value",
-      family: "mono",
-      emphasis: "strong",
     }),
   }),
   buttons: Object.freeze({

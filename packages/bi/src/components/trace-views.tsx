@@ -21,6 +21,7 @@ import { ScopedError } from "./status";
 
 const compareText = (left: string, right: string) =>
   left < right ? -1 : left > right ? 1 : 0;
+const traceDataPaletteSize = 6;
 
 function percentage(value: string, total: string): number {
   const denominator = BigInt(total);
@@ -34,6 +35,13 @@ function displayNano(value: string): string {
   if (nano >= 1_000_000n) return `${Number(nano / 1_000n) / 1000} ms`;
   if (nano >= 1_000n) return `${Number(nano) / 1000} μs`;
   return `${value} ns`;
+}
+
+function displayStatisticsDuration(value: string): string {
+  const nano = BigInt(value);
+  if (nano === 0n) return "0 ms";
+  if (nano < 1_000_000n) return "<1 ms";
+  return displayNano(value);
 }
 
 function nanoAtPercent(durationNano: string, percent: number): string {
@@ -328,7 +336,7 @@ const WaterfallLabelRow = memo(function WaterfallLabelRow({
           {Array.from({ length: node.depth }, (_, depth) => (
             <i
               className="trace-indent-item"
-              data-guide-depth={depth % 4}
+              data-guide-depth={depth % traceDataPaletteSize}
               data-guide-owner-id={node.id}
               data-testid="trace-waterfall-indent-guide"
               data-trace-depth={depth}
@@ -603,17 +611,16 @@ export function TraceWaterfall({
       data-trace-renderer="waterfall"
     >
       {viewNavigation}
-      <header className="trace-summary trace-summary-dense">
-        <div className="trace-summary-identity">
-          <Typography variant="eyebrow">Exact recorded timeline</Typography>
-          <Typography as="strong" variant="sectionTitle">
+      <header className="trace-summary trace-summary-dense trace-view-header">
+        <div className="trace-summary-identity trace-view-header-copy">
+          <Typography variant="overline">Exact recorded timeline</Typography>
+          <Typography as="strong" variant="h2">
             {trace.nodes[0]?.label ?? trace.traceId}
           </Typography>
-          <Typography as="code" variant="code">
-            {trace.traceId}
-          </Typography>
+          <Typography variant="caption">{trace.traceId}</Typography>
         </div>
-        <div className="trace-summary-metrics">
+        <div aria-hidden="true" className="trace-view-header-spacer" />
+        <div className="trace-summary-metrics trace-view-header-metrics">
           {[
             ["Duration", displayNano(trace.durationNano), "default"],
             [
@@ -628,15 +635,15 @@ export function TraceWaterfall({
               errorCount > 0 ? "error" : "success",
             ],
           ].map(([label, value, tone]) => (
-            <span className="trace-summary-stat" data-tone={tone} key={label}>
+            <span
+              className="trace-summary-stat trace-view-header-stat"
+              data-tone={tone}
+              key={label}
+            >
               <Typography as="small" variant="caption">
                 {label}
               </Typography>
-              <Typography
-                as="strong"
-                className="numeric-exact"
-                variant="sectionTitle"
-              >
+              <Typography as="strong" className="numeric-exact" variant="h2">
                 {value}
               </Typography>
             </span>
@@ -645,7 +652,7 @@ export function TraceWaterfall({
       </header>
       <section aria-label="Recorded trace minimap" className="trace-minimap">
         <div className="trace-minimap-copy">
-          <Typography as="strong" variant="label">
+          <Typography as="strong" variant="body2" weight="bold">
             Trace minimap
           </Typography>
           <Typography as="small" variant="caption">
@@ -727,7 +734,7 @@ export function TraceWaterfall({
               return (
                 <line
                   className={`trace-minimap-span trace-kind-${node.kind.toLowerCase()}${node.status === "ERROR" ? " trace-status-error" : ""}`}
-                  data-color-index={node.depth % 4}
+                  data-color-index={node.depth % traceDataPaletteSize}
                   data-minimap-row={row}
                   data-testid="trace-waterfall-minimap-span"
                   data-trace-node-id={node.id}
@@ -792,7 +799,7 @@ export function TraceWaterfall({
           <section className="trace-waterfall-canvas">
             <header className="trace-waterfall-toolbar">
               <div className="trace-waterfall-heading">
-                <Typography as="strong" variant="label">
+                <Typography as="strong" variant="body2" weight="bold">
                   Span tree
                 </Typography>
               </div>
@@ -986,7 +993,7 @@ export function TraceWaterfall({
                         >
                           <rect
                             className={`trace-timeline-bar trace-kind-${node.kind.toLowerCase()}${node.status === "ERROR" ? " trace-status-error" : ""}`}
-                            data-color-index={node.depth % 4}
+                            data-color-index={node.depth % traceDataPaletteSize}
                             data-testid="trace-waterfall-bar"
                             data-trace-node-id={node.id}
                             height={18}
@@ -1423,28 +1430,20 @@ export const TraceTree = memo(function TraceTree({
     let parentEdge = "";
     let linkEdge = "";
     const refreshPalette = () => {
-      surface = treeCanvasColor(canvas, "--wsr-tree-node-surface", "#17212d");
-      border = treeCanvasColor(canvas, "--wsr-tree-node-border", "#607084");
+      surface = treeCanvasColor(canvas, "--surface-raised", "#17212d");
+      border = treeCanvasColor(canvas, "--border-strong", "#607084");
       primary = treeCanvasColor(canvas, "--content-primary", "#f1f5f9");
       secondary = treeCanvasColor(canvas, "--content-secondary", "#a9b4c2");
-      series1 = treeCanvasColor(canvas, "--wsr-tree-internal-color", "#38bdf8");
-      series2 = treeCanvasColor(canvas, "--wsr-tree-client-color", "#2dd4bf");
-      error = treeCanvasColor(canvas, "--wsr-tree-error-color", "#fb7185");
+      series1 = treeCanvasColor(canvas, "--data-series-1", "#38bdf8");
+      series2 = treeCanvasColor(canvas, "--data-series-2", "#2dd4bf");
+      error = treeCanvasColor(canvas, "--status-error", "#fb7185");
       selectedColor = treeCanvasColor(
         canvas,
-        "--wsr-tree-selected-color",
+        "--interaction-accent",
         "#38bdf8",
       );
-      parentEdge = treeCanvasColor(
-        canvas,
-        "--wsr-tree-parent-edge-color",
-        "#607084",
-      );
-      linkEdge = treeCanvasColor(
-        canvas,
-        "--wsr-tree-link-edge-color",
-        "#fbbf24",
-      );
+      parentEdge = treeCanvasColor(canvas, "--border-strong", "#607084");
+      linkEdge = treeCanvasColor(canvas, "--status-warning", "#fbbf24");
     };
     refreshPalette();
     const duration = trace.durationNano ?? "0";
@@ -1649,23 +1648,11 @@ export const TraceTree = memo(function TraceTree({
     let parentEdge = "";
     let linkEdge = "";
     const refreshPalette = () => {
-      internal = treeCanvasColor(
-        canvas,
-        "--wsr-tree-internal-color",
-        "#38bdf8",
-      );
-      client = treeCanvasColor(canvas, "--wsr-tree-client-color", "#2dd4bf");
-      error = treeCanvasColor(canvas, "--wsr-tree-error-color", "#fb7185");
-      parentEdge = treeCanvasColor(
-        canvas,
-        "--wsr-tree-parent-edge-color",
-        "#607084",
-      );
-      linkEdge = treeCanvasColor(
-        canvas,
-        "--wsr-tree-link-edge-color",
-        "#fbbf24",
-      );
+      internal = treeCanvasColor(canvas, "--data-series-1", "#38bdf8");
+      client = treeCanvasColor(canvas, "--data-series-2", "#2dd4bf");
+      error = treeCanvasColor(canvas, "--status-error", "#fb7185");
+      parentEdge = treeCanvasColor(canvas, "--border-strong", "#607084");
+      linkEdge = treeCanvasColor(canvas, "--status-warning", "#fbbf24");
     };
     refreshPalette();
     const draw = () => {
@@ -1791,30 +1778,29 @@ export const TraceTree = memo(function TraceTree({
       data-testid="trace-tree"
       data-trace-renderer="tree"
     >
-      <header className="trace-summary trace-summary-dense trace-tree-context">
-        <div className="trace-summary-identity">
-          <Typography as="strong" variant="sectionTitle">
+      <header className="trace-summary trace-summary-dense trace-tree-context trace-view-header">
+        <div className="trace-summary-identity trace-view-header-copy">
+          <Typography variant="overline">Exact recorded call graph</Typography>
+          <Typography as="strong" variant="h2">
             {trace.nodes[0]?.label ?? trace.traceId}
           </Typography>
-          <Typography as="code" variant="code">
-            {trace.traceId}
-          </Typography>
+          <Typography variant="caption">{trace.traceId}</Typography>
         </div>
-        <div className="trace-summary-metrics">
+        <div aria-hidden="true" className="trace-view-header-spacer" />
+        <div className="trace-summary-metrics trace-view-header-metrics">
           {[
             ["Exact spans", trace.nodes.length],
             ["PARENT_EDGE", trace.parentEdges.length],
             ["LINK", trace.links.length],
           ].map(([label, value]) => (
-            <span className="trace-summary-stat" key={label}>
+            <span
+              className="trace-summary-stat trace-view-header-stat"
+              key={label}
+            >
               <Typography as="small" variant="caption">
                 {label}
               </Typography>
-              <Typography
-                as="strong"
-                className="numeric-exact"
-                variant="sectionTitle"
-              >
+              <Typography as="strong" className="numeric-exact" variant="h2">
                 {value}
               </Typography>
             </span>
@@ -1826,7 +1812,7 @@ export const TraceTree = memo(function TraceTree({
         <section className="trace-tree-canvas-shell">
           <header className="trace-tree-canvas-head">
             <div>
-              <Typography as="h2" variant="sectionTitle">
+              <Typography as="h2" variant="subtitle1">
                 Span call tree
               </Typography>
               <Typography as="p" variant="caption">
@@ -2001,6 +1987,249 @@ export const TraceTree = memo(function TraceTree({
   );
 });
 
+const statisticsColorCount = traceDataPaletteSize;
+
+type StatisticsDonutEntry = {
+  category?: string;
+  colorIndex: number;
+  displayValue: string;
+  label: string;
+  value: bigint;
+};
+
+type DurationBarSegment = {
+  colorIndex: number;
+  durationNano: string;
+  id: string;
+  label: string;
+  topic?: string;
+};
+
+function StatisticsDonut({
+  label,
+  entries,
+  total,
+  totalLabel,
+}: {
+  label: string;
+  entries: StatisticsDonutEntry[];
+  total: bigint;
+  totalLabel?: string;
+}) {
+  const segments = entries.map((entry, index) => {
+    const share =
+      total === 0n ? 0 : Number((entry.value * 10_000n) / total) / 100;
+    const offset = entries
+      .slice(0, index)
+      .reduce(
+        (sum, precedingEntry) =>
+          sum +
+          (total === 0n
+            ? 0
+            : Number((precedingEntry.value * 10_000n) / total) / 100),
+        0,
+      );
+    return {
+      ...entry,
+      offset,
+      share,
+    };
+  });
+  return (
+    <div className="trace-statistics-donut-layout">
+      <svg
+        aria-label={`${label} donut chart`}
+        className="trace-statistics-donut"
+        data-chart-type="donut"
+        role="img"
+        viewBox="0 0 48 48"
+      >
+        <circle
+          className="trace-statistics-donut-track"
+          cx="24"
+          cy="24"
+          r="18"
+        />
+        {segments.map((segment) => (
+          <circle
+            className="trace-statistics-color trace-statistics-donut-segment"
+            cx="24"
+            cy="24"
+            data-category={segment.category}
+            data-color-index={segment.colorIndex}
+            data-entry-label={segment.label}
+            key={segment.label}
+            pathLength="100"
+            r="18"
+            strokeDasharray={`${segment.share} ${100 - segment.share}`}
+            strokeDashoffset={-segment.offset}
+          />
+        ))}
+        <text x="24" y="23">
+          {totalLabel ?? total.toString()}
+        </text>
+        <text className="trace-statistics-donut-caption" x="24" y="29">
+          total
+        </text>
+      </svg>
+      <ul className="trace-statistics-legend">
+        {segments.map((segment) => (
+          <li key={segment.label}>
+            <i
+              aria-hidden="true"
+              className="trace-statistics-color"
+              data-category={segment.category}
+              data-color-index={segment.colorIndex}
+            />
+            <Typography variant="body1">{segment.label}</Typography>
+            <Typography
+              as="strong"
+              className="trace-statistics-color trace-statistics-value"
+              data-category={segment.category}
+              data-color-index={segment.colorIndex}
+              variant="body2"
+              weight="bold"
+            >
+              {segment.displayValue}
+            </Typography>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function statisticsPiePath(startPercent: number, endPercent: number) {
+  const radius = 18;
+  const point = (percent: number) => {
+    const angle = (percent / 100) * Math.PI * 2 - Math.PI / 2;
+    return [24 + Math.cos(angle) * radius, 24 + Math.sin(angle) * radius];
+  };
+  if (endPercent - startPercent >= 99.999)
+    return "M 24 6 A 18 18 0 1 1 24 42 A 18 18 0 1 1 24 6 Z";
+  const [startX, startY] = point(startPercent);
+  const [endX, endY] = point(endPercent);
+  return `M 24 24 L ${startX} ${startY} A 18 18 0 ${endPercent - startPercent > 50 ? 1 : 0} 1 ${endX} ${endY} Z`;
+}
+
+function StatisticsPie({
+  entries,
+  label,
+  total,
+}: {
+  entries: StatisticsDonutEntry[];
+  label: string;
+  total: bigint;
+}) {
+  const segments = entries.map((entry, index) => {
+    const share =
+      total === 0n ? 0 : Number((entry.value * 10_000n) / total) / 100;
+    const start = entries
+      .slice(0, index)
+      .reduce(
+        (sum, precedingEntry) =>
+          sum +
+          (total === 0n
+            ? 0
+            : Number((precedingEntry.value * 10_000n) / total) / 100),
+        0,
+      );
+    const segment = {
+      ...entry,
+      end: total > 0n && index === entries.length - 1 ? 100 : start + share,
+      start,
+    };
+    return segment;
+  });
+  return (
+    <div className="trace-statistics-donut-layout">
+      <svg
+        aria-label={`${label} pie chart`}
+        className="trace-statistics-pie"
+        data-chart-type="pie"
+        role="img"
+        viewBox="0 0 48 48"
+      >
+        {segments.map((segment) => (
+          <path
+            className="trace-statistics-color trace-statistics-pie-segment"
+            d={statisticsPiePath(segment.start, segment.end)}
+            data-category={segment.category}
+            data-color-index={segment.colorIndex}
+            data-entry-label={segment.label}
+            key={segment.label}
+          >
+            <title>{`${segment.label}: ${segment.displayValue}`}</title>
+          </path>
+        ))}
+      </svg>
+      <ul className="trace-statistics-legend">
+        {entries.map((entry) => (
+          <li key={entry.label}>
+            <i
+              aria-hidden="true"
+              className="trace-statistics-color"
+              data-category={entry.category}
+              data-color-index={entry.colorIndex}
+            />
+            <Typography variant="body1">{entry.label}</Typography>
+            <Typography
+              as="strong"
+              className="trace-statistics-color trace-statistics-value"
+              data-category={entry.category}
+              data-color-index={entry.colorIndex}
+              variant="body2"
+              weight="bold"
+            >
+              {entry.displayValue}
+            </Typography>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function StatisticsHorizontalBars({
+  entries,
+  label,
+}: {
+  entries: StatisticsDonutEntry[];
+  label: string;
+}) {
+  const maximum = entries.reduce(
+    (largest, entry) => (entry.value > largest ? entry.value : largest),
+    0n,
+  );
+  return (
+    <div
+      aria-label={`${label} horizontal bar chart`}
+      className="trace-statistics-kind-bars"
+      data-chart-type="horizontal-bar"
+      role="img"
+    >
+      {entries.map((entry) => (
+        <div className="trace-statistics-kind-bar-row" key={entry.label}>
+          <Typography variant="body1">{entry.label}</Typography>
+          <div className="trace-statistics-kind-bar-track">
+            <span
+              className="trace-statistics-color trace-statistics-kind-bar-fill"
+              data-color-index={entry.colorIndex}
+              data-entry-label={entry.label}
+              style={{
+                width: `${percentage(String(entry.value), String(maximum))}%`,
+              }}
+              title={`${entry.label}: ${entry.displayValue}`}
+            >
+              <span>{entry.displayValue}</span>
+            </span>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function TraceStatistics({
   trace,
   viewNavigation,
@@ -2022,7 +2251,7 @@ export function TraceStatistics({
     ["Recorded spans", String(trace.nodes.length)],
     ["Recorded links", String(trace.links.length)],
     ["ERROR spans", String(errorCount)],
-    ["Maximum recorded duration", `${maximum} ns`],
+    ["Maximum recorded duration", displayStatisticsDuration(maximum)],
   ];
   const statusCounts = Object.entries(
     trace.nodes.reduce<Record<string, number>>((counts, node) => {
@@ -2036,6 +2265,176 @@ export function TraceStatistics({
       return counts;
     }, {}),
   );
+  const statusEntries: StatisticsDonutEntry[] = statusCounts.map(
+    ([status, count], index) => ({
+      category: `status-${status.toLowerCase()}`,
+      colorIndex: index % statisticsColorCount,
+      displayValue: String(count),
+      label: status,
+      value: BigInt(count),
+    }),
+  );
+  const kindColorIndex = (kind: string, index: number) =>
+    kind === "INTERNAL"
+      ? 0
+      : kind === "CLIENT"
+        ? 3
+        : index % statisticsColorCount;
+  const kindEntries: StatisticsDonutEntry[] = kindCounts.map(
+    ([kind, count], index) => ({
+      colorIndex: kindColorIndex(kind, index),
+      displayValue: String(count),
+      label: kind,
+      value: BigInt(count),
+    }),
+  );
+  const durationByKind = Object.entries(
+    trace.nodes.reduce<Record<string, bigint>>((durations, node) => {
+      durations[node.kind] =
+        (durations[node.kind] ?? 0n) + BigInt(node.durationNano);
+      return durations;
+    }, {}),
+  );
+  const durationByKindEntries: StatisticsDonutEntry[] = durationByKind.map(
+    ([kind, duration], index) => ({
+      colorIndex: kindColorIndex(kind, index),
+      displayValue: displayStatisticsDuration(String(duration)),
+      label: kind,
+      value: duration,
+    }),
+  );
+  const rootDuration = trace.nodes[0];
+  const categoryNodes = trace.nodes.slice(1);
+  const categoryDuration = categoryNodes.reduce(
+    (sum, node) => sum + BigInt(node.durationNano),
+    0n,
+  );
+  const showExactCategoryComparison =
+    rootDuration !== undefined &&
+    categoryNodes.length > 0 &&
+    BigInt(rootDuration.durationNano) === categoryDuration;
+  const nodesById = new Map(trace.nodes.map((node) => [node.id, node]));
+  const topicForNode = (node: TraceViewNode) => {
+    const explicit = node.fields.find(
+      ({ field, value }) =>
+        field === "wsr.statistics.topic" &&
+        typeof value === "string" &&
+        value.trim().length > 0,
+    )?.value;
+    if (typeof explicit === "string") return explicit.trim();
+    let topicNode = node;
+    const visited = new Set<string>();
+    while (
+      topicNode.parentId !== undefined &&
+      topicNode.parentId !== rootDuration?.id &&
+      !visited.has(topicNode.id)
+    ) {
+      visited.add(topicNode.id);
+      const parent = nodesById.get(topicNode.parentId);
+      if (parent === undefined) break;
+      topicNode = parent;
+    }
+    return topicNode.label;
+  };
+  const topicGroups = new Map<
+    string,
+    {
+      duration: bigint;
+      firstIndex: number;
+      nodes: TraceViewNode[];
+      topic: string;
+    }
+  >();
+  categoryNodes.forEach((node, index) => {
+    const topic = topicForNode(node);
+    const existing = topicGroups.get(topic);
+    if (existing === undefined)
+      topicGroups.set(topic, {
+        duration: BigInt(node.durationNano),
+        firstIndex: index,
+        nodes: [node],
+        topic,
+      });
+    else {
+      existing.duration += BigInt(node.durationNano);
+      existing.nodes.push(node);
+    }
+  });
+  const semanticGroups = [...topicGroups.values()];
+  const displayedGroups =
+    semanticGroups.length <= 4
+      ? semanticGroups
+      : (() => {
+          const retainedTopics = new Set(
+            [...semanticGroups]
+              .sort((left, right) => {
+                if (left.duration !== right.duration)
+                  return left.duration > right.duration ? -1 : 1;
+                return left.firstIndex - right.firstIndex;
+              })
+              .slice(0, 3)
+              .map(({ topic }) => topic),
+          );
+          const retained = semanticGroups.filter(({ topic }) =>
+            retainedTopics.has(topic),
+          );
+          const overflowNodes = categoryNodes.filter(
+            (node) => !retainedTopics.has(topicForNode(node)),
+          );
+          return [
+            ...retained,
+            {
+              duration: overflowNodes.reduce(
+                (sum, node) => sum + BigInt(node.durationNano),
+                0n,
+              ),
+              firstIndex: overflowNodes.length,
+              nodes: overflowNodes,
+              topic: "Other",
+            },
+          ];
+        })();
+  const categoryGroups = displayedGroups.map((group, index) => ({
+    colorIndex: (index + 1) % statisticsColorCount,
+    durationNano: String(group.duration),
+    entries: group.nodes.map((node): StatisticsDonutEntry => ({
+      colorIndex: categoryNodes.indexOf(node) % statisticsColorCount,
+      displayValue: displayStatisticsDuration(node.durationNano),
+      label: node.label,
+      value: BigInt(node.durationNano),
+    })),
+    id: `category-group-${index + 1}`,
+    label: group.topic,
+    topic: group.topic,
+  }));
+  const durationColumns: DurationBarSegment[] = [
+    ...(rootDuration === undefined
+      ? []
+      : [
+          {
+            colorIndex: 0,
+            durationNano: rootDuration.durationNano,
+            id: rootDuration.id,
+            label: rootDuration.label,
+          },
+        ]),
+    ...categoryGroups.map((group): DurationBarSegment => ({
+      colorIndex: group.colorIndex,
+      durationNano: group.durationNano,
+      id: group.id,
+      label: group.label,
+      topic: group.topic,
+    })),
+  ];
+  const durationScale = String(
+    durationColumns.reduce(
+      (largest, column) =>
+        BigInt(column.durationNano) > largest
+          ? BigInt(column.durationNano)
+          : largest,
+      0n,
+    ),
+  );
   return (
     <section
       aria-label="Recorded trace statistics"
@@ -2043,75 +2442,134 @@ export function TraceStatistics({
       data-testid="trace-statistics"
       data-trace-renderer="statistics"
     >
-      <header className="trace-statistics-intro">
-        <Typography as="span" className="trace-eyebrow" variant="eyebrow">
-          Exact recorded inventory
-        </Typography>
-        <Typography as="h2" variant="sectionTitle">
-          Trace statistics
-        </Typography>
-        <Typography as="p" variant="caption">
-          Exact inventory and recorded-time aggregates only; no inferred
-          causality.
-        </Typography>
+      <header className="trace-statistics-intro trace-view-header">
+        <div className="trace-statistics-heading trace-view-header-copy">
+          <Typography as="span" className="trace-overline" variant="overline">
+            Exact recorded inventory
+          </Typography>
+          <Typography as="h2" variant="h2">
+            Trace Statistics
+          </Typography>
+          <Typography as="p" variant="caption">
+            Exact inventory and recorded-time aggregates only; no inferred
+            causality.
+          </Typography>
+        </div>
+        <div aria-hidden="true" className="trace-view-header-spacer" />
+        <dl className="trace-statistics-summary trace-view-header-metrics">
+          {rows.map(([label, value]) => (
+            <div className="trace-view-header-stat" key={label}>
+              <Typography as="dt" variant="caption">
+                {label}
+              </Typography>
+              <Typography as="dd" className="numeric-exact" variant="h2">
+                {value}
+              </Typography>
+            </div>
+          ))}
+        </dl>
       </header>
       {viewNavigation}
-      <dl className="trace-statistics-summary">
-        {rows.map(([label, value]) => (
-          <div className="panel-card" key={label}>
-            <Typography as="dt" variant="label">
-              {label}
-            </Typography>
-            <Typography as="dd" className="numeric-exact" variant="value">
-              {value}
-            </Typography>
-          </div>
-        ))}
-      </dl>
       <div className="trace-statistics-grid">
-        <section className="panel-card">
-          <Typography as="h3" variant="sectionTitle">
+        <section className="panel-card trace-statistics-inventory">
+          <Typography as="h3" variant="subtitle1">
             Recorded status inventory
           </Typography>
-          {statusCounts.map(([label, value]) => (
-            <div className="trace-stat-row" key={label}>
-              <Typography variant="body">{label}</Typography>
-              <Typography as="strong" variant="label">
-                {value}
-              </Typography>
-              <i style={{ width: `${(value / trace.nodes.length) * 100}%` }} />
-            </div>
-          ))}
+          <StatisticsDonut
+            entries={statusEntries}
+            label="Recorded status inventory"
+            total={BigInt(trace.nodes.length)}
+          />
         </section>
-        <section className="panel-card">
-          <Typography as="h3" variant="sectionTitle">
+        <section className="panel-card trace-statistics-inventory">
+          <Typography as="h3" variant="subtitle1">
             Recorded kind inventory
           </Typography>
-          {kindCounts.map(([label, value]) => (
-            <div className="trace-stat-row" key={label}>
-              <Typography variant="body">{label}</Typography>
-              <Typography as="strong" variant="label">
-                {value}
-              </Typography>
-              <i style={{ width: `${(value / trace.nodes.length) * 100}%` }} />
-            </div>
-          ))}
+          <StatisticsPie
+            entries={kindEntries}
+            label="Recorded kind inventory"
+            total={BigInt(trace.nodes.length)}
+          />
+        </section>
+        <section className="panel-card trace-statistics-inventory">
+          <Typography as="h3" variant="subtitle1">
+            Recorded duration by kind
+          </Typography>
+          <StatisticsHorizontalBars
+            entries={durationByKindEntries}
+            label="Recorded duration by kind"
+          />
         </section>
         <section className="panel-card trace-duration-distribution">
-          <Typography as="h3" variant="sectionTitle">
+          <Typography as="h3" variant="subtitle1">
             Recorded duration distribution
           </Typography>
-          {trace.nodes.map((node) => (
-            <div className="trace-duration-row" key={node.id}>
-              <Typography variant="body">{node.label}</Typography>
-              <i
-                style={{ width: `${percentage(node.durationNano, maximum)}%` }}
-              />
-              <Typography as="code" variant="code">
-                {displayNano(node.durationNano)}
-              </Typography>
+          <div className="trace-duration-distribution-body">
+            <div
+              aria-label="Recorded duration distribution vertical bar chart"
+              className="trace-duration-chart"
+              data-chart-type="vertical-bar"
+              data-exact-category-total={showExactCategoryComparison}
+              role="img"
+            >
+              {durationColumns.map((column) => (
+                <div
+                  className="trace-duration-column trace-statistics-color"
+                  data-color-index={column.colorIndex}
+                  data-topic={column.topic}
+                  key={column.id}
+                >
+                  <div className="trace-duration-column-plot">
+                    <span
+                      className="trace-duration-column-fill"
+                      style={{
+                        height: `${percentage(column.durationNano, durationScale)}%`,
+                      }}
+                      title={`${column.label}: ${displayStatisticsDuration(column.durationNano)}`}
+                    >
+                      <span>
+                        {displayStatisticsDuration(column.durationNano)}
+                      </span>
+                    </span>
+                  </div>
+                  <Typography
+                    as="span"
+                    className="trace-duration-column-label"
+                    title={column.label}
+                    variant="caption"
+                    weight="medium"
+                  >
+                    {column.label}
+                  </Typography>
+                </div>
+              ))}
             </div>
-          ))}
+            <div className="trace-duration-breakdowns">
+              {categoryGroups.map((group) => (
+                <section
+                  className="trace-duration-breakdown"
+                  data-topic={group.topic}
+                  key={group.id}
+                >
+                  <Typography
+                    as="h4"
+                    className="trace-duration-breakdown-title trace-statistics-color"
+                    data-color-index={group.colorIndex}
+                    variant="caption"
+                    weight="bold"
+                  >
+                    {group.label}
+                  </Typography>
+                  <StatisticsDonut
+                    entries={group.entries}
+                    label={`Recorded duration ${group.topic}`}
+                    total={BigInt(group.durationNano)}
+                    totalLabel={displayStatisticsDuration(group.durationNano)}
+                  />
+                </section>
+              ))}
+            </div>
+          </div>
         </section>
       </div>
     </section>

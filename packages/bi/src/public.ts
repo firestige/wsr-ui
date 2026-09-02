@@ -10,6 +10,10 @@ export {
   Surface,
   TextInput,
   Typography,
+  type TypographyFamily,
+  type TypographyTone,
+  type TypographyVariant,
+  type TypographyWeight,
 } from "./components/design-system";
 export {
   STUDIO_DESIGN_IR,
@@ -22,7 +26,13 @@ export {
   BiSurface,
   type BiSurfaceProps,
 } from "./components/bi-surface";
-export { createBiTheme, type BiTheme } from "./domain/theme";
+export {
+  createBiTheme,
+  type BiDataPalette,
+  type BiPalette,
+  type BiTheme,
+  type BiTypographyScale,
+} from "./domain/theme";
 export { CompareResultFrame } from "./components/compare-result";
 export { MetricExplanationView, ReceiptView } from "./components/details";
 export {

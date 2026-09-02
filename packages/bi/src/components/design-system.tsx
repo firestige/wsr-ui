@@ -6,33 +6,54 @@ import type {
   ReactNode,
 } from "react";
 
-type TypographyVariant =
-  | "pageTitle"
-  | "sectionTitle"
-  | "body"
-  | "label"
-  | "caption"
-  | "eyebrow"
-  | "code"
-  | "value";
+export type TypographyVariant =
+  "h1" | "h2" | "subtitle1" | "body1" | "body2" | "caption" | "overline";
+export type TypographyFamily = "sans" | "mono";
+export type TypographyWeight = "regular" | "medium" | "semibold" | "bold";
+export type TypographyTone =
+  | "primary"
+  | "secondary"
+  | "muted"
+  | "inverse"
+  | "error"
+  | "warning"
+  | "success";
 type ButtonAppearance = "solid" | "outline" | "ghost" | "segment";
-type Tone = "neutral" | "primary" | "danger";
+type ButtonTone = "neutral" | "primary" | "danger";
 type SurfaceLevel = "section" | "panel" | "inset" | "raised";
 type Status = "available" | "selected" | "partial" | "unavailable" | "error";
 
 export function Typography({
   as: Tag = "span",
   variant,
+  family,
+  weight,
+  tone,
+  italic = false,
+  underline = false,
+  truncate = false,
   className,
   ...props
 }: HTMLAttributes<HTMLElement> & {
   as?: ElementType;
   variant: TypographyVariant;
+  family?: TypographyFamily;
+  weight?: TypographyWeight;
+  tone?: TypographyTone;
+  italic?: boolean;
+  underline?: boolean;
+  truncate?: boolean;
 }) {
   return (
     <Tag
       className={["wsr-typography", className].filter(Boolean).join(" ")}
+      data-family={family}
+      data-italic={italic || undefined}
+      data-tone={tone}
+      data-truncate={truncate || undefined}
+      data-underline={underline || undefined}
       data-variant={variant}
+      data-weight={weight}
       {...props}
     />
   );
@@ -47,7 +68,7 @@ export function Button({
   ...props
 }: ButtonHTMLAttributes<HTMLButtonElement> & {
   appearance?: ButtonAppearance;
-  tone?: Tone;
+  tone?: ButtonTone;
   size?: "compact" | "regular";
   selected?: boolean;
 }) {
@@ -71,7 +92,7 @@ export function IconButton({
 }: ButtonHTMLAttributes<HTMLButtonElement> & {
   "aria-label": string;
   appearance?: ButtonAppearance;
-  tone?: Tone;
+  tone?: ButtonTone;
   size?: "compact" | "regular";
   selected?: boolean;
 }) {
