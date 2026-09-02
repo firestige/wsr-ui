@@ -48,3 +48,28 @@ body {
   max-width: 100rem;
   margin: 0 auto;
 }
+
+.test-dashboard {
+  display: grid;
+  gap: var(--space-grid);
+}
+
+.test-dashboard__intro {
+  width: 100%;
+}
+
+.test-dashboard__intro h2,
+.test-dashboard__intro p {
+  margin: 0;
+}
+
+.test-dashboard__actions {
+  display: flex;
+  align-items: center;
+}
+
+@media (max-width: 40rem) {
+  .test-dashboard__intro {
+    align-items: start;
+  }
+}

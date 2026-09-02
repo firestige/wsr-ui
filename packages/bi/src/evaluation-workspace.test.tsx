@@ -201,7 +201,7 @@ describe("Evaluation workspace", () => {
     await user.click(
       await screen.findByRole("button", { name: "Edit dashboard" }),
     );
-    await user.click(screen.getByRole("button", { name: "Save local layout" }));
+    await user.click(screen.getByRole("button", { name: "Save dashboard" }));
     expect(window.localStorage.getItem("wsr.bi.dashboard-layout@1")).toContain(
       '"layout_version":1',
     );

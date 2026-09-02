@@ -50,7 +50,10 @@ describe("host-neutral shared package boundary", () => {
       react: ">=18.3.1 <20",
       "react-dom": ">=18.3.1 <20",
     });
-    expect(packageJson.dependencies).toEqual({ d3: "7.9.0" });
+    expect(packageJson.dependencies).toEqual({
+      d3: "7.9.0",
+      "react-grid-layout": "2.2.4",
+    });
   });
 
   it("has a dedicated public entry that does not start an application", () => {

@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
@@ -31,7 +31,7 @@ const result: MetricResult = {
 };
 
 describe("Metric panel visualization", () => {
-  it("renders a focused SMALL dashboard panel without detail-only coverage or actions", () => {
+  it("renders a compact, non-scrolling SMALL numeric card with icon evidence", () => {
     render(
       <DashboardMetricPanel
         onEvidence={vi.fn()}
@@ -46,10 +46,32 @@ describe("Metric panel visualization", () => {
     });
     expect(panel).toHaveAttribute("data-presentation", "dashboard");
     expect(panel).toHaveAttribute("data-panel-size", "SMALL");
+    expect(panel).toHaveAttribute("data-scrollable", "false");
     expect(panel).toHaveTextContent("33.33%");
+    expect(panel).not.toHaveTextContent("Exact value");
+    expect(panel).not.toHaveTextContent("1 / 3 exact");
     expect(panel).not.toHaveTextContent("Coverage");
     expect(panel).not.toHaveTextContent("Metric explanation");
-    expect(screen.queryByRole("button", { name: "View evidence" })).toBeNull();
+    expect(within(panel).getByRole("heading")).toHaveClass(
+      "dashboard-panel-title",
+    );
+    const evidence = within(panel).getByRole("button", {
+      name: "View evidence",
+    });
+    expect(evidence).toHaveAttribute("data-icon-button", "true");
+    expect(evidence.querySelector("svg")).toBeNull();
+    expect(evidence.querySelector(".dashboard-evidence-icon")).toHaveClass(
+      "icon-[tabler--file-search]",
+    );
+    const available = within(panel)
+      .getByText("Available")
+      .closest(".status-label")!;
+    expect(available.querySelector(".status-label-marker")).toHaveTextContent(
+      "✓",
+    );
+    expect(available.querySelector(".status-label-text")).toHaveTextContent(
+      "Available",
+    );
   });
 
   it("renders a MEDIUM dashboard ratio as one chart and one evidence action", () => {
@@ -65,6 +87,22 @@ describe("Metric panel visualization", () => {
     expect(screen.getByRole("img", { name: /33.33%/i })).toBeVisible();
     expect(screen.queryByRole("table", { name: /ratio bar data/i })).toBeNull();
     expect(screen.getByRole("button", { name: "View evidence" })).toBeVisible();
+  });
+
+  it("hides exact numerator detail when a ratio card is SMALL", () => {
+    render(
+      <DashboardMetricPanel
+        result={result}
+        size="SMALL"
+        visualizer="ratio-bar@1"
+      />,
+    );
+
+    const panel = screen.getByRole("article", {
+      name: "Delivery terminal outcome rate",
+    });
+    expect(panel).toHaveTextContent("33.33%");
+    expect(panel).not.toHaveTextContent("1 / 3 exact");
   });
 
   it("renders a WIDE dashboard table as a focused three-column preview", () => {
