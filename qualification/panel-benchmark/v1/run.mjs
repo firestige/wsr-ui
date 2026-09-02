@@ -23,6 +23,8 @@ const argument = (name, fallback) => {
   return entry === undefined ? fallback : entry.slice(name.length + 3);
 };
 const mode = argument("mode", "smoke");
+const focusedPanel = argument("panel", "");
+const focusedFixture = argument("fixture", "");
 const manifestPath = resolve(
   repositoryRoot,
   argument("manifest", "qualification/panel-benchmark/v1/manifest.json"),
@@ -34,7 +36,17 @@ const runCount = isFull ? manifest.protocol.independentRuns : 1;
 const sampleCount = isFull ? manifest.protocol.measuredSamplesPerRun : 3;
 const interactionDurationMs = isFull
   ? manifest.protocol.interactiveDurationMsPerSample
-  : 250;
+  : Number(argument("interaction-duration", "250"));
+
+if (
+  !Number.isFinite(interactionDurationMs) ||
+  interactionDurationMs <= 0 ||
+  (isFull && (focusedPanel !== "" || focusedFixture !== ""))
+) {
+  throw new Error(
+    "Focused targets and custom interaction durations are non-qualifying smoke diagnostics only",
+  );
+}
 
 if (isFull) {
   if (process.env.WSR_BENCHMARK_FIXED_RUNNER !== "1") {
@@ -179,6 +191,16 @@ targets.push({
   fixtureId: "unavailable@1",
   interactive: false,
 });
+const selectedTargets = targets.filter(
+  (target) =>
+    (focusedPanel === "" || target.panel === focusedPanel) &&
+    (focusedFixture === "" || target.fixture === focusedFixture),
+);
+if (selectedTargets.length === 0) {
+  throw new Error(
+    `No benchmark target matches panel=${focusedPanel || "*"} fixture=${focusedFixture || "*"}`,
+  );
+}
 
 const timestamp = new Date().toISOString().replaceAll(/[:.]/g, "-");
 const resultRoot = resolve(benchmarkRoot, "results", `${mode}-${timestamp}`);
@@ -194,7 +216,7 @@ try {
       `Browser version mismatch: expected ${manifest.runner.playwright.browserVersion}, got ${browserVersion}`,
     );
   }
-  for (const target of targets) {
+  for (const target of selectedTargets) {
     const targetResult = { ...target, runs: [] };
     for (let runIndex = 1; runIndex <= runCount; runIndex += 1) {
       const context = await browser.newContext();

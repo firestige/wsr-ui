@@ -22,6 +22,7 @@ import { ScopedError } from "./status";
 const compareText = (left: string, right: string) =>
   left < right ? -1 : left > right ? 1 : 0;
 const traceDataPaletteSize = 6;
+const emptyTraceNodeIds = new Set<string>();
 
 function percentage(value: string, total: string): number {
   const denominator = BigInt(total);
@@ -415,6 +416,40 @@ export function TraceWaterfall({
     waterfallFallbackWidth,
   );
   const selectNode = useCallback((id: string) => setSelectedId(id), []);
+  const traceIndex = useMemo(() => {
+    const nodeById = new Map<string, TraceViewNode>();
+    const nodesWithChildren = new Set<string>();
+    let errorCount = 0;
+    for (const node of trace.nodes) {
+      nodeById.set(node.id, node);
+      if (node.parentId !== undefined) nodesWithChildren.add(node.parentId);
+      if (node.status === "ERROR") errorCount += 1;
+    }
+    return { errorCount, nodeById, nodesWithChildren };
+  }, [trace.nodes]);
+  const normalized = useMemo(() => query.trim().toLocaleLowerCase(), [query]);
+  const matchingNodes = useMemo(
+    () =>
+      normalized === ""
+        ? trace.nodes
+        : trace.nodes.filter(
+            (node) =>
+              node.label.toLocaleLowerCase().includes(normalized) ||
+              node.id.toLocaleLowerCase().includes(normalized),
+          ),
+    [normalized, trace.nodes],
+  );
+  const nodes = useMemo(() => {
+    if (normalized !== "" || collapsedIds.size === 0) return matchingNodes;
+    return matchingNodes.filter((node) => {
+      let parentId = node.parentId;
+      while (parentId !== undefined) {
+        if (collapsedIds.has(parentId)) return false;
+        parentId = traceIndex.nodeById.get(parentId)?.parentId;
+      }
+      return true;
+    });
+  }, [collapsedIds, matchingNodes, normalized, traceIndex.nodeById]);
   useEffect(
     () => () => {
       for (const timer of timelineMotionTimers.current.values())
@@ -424,32 +459,8 @@ export function TraceWaterfall({
   );
   if (trace.status !== "READY" || trace.durationNano === undefined)
     return <InvalidTrace trace={trace} />;
-  const normalized = query.trim().toLocaleLowerCase();
-  const matchingNodes = trace.nodes.filter(
-    (node) =>
-      normalized === "" ||
-      node.label.toLocaleLowerCase().includes(normalized) ||
-      node.id.toLocaleLowerCase().includes(normalized),
-  );
-  const nodes = matchingNodes.filter((node) => {
-    if (normalized !== "") return true;
-    let parentId = node.parentId;
-    while (parentId !== undefined) {
-      if (collapsedIds.has(parentId)) return false;
-      parentId = trace.nodes.find(({ id }) => id === parentId)?.parentId;
-    }
-    return true;
-  });
-  const selected =
-    trace.nodes.find((node) => node.id === selectedId) ?? trace.nodes[0]!;
-  const errorCount = trace.nodes.filter(
-    ({ status }) => status === "ERROR",
-  ).length;
-  const nodesWithChildren = new Set(
-    trace.nodes
-      .filter((node) => nodeChildren(trace, node).length > 0)
-      .map(({ id }) => id),
-  );
+  const selected = traceIndex.nodeById.get(selectedId ?? "") ?? trace.nodes[0]!;
+  const { errorCount, nodesWithChildren } = traceIndex;
   const applyZoom = (next: [number, number], animateMovement: boolean) => {
     const previous = zoomValue.current;
     if (animateMovement && next[0] !== previous[0] && !reducedMotion) {
@@ -1347,16 +1358,35 @@ export const TraceTree = memo(function TraceTree({
     () => new Map(geometry.map((item) => [item.node.id, item])),
     [geometry],
   );
-  const selected =
-    trace.nodes.find((node) => node.id === selectedId) ?? trace.nodes[0];
+  const nodeById = useMemo(
+    () => new Map(trace.nodes.map((node) => [node.id, node])),
+    [trace.nodes],
+  );
+  const childrenByParent = useMemo(() => {
+    const index = new Map<string, TraceViewNode[]>();
+    for (const node of trace.nodes) {
+      if (node.parentId === undefined) continue;
+      const children = index.get(node.parentId);
+      if (children === undefined) index.set(node.parentId, [node]);
+      else children.push(node);
+    }
+    return index;
+  }, [trace.nodes]);
+  const selected = nodeById.get(selectedId ?? "") ?? trace.nodes[0];
+  const selectedRef = useRef(selected?.id);
+  useEffect(() => {
+    selectedRef.current = selected?.id;
+  }, [selected?.id]);
+  const selectionRenderKey = reducedMotion ? selected?.id : undefined;
   const lensIds = useMemo(() => {
     if (selected === undefined) return new Set<string>();
+    if (lens === "none") return emptyTraceNodeIds;
     const ids = new Set<string>([selected.id]);
     if (lens === "ancestors") {
       let cursor = selected;
       while (cursor.parentId !== undefined) {
         ids.add(cursor.parentId);
-        const parent = trace.nodes.find(({ id }) => id === cursor.parentId);
+        const parent = nodeById.get(cursor.parentId);
         if (parent === undefined) break;
         cursor = parent;
       }
@@ -1365,16 +1395,14 @@ export const TraceTree = memo(function TraceTree({
       const queue = [selected.id];
       while (queue.length > 0) {
         const parentId = queue.shift()!;
-        for (const child of trace.nodes.filter(
-          ({ parentId: candidate }) => candidate === parentId,
-        )) {
+        for (const child of childrenByParent.get(parentId) ?? []) {
           ids.add(child.id);
           queue.push(child.id);
         }
       }
     }
     return ids;
-  }, [lens, selected, trace.nodes]);
+  }, [childrenByParent, lens, nodeById, selected]);
   const parentCurves = useMemo(
     () =>
       geometry.flatMap((child) => {
@@ -1527,10 +1555,10 @@ export const TraceTree = memo(function TraceTree({
         context.strokeStyle =
           node.status === "ERROR"
             ? error
-            : selected?.id === node.id
+            : selectedRef.current === node.id
               ? selectedColor
               : border;
-        context.lineWidth = selected?.id === node.id ? 2.5 : 1.2;
+        context.lineWidth = selectedRef.current === node.id ? 2.5 : 1.2;
         const rightRadius = 9;
         context.beginPath();
         context.moveTo(x, y);
@@ -1629,7 +1657,7 @@ export const TraceTree = memo(function TraceTree({
     lens,
     lensIds,
     reducedMotion,
-    selected,
+    selectionRenderKey,
     trace.durationNano,
   ]);
 
