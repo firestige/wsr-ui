@@ -39,6 +39,9 @@ export async function inspectPackageArtifact(packageRoot) {
   ) {
     throw new Error("Package artifact contains a bundled React runtime");
   }
+  if (/\brequire\s*\(|Calling `require` for/.test(indexSource)) {
+    throw new Error("Package artifact contains a CommonJS React loader");
+  }
   if (
     !/(?:from\s*["']react["']|from\s*["']react\/jsx-runtime["'])/.test(
       indexSource,

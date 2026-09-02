@@ -11,7 +11,13 @@ export default defineConfig({
       formats: ["es"],
     },
     rollupOptions: {
-      external: ["d3", "react", "react-dom", "react/jsx-runtime"],
+      external: [
+        "d3",
+        "react",
+        "react-dom",
+        "react/jsx-runtime",
+        "react-grid-layout",
+      ],
     },
   },
   plugins: [react(), tailwindcss()],

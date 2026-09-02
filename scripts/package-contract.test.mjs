@@ -55,3 +55,12 @@ test("fails closed when the package contains a bundled React runtime", async (t)
 
   await assert.rejects(inspectPackageArtifact(root), /bundled React runtime/i);
 });
+
+test("fails closed when an ESM artifact retains a CommonJS React loader", async (t) => {
+  const root = await artifactFixture(
+    'import { createElement } from "react";\nconst load = (name) => require(name);\nexport { createElement, load };\n',
+  );
+  t.after(() => rm(root, { force: true, recursive: true }));
+
+  await assert.rejects(inspectPackageArtifact(root), /CommonJS React loader/i);
+});
