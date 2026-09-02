@@ -1456,7 +1456,7 @@ export const TraceTree = memo(function TraceTree({
   const coalescedParentGeometry = parentCurves.length > 128;
   const edgeFlowCurves = useMemo(() => {
     const focused = curves.filter((curve) => curve.focused);
-    return coalescedParentGeometry ? focused.slice(0, 24) : focused;
+    return coalescedParentGeometry ? focused.slice(0, 8) : focused;
   }, [coalescedParentGeometry, curves]);
 
   useEffect(() => {
@@ -1578,7 +1578,7 @@ export const TraceTree = memo(function TraceTree({
           );
           context.save();
           context.fillStyle = curve.kind === "link" ? linkEdge : selectedColor;
-          context.shadowBlur = 10;
+          context.shadowBlur = coalescedParentGeometry ? 0 : 10;
           context.shadowColor = context.fillStyle;
           context.beginPath();
           context.arc(point.x, point.y, 4, 0, Math.PI * 2);

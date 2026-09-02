@@ -95,3 +95,10 @@ rows. It now retains one exact accessible `treeitem` per Span with a compact
 DOM representation; narrow mode retains the complete visible row layout. The
 focused upper-bound result improved to 38.19 ms first-paint P95 with zero long
 tasks before the next fixed rerun.
+
+That fixed rerun moved the only violation from paint to one 51 ms task in the
+Tree upper-bound interaction window; every other target/run and all P95 budgets
+passed. The retained result is
+`results/full-2026-09-02T10-34-59-263Z/result.json`. Summary motion is therefore
+bounded to 8 deterministic representative edges without shadow blur, while the
+complete static geometry and exact semantic tree remain unchanged.

@@ -724,7 +724,7 @@ describe("recorded Trace business panels", () => {
     );
     expect(screen.getByTestId("trace-tree-canvas")).toHaveAttribute(
       "data-edge-flow-count",
-      "24",
+      "8",
     );
     expect(
       container.querySelectorAll('[data-render-detail="summary"]'),
