@@ -37,3 +37,13 @@ Before the qualifying rerun, each affected 200-span panel passed a focused
 
 These native smoke results are diagnostic only. They do not replace the fixed
 Linux/arm64 three-run qualification result.
+
+The first qualifying rerun at provider commit `e65f76b` retained 21 complete
+browser traces and proved Tree green, but correctly exited non-zero because
+Waterfall still recorded 1 / 1 / 2 long tasks across its upper-bound runs. Its
+result is retained at `results/full-2026-09-02T08-39-21-272Z/result.json`
+(SHA-256
+`f2bc6d685a5143051d2cce4e6c67e8eae9fb7a6a37dc5a660d08b482af58ea1f`).
+The remaining 50–56 ms events affected 4 of 90 samples. Memoizing the 200
+static minimap elements across selection-only renders then returned the focused
+Waterfall microbenchmark to zero long tasks before the next qualifying rerun.

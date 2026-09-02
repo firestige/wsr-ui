@@ -450,6 +450,35 @@ export function TraceWaterfall({
       return true;
     });
   }, [collapsedIds, matchingNodes, normalized, traceIndex.nodeById]);
+  const minimapSpans = useMemo(
+    () =>
+      trace.durationNano === undefined
+        ? []
+        : trace.nodes.map((node, row) => {
+            const start = percentage(node.startOffsetNano, trace.durationNano!);
+            const end = Math.min(
+              100,
+              start + percentage(node.durationNano, trace.durationNano!),
+            );
+            const y = row + 0.5;
+            return (
+              <line
+                className={`trace-minimap-span trace-kind-${node.kind.toLowerCase()}${node.status === "ERROR" ? " trace-status-error" : ""}`}
+                data-color-index={node.depth % traceDataPaletteSize}
+                data-minimap-row={row}
+                data-testid="trace-waterfall-minimap-span"
+                data-trace-node-id={node.id}
+                key={node.id}
+                strokeWidth={minimapStrokeWidth(trace.nodes.length)}
+                x1={start}
+                x2={end}
+                y1={y}
+                y2={y}
+              />
+            );
+          }),
+    [trace.durationNano, trace.nodes],
+  );
   useEffect(
     () => () => {
       for (const timer of timelineMotionTimers.current.values())
@@ -732,32 +761,7 @@ export function TraceWaterfall({
             preserveAspectRatio="none"
             viewBox={`0 0 100 ${Math.max(1, trace.nodes.length)}`}
           >
-            {trace.nodes.map((node, row) => {
-              const start = percentage(
-                node.startOffsetNano,
-                trace.durationNano!,
-              );
-              const end = Math.min(
-                100,
-                start + percentage(node.durationNano, trace.durationNano!),
-              );
-              const y = row + 0.5;
-              return (
-                <line
-                  className={`trace-minimap-span trace-kind-${node.kind.toLowerCase()}${node.status === "ERROR" ? " trace-status-error" : ""}`}
-                  data-color-index={node.depth % traceDataPaletteSize}
-                  data-minimap-row={row}
-                  data-testid="trace-waterfall-minimap-span"
-                  data-trace-node-id={node.id}
-                  key={node.id}
-                  strokeWidth={minimapStrokeWidth(trace.nodes.length)}
-                  x1={start}
-                  x2={end}
-                  y1={y}
-                  y2={y}
-                />
-              );
-            })}
+            {minimapSpans}
           </svg>
           <span
             className="trace-minimap-window"
