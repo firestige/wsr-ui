@@ -722,6 +722,10 @@ describe("recorded Trace business panels", () => {
       "data-parent-edge-count",
       "129",
     );
+    expect(screen.getByTestId("trace-tree-canvas")).toHaveAttribute(
+      "data-edge-flow-count",
+      "24",
+    );
     expect(
       container.querySelectorAll('[data-render-detail="summary"]'),
     ).toHaveLength(1);

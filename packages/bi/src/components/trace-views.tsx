@@ -1441,6 +1441,10 @@ export const TraceTree = memo(function TraceTree({
     [linkCurves, parentCurves],
   );
   const coalescedParentGeometry = parentCurves.length > 128;
+  const edgeFlowCurves = useMemo(() => {
+    const focused = curves.filter((curve) => curve.focused);
+    return coalescedParentGeometry ? focused.slice(0, 24) : focused;
+  }, [coalescedParentGeometry, curves]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -1534,8 +1538,7 @@ export const TraceTree = memo(function TraceTree({
 
       curves.forEach(drawCurve);
       if (!reducedMotion) {
-        curves.forEach((curve, index) => {
-          if (!curve.focused) return;
+        edgeFlowCurves.forEach((curve, index) => {
           const point = pointOnTreeCurve(
             curve,
             (((timestamp / 1600 + index * 0.17) % 1) + 1) % 1,
@@ -1657,6 +1660,7 @@ export const TraceTree = memo(function TraceTree({
     camera,
     coalescedParentGeometry,
     curves,
+    edgeFlowCurves,
     geometry,
     lens,
     lensIds,
@@ -1914,7 +1918,7 @@ export const TraceTree = memo(function TraceTree({
               aria-label="Recorded span call tree graph"
               className="trace-tree-canvas-surface"
               data-camera-view={formatTreeCamera(camera)}
-              data-edge-flow-count={reducedMotion ? 0 : curves.length}
+              data-edge-flow-count={reducedMotion ? 0 : edgeFlowCurves.length}
               data-edge-routing="orthogonal"
               data-link-count={linkCurves.length}
               data-layout="call-graph"

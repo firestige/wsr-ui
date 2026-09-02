@@ -47,3 +47,14 @@ result is retained at `results/full-2026-09-02T08-39-21-272Z/result.json`
 The remaining 50–56 ms events affected 4 of 90 samples. Memoizing the 200
 static minimap elements across selection-only renders then returned the focused
 Waterfall microbenchmark to zero long tasks before the next qualifying rerun.
+
+The next full result at provider commit `cd8b333` proved Waterfall green in all
+three runs. Tree upper-bound recorded 1 / 4 / 0 long tasks because the summary
+renderer still animated every one of roughly 200 recorded edges with an
+individual shadowed particle on every frame. The complete failed result remains
+at `results/full-2026-09-02T09-20-41-051Z/result.json` (SHA-256
+`7bcc387e5e999236399bcb7aeeef74381ccf74abc70c09834ed185108697322e`).
+The summary renderer now retains the complete deterministic node/edge geometry
+and bounds concurrent motion to the first 24 focused edges in stable trace
+order. A component test fixes that behavior, and the 200-span Tree
+microbenchmark returned to zero long tasks before the final qualifying rerun.
