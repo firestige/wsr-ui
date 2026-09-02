@@ -19,6 +19,14 @@
   --wsr-trace-indent-1: var(--wsr-waterfall-color-1);
   --wsr-trace-indent-2: var(--wsr-waterfall-color-2);
   --wsr-trace-indent-3: var(--wsr-waterfall-color-3);
+  --wsr-tree-node-surface: var(--surface-raised);
+  --wsr-tree-node-border: var(--border-strong);
+  --wsr-tree-internal-color: var(--data-series-1);
+  --wsr-tree-client-color: var(--data-series-2);
+  --wsr-tree-error-color: var(--status-error);
+  --wsr-tree-selected-color: var(--interaction-accent);
+  --wsr-tree-parent-edge-color: var(--border-strong);
+  --wsr-tree-link-edge-color: var(--status-warning);
   --trace-indent-column: 0;
   --trace-indent-columns: 1;
   --surface-canvas: oklch(0.975 0.006 250);
@@ -453,6 +461,17 @@
   margin: 0;
   color: var(--content-secondary);
 }
+.wsr-bi .trace-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
 
 @keyframes trace-recorded-reveal {
   from {
@@ -510,7 +529,6 @@
 }
 
 .wsr-bi .trace-view-tools,
-.wsr-bi .trace-motion-actions,
 .wsr-bi .trace-passport-head {
   display: flex;
   flex-wrap: wrap;
@@ -716,25 +734,34 @@
   height: 1.8125rem;
   flex: 0 0 auto;
   place-items: center;
-  border: 1px solid var(--data-series-1);
+  border: 1px solid var(--wsr-tree-internal-color);
   border-radius: 0.4375rem;
   background: color-mix(
     in srgb,
-    var(--data-series-1) 16%,
+    var(--wsr-tree-internal-color) 16%,
     var(--surface-panel)
   );
-  color: var(--data-series-1);
+  color: var(--wsr-tree-internal-color);
   font-size: 0.5rem;
   font-weight: 800;
 }
 .wsr-bi .trace-passport-sigil.trace-kind-client {
-  border-color: var(--data-series-2);
+  border-color: var(--wsr-tree-client-color);
   background: color-mix(
     in srgb,
-    var(--data-series-2) 16%,
+    var(--wsr-tree-client-color) 16%,
     var(--surface-panel)
   );
-  color: var(--data-series-2);
+  color: var(--wsr-tree-client-color);
+}
+.wsr-bi .trace-passport-sigil.trace-status-error {
+  border-color: var(--wsr-tree-error-color);
+  background: color-mix(
+    in srgb,
+    var(--wsr-tree-error-color) 16%,
+    var(--surface-panel)
+  );
+  color: var(--wsr-tree-error-color);
 }
 .wsr-bi .trace-passport-grid {
   display: grid;
@@ -757,39 +784,24 @@
 .wsr-bi .trace-passport-grid .numeric-exact {
   font-size: 0.5rem;
 }
-.wsr-bi .trace-link-receipt {
-  padding: var(--space-tight);
-  border-inline-start: 3px solid var(--status-warning);
+.wsr-bi .trace-link-receipt,
+.wsr-bi .trace-focus-receipt {
+  margin-block: var(--space-grid);
+  padding: 0.65rem;
   border-radius: var(--shape-control);
+  color: var(--content-secondary);
+  font-family: var(--type-code-family);
+  font-size: var(--type-caption-size);
+  line-height: 1.5;
+  text-align: start;
+}
+.wsr-bi .trace-link-receipt {
+  border-inline-start: 3px solid var(--wsr-tree-link-edge-color);
   background: color-mix(
     in srgb,
-    var(--status-warning) 16%,
+    var(--wsr-tree-link-edge-color) 16%,
     var(--surface-panel)
   );
-  color: var(--content-secondary);
-}
-
-.wsr-bi .trace-motion {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  gap: var(--space-grid);
-  align-items: center;
-  padding: var(--space-tight) var(--space-grid);
-  border: 1px solid var(--border-default);
-  border-radius: var(--shape-panel);
-  background: var(--surface-panel);
-}
-
-.wsr-bi .trace-motion-copy {
-  display: grid;
-  gap: var(--space-tight);
-}
-.wsr-bi .trace-motion-copy input {
-  width: 100%;
-}
-.wsr-bi .trace-motion-copy span {
-  color: var(--content-secondary);
-  font-size: var(--type-caption-size);
 }
 
 .wsr-bi .trace-tree-canvas {
@@ -800,98 +812,51 @@
   background-image: radial-gradient(var(--border-default) 1px, transparent 1px);
   background-size: 1.25rem 1.25rem;
 }
-.wsr-bi .trace-tree-svg {
+.wsr-bi .trace-tree-canvas-surface {
+  display: block;
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
-}
-.wsr-bi .trace-tree-edge {
-  fill: none;
-  stroke: var(--border-strong);
-  stroke-width: 2;
-  marker-end: url(#trace-parent-arrow);
-}
-.wsr-bi .trace-tree-link {
-  stroke: var(--status-warning);
-  stroke-dasharray: 7 6;
-  marker-end: url(#trace-link-arrow);
-}
-.wsr-bi #trace-parent-arrow path {
-  fill: var(--border-strong);
-}
-.wsr-bi #trace-link-arrow path {
-  fill: var(--status-warning);
-}
-.wsr-bi .trace-tree-node {
   cursor: pointer;
-  outline: none;
-}
-.wsr-bi .trace-tree-card {
-  fill: var(--surface-raised);
-  stroke: var(--border-strong);
-  stroke-width: 1.2;
-}
-.wsr-bi .trace-tree-node.is-selected .trace-tree-card {
-  stroke: var(--data-series-1);
-  stroke-width: 2;
-  filter: drop-shadow(
-    0 0 5px color-mix(in srgb, var(--data-series-1) 45%, transparent)
-  );
-}
-.wsr-bi .trace-tree-node.trace-status-error .trace-tree-card {
-  stroke: var(--status-error);
-}
-.wsr-bi .trace-tree-kind-rail,
-.wsr-bi .trace-tree-micro {
-  fill: var(--data-series-1);
-}
-.wsr-bi .trace-tree-node.trace-kind-client .trace-tree-kind-rail,
-.wsr-bi .trace-tree-node.trace-kind-client .trace-tree-micro {
-  fill: var(--data-series-2);
-}
-.wsr-bi .trace-tree-kind,
-.wsr-bi .trace-tree-meta,
-.wsr-bi .trace-tree-status,
-.wsr-bi .trace-tree-duration {
-  fill: var(--content-secondary);
-  font: var(--type-caption-size) var(--type-code-family);
-}
-.wsr-bi .trace-tree-name {
-  fill: var(--content-primary);
-  font-size: var(--type-label-size);
-  font-weight: 650;
-}
-.wsr-bi .trace-tree-micro-bg {
-  fill: var(--border-default);
+  touch-action: none;
 }
 .wsr-bi .trace-camera-map {
   position: absolute;
-  inset-inline-end: var(--space-grid);
+  z-index: 2;
+  inset-inline-start: var(--space-grid);
   inset-block-end: var(--space-grid);
-  width: 8.5rem;
-  min-height: 5.25rem;
+  width: 9.5rem;
   padding: var(--space-tight);
   border: 1px solid var(--border-strong);
   border-radius: var(--shape-control);
   background: color-mix(in srgb, var(--surface-base) 90%, transparent);
+  cursor: crosshair;
+  touch-action: none;
+  user-select: none;
 }
 .wsr-bi .trace-camera-map > strong {
   color: var(--content-secondary);
-  font-size: var(--type-caption-size);
   text-transform: uppercase;
 }
-.wsr-bi .trace-camera-map > div {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-tight);
+.wsr-bi .trace-camera-map-viewport {
+  position: relative;
+  height: 5rem;
   margin-block-start: var(--space-tight);
+  overflow: hidden;
+  border-radius: calc(var(--shape-control) / 2);
+  background: var(--surface-inset);
 }
-.wsr-bi .trace-camera-map i {
-  width: 0.85rem;
-  height: 0.45rem;
-  border-radius: 2px;
-  background: var(--data-series-2);
+.wsr-bi .trace-camera-map-viewport canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.wsr-bi .trace-camera-map-viewport > span {
+  position: absolute;
+  border: 1px solid var(--interaction-accent);
+  background: color-mix(in srgb, var(--interaction-accent) 15%, transparent);
+  pointer-events: none;
 }
 
 .wsr-bi .trace-tree-outline {
@@ -942,14 +907,17 @@
 
 @media (max-width: 40rem) {
   .wsr-bi .trace-summary-dense,
-  .wsr-bi .trace-motion,
   .wsr-bi .trace-statistics dl {
     grid-template-columns: 1fr;
   }
   .wsr-bi .trace-minimap,
   .wsr-bi .trace-waterfall-canvas,
-  .wsr-bi .trace-tree-canvas {
+  .wsr-bi .trace-tree-canvas-surface,
+  .wsr-bi .trace-camera-map {
     display: none;
+  }
+  .wsr-bi .trace-tree-canvas {
+    min-height: auto;
   }
   .wsr-bi .trace-tree-outline {
     position: static;
@@ -1019,29 +987,124 @@
   grid-template-columns: minmax(0, 1fr) minmax(17rem, 18.75rem);
   gap: 0.75rem;
 }
-.wsr-bi .trace-timeline-head {
+.wsr-bi .trace-tree-canvas-head {
   display: grid;
-  grid-template-columns: minmax(16rem, 19rem) minmax(25rem, 1fr);
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-grid);
+  min-height: 3rem;
+  padding: 0.45rem 0.75rem;
+  border-block-end: 1px solid var(--border-default);
 }
-.wsr-bi .trace-timeline-head > :last-child {
-  padding-inline-start: var(--space-grid);
-  text-align: end;
+.wsr-bi .trace-tree-canvas-head > div:first-child {
+  display: grid;
+  min-width: 0;
+  gap: 0.15rem;
 }
-.wsr-bi .trace-focus-receipt {
-  margin-block: var(--space-grid);
-  padding: 0.65rem;
-  border-inline-start: 3px solid var(--data-series-2);
-  border-radius: var(--shape-control);
-  background: color-mix(
-    in srgb,
-    var(--data-series-2) 14%,
-    var(--surface-panel)
-  );
+.wsr-bi .trace-tree-canvas-head h2,
+.wsr-bi .trace-tree-canvas-head p {
+  margin: 0;
+}
+.wsr-bi .trace-tree-canvas-head h2 {
+  font-size: var(--type-label-size);
+}
+.wsr-bi .trace-tree-canvas-head p {
+  overflow: hidden;
+  color: var(--content-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.wsr-bi .trace-tree-canvas-head [role="group"] {
+  display: flex;
+  gap: var(--space-tight);
+}
+.wsr-bi .trace-tree-canvas-head button {
+  min-height: 1.65rem;
+}
+.wsr-bi .trace-tree-actions {
+  justify-self: end;
+}
+.wsr-bi
+  .trace-tree-actions
+  .wsr-button[data-icon-button="true"]:is(:hover, :focus-visible) {
+  border-color: var(--interaction-accent);
+  background: var(--interaction-selection);
+  color: var(--interaction-accent);
+}
+.wsr-bi .trace-tree-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 1rem;
+  min-height: 2rem;
+  margin: 0;
+  padding: 0.35rem 0.75rem;
+  border-block-end: 1px solid var(--border-default);
+  background: var(--surface-panel);
   color: var(--content-secondary);
   font-size: var(--type-caption-size);
+  list-style: none;
 }
-.wsr-bi .trace-passport-actions,
-.wsr-bi .trace-tree-toolbar {
+.wsr-bi .trace-tree-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  white-space: nowrap;
+}
+.wsr-bi .trace-tree-legend i {
+  position: relative;
+  display: inline-block;
+  flex: 0 0 auto;
+  inline-size: 1rem;
+  block-size: 0.45rem;
+  border-radius: 0 0.25rem 0.25rem 0;
+  background: var(--data-series-1);
+}
+.wsr-bi .trace-tree-legend i[data-legend-kind="client"] {
+  background: var(--data-series-2);
+}
+.wsr-bi .trace-tree-legend i[data-legend-kind="error"] {
+  background: var(--status-error);
+}
+.wsr-bi .trace-tree-legend i[data-legend-kind="parent"],
+.wsr-bi .trace-tree-legend i[data-legend-kind="link"] {
+  block-size: 0;
+  border-block-start: 1px solid var(--content-secondary);
+  border-radius: 0;
+  background: transparent;
+}
+.wsr-bi .trace-tree-legend i[data-legend-kind="link"] {
+  border-block-start-style: dashed;
+  border-block-start-color: var(--status-warning);
+}
+.wsr-bi .trace-tree-legend i[data-legend-kind="parent"]::after,
+.wsr-bi .trace-tree-legend i[data-legend-kind="link"]::after {
+  position: absolute;
+  inset-block-start: -0.2rem;
+  inset-inline-end: -0.05rem;
+  inline-size: 0.3rem;
+  block-size: 0.3rem;
+  border-block-start: 1px solid currentColor;
+  border-inline-end: 1px solid currentColor;
+  content: "";
+  transform: rotate(45deg);
+}
+.wsr-bi .trace-tree-legend i[data-legend-kind="flow"] {
+  inline-size: 0.4rem;
+  block-size: 0.4rem;
+  border-radius: 50%;
+  background: var(--interaction-accent);
+  box-shadow: 0 0 0.35rem var(--interaction-accent);
+}
+.wsr-bi .trace-focus-receipt {
+  border-inline-start: 3px solid var(--wsr-tree-selected-color);
+  background: color-mix(
+    in srgb,
+    var(--wsr-tree-selected-color) 14%,
+    var(--surface-panel)
+  );
+}
+.wsr-bi .trace-passport-actions {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-tight);
@@ -1072,78 +1135,6 @@
   border-radius: 0;
   background: transparent;
   text-align: start;
-}
-.wsr-bi .trace-tree-context {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: var(--space-grid);
-  align-items: center;
-  padding: 0.7rem 0.85rem;
-  border: 1px solid var(--border-default);
-  border-radius: var(--shape-panel);
-  background: var(--surface-panel);
-}
-.wsr-bi .trace-tree-context strong,
-.wsr-bi .trace-tree-context code {
-  display: block;
-}
-.wsr-bi .trace-tree-context strong {
-  font-size: var(--type-heading-size);
-}
-.wsr-bi .trace-tree-context code {
-  margin-block-start: 0.3rem;
-  overflow: hidden;
-  color: var(--content-secondary);
-  font: var(--type-caption-size) var(--type-code-family);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.wsr-bi .trace-depth-label {
-  position: absolute;
-  z-index: 1;
-  inset-block-start: 0.8rem;
-  color: var(--content-muted);
-  font-size: 0.65rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-.wsr-bi .trace-depth-0 {
-  inset-inline-start: 5%;
-}
-.wsr-bi .trace-depth-1 {
-  inset-inline-start: 37%;
-}
-.wsr-bi .trace-depth-2 {
-  inset-inline-start: 70%;
-}
-.wsr-bi .trace-depth-divider {
-  position: absolute;
-  z-index: 0;
-  inset-block: 2.1rem 1.25rem;
-  border-inline-start: 1px dashed var(--border-default);
-}
-.wsr-bi .trace-depth-divider-1 {
-  inset-inline-start: 32%;
-}
-.wsr-bi .trace-depth-divider-2 {
-  inset-inline-start: 65%;
-}
-.wsr-bi .trace-tree-edge.is-muted,
-.wsr-bi .trace-tree-node.is-lens-muted {
-  opacity: 0.16;
-}
-.wsr-bi .trace-tree-edge.is-focused {
-  stroke: var(--data-series-2);
-  filter: drop-shadow(
-    0 0 4px color-mix(in srgb, var(--data-series-2) 50%, transparent)
-  );
-}
-.wsr-bi .trace-tree-node.is-time-current .trace-tree-card {
-  filter: brightness(1.3)
-    drop-shadow(
-      0 0 5px color-mix(in srgb, var(--data-series-1) 45%, transparent)
-    );
 }
 .wsr-bi .trace-statistics-intro {
   padding: 0.8rem 0.9rem;
@@ -1208,24 +1199,16 @@
     max-inline-size: 100%;
     min-inline-size: 0;
   }
-  .wsr-bi .trace-view,
-  .wsr-bi .trace-motion-copy {
+  .wsr-bi .trace-view {
     overflow: hidden;
-  }
-  .wsr-bi .trace-motion-copy span {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
   }
   .wsr-bi .trace-tree-context {
     grid-template-columns: 1fr;
   }
-  .wsr-bi .trace-timeline-head {
-    display: flex;
-    min-height: auto;
-    padding: 0.65rem 0.75rem;
+  .wsr-bi .trace-tree-canvas-head {
+    grid-template-columns: 1fr;
   }
-  .wsr-bi .trace-timeline-head > :last-child {
+  .wsr-bi .trace-tree-canvas-head p {
     display: none;
   }
   .wsr-bi .trace-tree-outline > div > button {

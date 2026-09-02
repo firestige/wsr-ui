@@ -194,7 +194,7 @@ export function SpanPassport({
         <div className="trace-passport-title">
           <span
             aria-hidden="true"
-            className={`trace-passport-sigil trace-kind-${node.kind.toLowerCase()}`}
+            className={`trace-passport-sigil trace-kind-${node.kind.toLowerCase()}${node.status === "ERROR" ? " trace-status-error" : ""}`}
           >
             {node.kind === "CLIENT" ? "↗" : "◆"}
           </span>
@@ -255,77 +255,16 @@ function RecordedLinks({
     : trace.links;
   if (links.length === 0) return null;
   return (
-    <ul aria-label="Recorded span links" className="trace-link-list">
+    <ul
+      aria-label="Recorded span links"
+      className="trace-link-list trace-sr-only"
+    >
       {links.map((link) => (
         <li className="text-code" key={link.id}>
           {`Recorded LINK → ${link.to.trace_id}:${link.to.span_id}`}
         </li>
       ))}
     </ul>
-  );
-}
-
-function TraceMotion({
-  durationNano,
-  position,
-  playing,
-  reducedMotion,
-  onPlayingChange,
-  onPositionChange,
-}: {
-  durationNano: string;
-  position: number;
-  playing: boolean;
-  reducedMotion: boolean;
-  onPlayingChange(value: boolean): void;
-  onPositionChange(value: number): void;
-}) {
-  return (
-    <footer className="trace-motion">
-      <div className="trace-motion-actions">
-        <button
-          disabled={reducedMotion}
-          onClick={() => onPlayingChange(!playing)}
-          type="button"
-        >
-          {reducedMotion
-            ? "Reduced motion: Still"
-            : playing
-              ? "Pause"
-              : "Play recorded time"}
-        </button>
-        <button
-          onClick={() => {
-            onPlayingChange(false);
-            onPositionChange(0);
-          }}
-          type="button"
-        >
-          Restart
-        </button>
-      </div>
-      <div className="trace-motion-copy">
-        <strong>
-          {playing ? "Playing · exact recorded time" : "Still · complete trace"}
-        </strong>
-        <input
-          aria-label="Recorded time position"
-          aria-valuemax={100}
-          aria-valuemin={0}
-          max={100}
-          min={0}
-          onChange={(event) =>
-            onPositionChange(Number(event.currentTarget.value))
-          }
-          type="range"
-          value={position}
-        />
-        <span>
-          Finite reader-controlled visualization; not a running execution.
-        </span>
-      </div>
-      <code>{`${Math.round(position)}% / ${displayNano(durationNano)}`}</code>
-    </footer>
   );
 }
 
@@ -1145,18 +1084,36 @@ export function TraceWaterfall({
 
 interface GeometryNode {
   node: TraceViewNode;
+  column: number;
   x: number;
   y: number;
 }
 
 function treeGeometry(trace: TraceView): GeometryNode[] {
-  const byDepth = new Map<number, TraceViewNode[]>();
+  const byId = new Map(trace.nodes.map((node) => [node.id, node]));
+  const columns = new Map<string, number>();
+  const resolveColumn = (
+    node: TraceViewNode,
+    visiting = new Set<string>(),
+  ): number => {
+    const settled = columns.get(node.id);
+    if (settled !== undefined) return settled;
+    if (node.parentId === undefined || visiting.has(node.id)) return 0;
+    const parent = byId.get(node.parentId);
+    if (parent === undefined) return 0;
+    const nextVisiting = new Set(visiting).add(node.id);
+    const column = resolveColumn(parent, nextVisiting) + 1;
+    columns.set(node.id, column);
+    return column;
+  };
+  const byColumn = new Map<number, TraceViewNode[]>();
   for (const node of trace.nodes) {
-    const row = byDepth.get(node.depth) ?? [];
+    const column = resolveColumn(node);
+    const row = byColumn.get(column) ?? [];
     row.push(node);
-    byDepth.set(node.depth, row);
+    byColumn.set(column, row);
   }
-  return [...byDepth.entries()].flatMap(([depth, nodes]) =>
+  return [...byColumn.entries()].flatMap(([column, nodes]) =>
     [...nodes]
       .sort(
         (left, right) =>
@@ -1165,7 +1122,8 @@ function treeGeometry(trace: TraceView): GeometryNode[] {
       )
       .map((node, index) => ({
         node,
-        x: 60 + depth * 330,
+        column,
+        x: 60 + column * 330,
         y:
           nodes.length === 1
             ? 240
@@ -1176,176 +1134,216 @@ function treeGeometry(trace: TraceView): GeometryNode[] {
   );
 }
 
-function edgePath(from: GeometryNode, to: GeometryNode): string {
-  const startX = from.x + 190;
-  const startY = from.y + 35;
-  const endX = to.x;
-  const endY = to.y + 35;
-  const middle = (startX + endX) / 2;
-  return `M${startX} ${startY} C${middle} ${startY} ${middle} ${endY} ${endX} ${endY}`;
+const treeWorldWidth = 980;
+const treeWorldHeight = 560;
+const treeNodeWidth = 190;
+const treeNodeHeight = 70;
+
+interface TreeCamera {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
 }
 
-const TreeNodeGlyph = memo(function TreeNodeGlyph({
-  node,
-  x,
-  y,
-  selected,
-  lensHit,
-  current,
-  playing,
-  summary,
-  traceDurationNano,
-  onSelect,
-}: GeometryNode & {
-  selected: boolean;
-  lensHit: boolean;
-  current: boolean;
-  playing: boolean;
-  summary: boolean;
-  traceDurationNano: string;
-  onSelect(id: string): void;
-}) {
-  const select = () => onSelect(node.id);
-  return (
-    <g
-      aria-label={`${node.label}, ${node.kind}, ${node.status}, ${displayNano(node.durationNano)}`}
-      aria-level={node.depth + 1}
-      className={`trace-tree-node trace-kind-${node.kind.toLowerCase()}${selected ? " is-selected" : ""}${lensHit ? " is-lens-hit" : " is-lens-muted"}${current && playing ? " is-time-current" : ""}${node.status === "ERROR" ? " trace-status-error" : ""}`}
-      data-render-detail={summary ? "summary" : "complete"}
-      data-testid="trace-tree-node"
-      data-trace-node-id={node.id}
-      onClick={select}
-      onKeyDown={(event) => {
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault();
-          select();
-        }
-      }}
-      role="treeitem"
-      tabIndex={0}
-      transform={`translate(${x} ${y})`}
-    >
-      <rect className="trace-tree-card" height="70" rx="9" width="190" />
-      <rect className="trace-tree-kind-rail" height="70" rx="3" width="4" />
-      {summary ? (
-        <>
-          <text className="trace-tree-name" x="14" y="31">
-            {node.label}
-          </text>
-          <text className="trace-tree-duration" textAnchor="end" x="176" y="50">
-            {displayNano(node.durationNano)}
-          </text>
-        </>
-      ) : (
-        <>
-          <text className="trace-tree-kind" x="14" y="17">
-            {node.kind}
-          </text>
-          <text className="trace-tree-status" textAnchor="end" x="176" y="17">
-            {node.status}
-          </text>
-          <text className="trace-tree-name" x="14" y="37">
-            {node.label}
-          </text>
-          <text
-            className="trace-tree-meta"
-            x="14"
-            y="53"
-          >{`+${displayNano(node.startOffsetNano)} · ${compactIdentity(node.id)}`}</text>
-          <text className="trace-tree-duration" textAnchor="end" x="176" y="53">
-            {displayNano(node.durationNano)}
-          </text>
-          <rect
-            className="trace-tree-micro-bg"
-            height="3"
-            rx="2"
-            width="160"
-            x="14"
-            y="61"
-          />
-          <rect
-            className="trace-tree-micro"
-            height="3"
-            rx="2"
-            width={Math.max(
-              2,
-              percentage(node.durationNano, traceDurationNano) * 1.6,
-            )}
-            x={14 + percentage(node.startOffsetNano, traceDurationNano) * 1.6}
-            y="61"
-          />
-        </>
-      )}
-    </g>
-  );
-});
+interface TreeCurve {
+  startX: number;
+  startY: number;
+  middleX: number;
+  endX: number;
+  endY: number;
+  kind: "parent" | "link";
+  focused: boolean;
+}
+
+const treeFitCamera: TreeCamera = {
+  x: 0,
+  y: 0,
+  width: treeWorldWidth,
+  height: treeWorldHeight,
+};
+
+function normalizedTreeCamera(camera: TreeCamera): TreeCamera {
+  const width = Math.min(treeWorldWidth, Math.max(392, camera.width));
+  const height = Math.min(treeWorldHeight, Math.max(224, camera.height));
+  return {
+    x:
+      Math.round(
+        Math.max(0, Math.min(treeWorldWidth - width, camera.x)) * 1000,
+      ) / 1000,
+    y:
+      Math.round(
+        Math.max(0, Math.min(treeWorldHeight - height, camera.y)) * 1000,
+      ) / 1000,
+    width: Math.round(width * 1000) / 1000,
+    height: Math.round(height * 1000) / 1000,
+  };
+}
+
+function zoomTreeCamera(camera: TreeCamera, factor: number): TreeCamera {
+  const width = camera.width * factor;
+  const height = camera.height * factor;
+  return normalizedTreeCamera({
+    x: camera.x + (camera.width - width) / 2,
+    y: camera.y + (camera.height - height) / 2,
+    width,
+    height,
+  });
+}
+
+function formatTreeCamera(camera: TreeCamera): string {
+  return `${camera.x} ${camera.y} ${camera.width} ${camera.height}`;
+}
+
+function treeCanvasProjection(
+  width: number,
+  height: number,
+  camera: TreeCamera,
+) {
+  const scale = Math.min(width / camera.width, height / camera.height);
+  return {
+    scale,
+    offsetX: (width - camera.width * scale) / 2,
+    offsetY: (height - camera.height * scale) / 2,
+  };
+}
+
+function treeCurve(
+  from: GeometryNode,
+  to: GeometryNode | undefined,
+  kind: TreeCurve["kind"],
+  focused: boolean,
+): TreeCurve {
+  const startX = from.x + treeNodeWidth;
+  const startY = from.y + treeNodeHeight / 2;
+  const endX = to?.x ?? treeWorldWidth - 30;
+  const endY =
+    to === undefined
+      ? Math.min(treeWorldHeight - 40, startY + 80)
+      : to.y + treeNodeHeight / 2;
+  const middle = (startX + endX) / 2;
+  return {
+    startX,
+    startY,
+    middleX: middle,
+    endX,
+    endY,
+    kind,
+    focused,
+  };
+}
+
+function pointOnTreeCurve(curve: TreeCurve, progress: number) {
+  const firstLength = Math.abs(curve.middleX - curve.startX);
+  const verticalLength = Math.abs(curve.endY - curve.startY);
+  const lastLength = Math.abs(curve.endX - curve.middleX);
+  const totalLength = firstLength + verticalLength + lastLength;
+  let distance = progress * totalLength;
+  const interpolate = (from: number, to: number, ratio: number) =>
+    from + (to - from) * ratio;
+  if (distance <= firstLength)
+    return {
+      x: interpolate(
+        curve.startX,
+        curve.middleX,
+        firstLength === 0 ? 1 : distance / firstLength,
+      ),
+      y: curve.startY,
+    };
+  distance -= firstLength;
+  if (distance <= verticalLength)
+    return {
+      x: curve.middleX,
+      y: interpolate(
+        curve.startY,
+        curve.endY,
+        verticalLength === 0 ? 1 : distance / verticalLength,
+      ),
+    };
+  distance -= verticalLength;
+  return {
+    x: interpolate(
+      curve.middleX,
+      curve.endX,
+      lastLength === 0 ? 1 : distance / lastLength,
+    ),
+    y: curve.endY,
+  };
+}
+
+function treeCanvasColor(
+  canvas: HTMLCanvasElement,
+  token: string,
+  fallback: string,
+): string {
+  const value = getComputedStyle(canvas).getPropertyValue(token).trim();
+  return value === "" ? fallback : value;
+}
 
 const TreeOutlineRow = memo(function TreeOutlineRow({
   node,
   trace,
   onSelect,
+  layout,
+  showLinks = true,
 }: {
   node: TraceViewNode;
   trace: TraceView;
   onSelect(id: string): void;
+  layout?: GeometryNode;
+  showLinks?: boolean;
 }) {
   return (
-    <div
-      aria-level={node.depth + 1}
-      role="treeitem"
-      style={{ paddingInlineStart: `${node.depth * 1.5}rem` }}
-    >
+    <div style={{ paddingInlineStart: `${node.depth * 1.5}rem` }}>
       <button
+        aria-level={(layout?.column ?? node.depth) + 1}
+        data-tree-x={layout?.x}
+        data-tree-y={layout?.y}
         data-testid="trace-tree-node"
         data-trace-node-id={node.id}
         onClick={() => onSelect(node.id)}
+        role="treeitem"
         type="button"
       >
         <span>{node.label}</span>
         <span>{displayNano(node.durationNano)}</span>
       </button>
-      <RecordedLinks node={node} trace={trace} />
+      {showLinks ? <RecordedLinks node={node} trace={trace} /> : null}
     </div>
   );
 });
 
 export const TraceTree = memo(function TraceTree({
   trace,
+  reducedMotion = false,
   viewNavigation,
 }: {
   trace: TraceView;
+  reducedMotion?: boolean;
   viewNavigation?: ReactNode;
 }) {
   const [selectedId, setSelectedId] = useState<string>();
   const [lens, setLens] = useState<"none" | "ancestors" | "descendants">(
     "none",
   );
-  const [position, setPosition] = useState(0);
-  const [playing, setPlaying] = useState(false);
+  const [camera, setCamera] = useState<TreeCamera>(treeFitCamera);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const minimapRef = useRef<HTMLCanvasElement>(null);
+  const minimapDragging = useRef(false);
   const selectNode = useCallback((id: string) => setSelectedId(id), []);
   const narrow = useNarrowTraceView();
   const geometry = useMemo(
     () => (trace.status === "READY" ? treeGeometry(trace) : []),
     [trace],
   );
-  useEffect(() => {
-    if (!playing) return undefined;
-    const timer = window.setInterval(() => {
-      setPosition((current) => {
-        if (current >= 100) {
-          setPlaying(false);
-          return 100;
-        }
-        return Math.min(100, current + 2);
-      });
-    }, 100);
-    return () => window.clearInterval(timer);
-  }, [playing]);
-  if (trace.status !== "READY") return <InvalidTrace trace={trace} />;
-  const byId = new Map(geometry.map((item) => [item.node.id, item]));
+  const byId = useMemo(
+    () => new Map(geometry.map((item) => [item.node.id, item])),
+    [geometry],
+  );
   const selected =
-    trace.nodes.find((node) => node.id === selectedId) ?? trace.nodes[0]!;
-  const lensIds = (() => {
+    trace.nodes.find((node) => node.id === selectedId) ?? trace.nodes[0];
+  const lensIds = useMemo(() => {
+    if (selected === undefined) return new Set<string>();
     const ids = new Set<string>([selected.id]);
     if (lens === "ancestors") {
       let cursor = selected;
@@ -1369,55 +1367,558 @@ export const TraceTree = memo(function TraceTree({
       }
     }
     return ids;
-  })();
+  }, [lens, selected, trace.nodes]);
+  const parentCurves = useMemo(
+    () =>
+      geometry.flatMap((child) => {
+        if (child.node.parentId === undefined) return [];
+        const parent = byId.get(child.node.parentId);
+        if (parent === undefined) return [];
+        return [
+          treeCurve(
+            parent,
+            child,
+            "parent",
+            lens === "none" ||
+              (lensIds.has(parent.node.id) && lensIds.has(child.node.id)),
+          ),
+        ];
+      }),
+    [byId, geometry, lens, lensIds],
+  );
+  const linkCurves = useMemo(
+    () =>
+      trace.links.flatMap((link) => {
+        const from = byId.get(link.from.span_id);
+        if (from === undefined) return [];
+        return [
+          treeCurve(from, byId.get(link.to.span_id), "link", lens === "none"),
+        ];
+      }),
+    [byId, lens, trace.links],
+  );
+  const curves = useMemo(
+    () => [...parentCurves, ...linkCurves],
+    [linkCurves, parentCurves],
+  );
+  const coalescedParentGeometry = parentCurves.length > 128;
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (
+      canvas === null ||
+      typeof window.CanvasRenderingContext2D === "undefined"
+    )
+      return undefined;
+    const context = canvas.getContext("2d");
+    if (context === null) return undefined;
+    let surface = "";
+    let border = "";
+    let primary = "";
+    let secondary = "";
+    let series1 = "";
+    let series2 = "";
+    let error = "";
+    let selectedColor = "";
+    let parentEdge = "";
+    let linkEdge = "";
+    const refreshPalette = () => {
+      surface = treeCanvasColor(canvas, "--wsr-tree-node-surface", "#17212d");
+      border = treeCanvasColor(canvas, "--wsr-tree-node-border", "#607084");
+      primary = treeCanvasColor(canvas, "--content-primary", "#f1f5f9");
+      secondary = treeCanvasColor(canvas, "--content-secondary", "#a9b4c2");
+      series1 = treeCanvasColor(canvas, "--wsr-tree-internal-color", "#38bdf8");
+      series2 = treeCanvasColor(canvas, "--wsr-tree-client-color", "#2dd4bf");
+      error = treeCanvasColor(canvas, "--wsr-tree-error-color", "#fb7185");
+      selectedColor = treeCanvasColor(
+        canvas,
+        "--wsr-tree-selected-color",
+        "#38bdf8",
+      );
+      parentEdge = treeCanvasColor(
+        canvas,
+        "--wsr-tree-parent-edge-color",
+        "#607084",
+      );
+      linkEdge = treeCanvasColor(
+        canvas,
+        "--wsr-tree-link-edge-color",
+        "#fbbf24",
+      );
+    };
+    refreshPalette();
+    const duration = trace.durationNano ?? "0";
+    let animationFrame = 0;
+    let resizeObserver: ResizeObserver | undefined;
+    let themeObserver: MutationObserver | undefined;
+
+    const drawCurve = (curve: TreeCurve) => {
+      context.save();
+      context.globalAlpha = curve.focused ? 1 : 0.2;
+      context.strokeStyle = curve.kind === "link" ? linkEdge : parentEdge;
+      context.lineWidth = 2;
+      context.setLineDash(curve.kind === "link" ? [7, 6] : []);
+      context.beginPath();
+      context.moveTo(curve.startX, curve.startY);
+      context.lineTo(curve.middleX, curve.startY);
+      context.lineTo(curve.middleX, curve.endY);
+      context.lineTo(curve.endX, curve.endY);
+      context.stroke();
+      context.setLineDash([]);
+      context.fillStyle = curve.kind === "link" ? linkEdge : parentEdge;
+      const direction = curve.endX >= curve.startX ? 1 : -1;
+      context.beginPath();
+      context.moveTo(curve.endX, curve.endY);
+      context.lineTo(curve.endX - direction * 9, curve.endY - 5);
+      context.lineTo(curve.endX - direction * 9, curve.endY + 5);
+      context.closePath();
+      context.fill();
+      context.restore();
+    };
+
+    const draw = (timestamp: number) => {
+      const bounds = canvas.getBoundingClientRect();
+      const cssWidth = bounds.width || treeWorldWidth;
+      const cssHeight = bounds.height || treeWorldHeight;
+      const pixelRatio = Math.max(1, window.devicePixelRatio || 1);
+      const backingWidth = Math.round(cssWidth * pixelRatio);
+      const backingHeight = Math.round(cssHeight * pixelRatio);
+      if (canvas.width !== backingWidth || canvas.height !== backingHeight) {
+        canvas.width = backingWidth;
+        canvas.height = backingHeight;
+      }
+      canvas.dataset.pixelRatio = String(pixelRatio);
+      canvas.dataset.backingSize = `${backingWidth}x${backingHeight}`;
+      context.resetTransform();
+      context.clearRect(0, 0, backingWidth, backingHeight);
+      const projection = treeCanvasProjection(cssWidth, cssHeight, camera);
+      context.setTransform(
+        projection.scale * pixelRatio,
+        0,
+        0,
+        projection.scale * pixelRatio,
+        (projection.offsetX - camera.x * projection.scale) * pixelRatio,
+        (projection.offsetY - camera.y * projection.scale) * pixelRatio,
+      );
+
+      curves.forEach(drawCurve);
+      if (!reducedMotion) {
+        curves.forEach((curve, index) => {
+          if (!curve.focused) return;
+          const point = pointOnTreeCurve(
+            curve,
+            (((timestamp / 1600 + index * 0.17) % 1) + 1) % 1,
+          );
+          context.save();
+          context.fillStyle = curve.kind === "link" ? linkEdge : selectedColor;
+          context.shadowBlur = 10;
+          context.shadowColor = context.fillStyle;
+          context.beginPath();
+          context.arc(point.x, point.y, 4, 0, Math.PI * 2);
+          context.fill();
+          context.restore();
+        });
+      }
+
+      geometry.forEach(({ node, x, y }) => {
+        const lensHit = lens === "none" || lensIds.has(node.id);
+        context.save();
+        context.globalAlpha = lensHit ? 1 : 0.28;
+        context.fillStyle = surface;
+        context.strokeStyle =
+          node.status === "ERROR"
+            ? error
+            : selected?.id === node.id
+              ? selectedColor
+              : border;
+        context.lineWidth = selected?.id === node.id ? 2.5 : 1.2;
+        const rightRadius = 9;
+        context.beginPath();
+        context.moveTo(x, y);
+        context.lineTo(x + treeNodeWidth - rightRadius, y);
+        context.quadraticCurveTo(
+          x + treeNodeWidth,
+          y,
+          x + treeNodeWidth,
+          y + rightRadius,
+        );
+        context.lineTo(x + treeNodeWidth, y + treeNodeHeight - rightRadius);
+        context.quadraticCurveTo(
+          x + treeNodeWidth,
+          y + treeNodeHeight,
+          x + treeNodeWidth - rightRadius,
+          y + treeNodeHeight,
+        );
+        context.lineTo(x, y + treeNodeHeight);
+        context.closePath();
+        context.fill();
+        context.stroke();
+        context.save();
+        context.clip();
+        context.fillStyle = node.kind === "CLIENT" ? series2 : series1;
+        context.fillRect(x, y, 4, treeNodeHeight);
+        context.restore();
+        context.fillStyle = secondary;
+        context.font = "10px ui-monospace, monospace";
+        context.fillText(node.kind, x + 14, y + 17);
+        context.textAlign = "right";
+        context.fillText(node.status, x + 176, y + 17);
+        context.textAlign = "left";
+        context.fillStyle = primary;
+        context.font = "650 12px system-ui";
+        context.fillText(node.label, x + 14, y + 37, 160);
+        if (!coalescedParentGeometry) {
+          context.fillStyle = secondary;
+          context.font = "10px ui-monospace, monospace";
+          context.fillText(
+            `+${displayNano(node.startOffsetNano)} · ${compactIdentity(node.id)}`,
+            x + 14,
+            y + 53,
+            120,
+          );
+          context.textAlign = "right";
+          context.fillText(displayNano(node.durationNano), x + 176, y + 53);
+          context.textAlign = "left";
+          context.fillStyle = border;
+          context.fillRect(x + 14, y + 61, 160, 3);
+          context.fillStyle = node.kind === "CLIENT" ? series2 : series1;
+          context.fillRect(
+            x + 14 + percentage(node.startOffsetNano, duration) * 1.6,
+            y + 61,
+            Math.max(2, percentage(node.durationNano, duration) * 1.6),
+            3,
+          );
+        } else {
+          context.fillStyle = secondary;
+          context.font = "10px ui-monospace, monospace";
+          context.textAlign = "right";
+          context.fillText(displayNano(node.durationNano), x + 176, y + 54);
+          context.textAlign = "left";
+        }
+        context.restore();
+      });
+      context.resetTransform();
+      if (!reducedMotion) animationFrame = window.requestAnimationFrame(draw);
+    };
+
+    draw(performance.now());
+    if (reducedMotion && typeof ResizeObserver !== "undefined") {
+      resizeObserver = new ResizeObserver(() => draw(performance.now()));
+      resizeObserver.observe(canvas);
+    }
+    if (typeof MutationObserver !== "undefined") {
+      themeObserver = new MutationObserver(() => {
+        refreshPalette();
+        if (reducedMotion) draw(performance.now());
+      });
+      themeObserver.observe(canvas.closest(".wsr-bi") ?? canvas, {
+        attributeFilter: ["class", "data-theme", "style"],
+        attributes: true,
+        subtree: true,
+      });
+    }
+    return () => {
+      window.cancelAnimationFrame(animationFrame);
+      resizeObserver?.disconnect();
+      themeObserver?.disconnect();
+    };
+  }, [
+    camera,
+    coalescedParentGeometry,
+    curves,
+    geometry,
+    lens,
+    lensIds,
+    reducedMotion,
+    selected,
+    trace.durationNano,
+  ]);
+
+  useEffect(() => {
+    const canvas = minimapRef.current;
+    if (
+      canvas === null ||
+      typeof window.CanvasRenderingContext2D === "undefined"
+    )
+      return;
+    const context = canvas.getContext("2d");
+    if (context === null) return;
+    let internal = "";
+    let client = "";
+    let error = "";
+    let parentEdge = "";
+    let linkEdge = "";
+    const refreshPalette = () => {
+      internal = treeCanvasColor(
+        canvas,
+        "--wsr-tree-internal-color",
+        "#38bdf8",
+      );
+      client = treeCanvasColor(canvas, "--wsr-tree-client-color", "#2dd4bf");
+      error = treeCanvasColor(canvas, "--wsr-tree-error-color", "#fb7185");
+      parentEdge = treeCanvasColor(
+        canvas,
+        "--wsr-tree-parent-edge-color",
+        "#607084",
+      );
+      linkEdge = treeCanvasColor(
+        canvas,
+        "--wsr-tree-link-edge-color",
+        "#fbbf24",
+      );
+    };
+    refreshPalette();
+    const draw = () => {
+      const bounds = canvas.getBoundingClientRect();
+      const cssWidth = bounds.width || 140;
+      const cssHeight = bounds.height || 80;
+      const pixelRatio = Math.max(1, window.devicePixelRatio || 1);
+      const backingWidth = Math.round(cssWidth * pixelRatio);
+      const backingHeight = Math.round(cssHeight * pixelRatio);
+      if (canvas.width !== backingWidth || canvas.height !== backingHeight) {
+        canvas.width = backingWidth;
+        canvas.height = backingHeight;
+      }
+      context.resetTransform();
+      context.clearRect(0, 0, backingWidth, backingHeight);
+      context.setTransform(
+        backingWidth / treeWorldWidth,
+        0,
+        0,
+        backingHeight / treeWorldHeight,
+        0,
+        0,
+      );
+      context.lineWidth = 5;
+      curves.forEach((curve) => {
+        context.strokeStyle = curve.kind === "link" ? linkEdge : parentEdge;
+        context.setLineDash(curve.kind === "link" ? [14, 12] : []);
+        context.beginPath();
+        context.moveTo(curve.startX, curve.startY);
+        context.lineTo(curve.middleX, curve.startY);
+        context.lineTo(curve.middleX, curve.endY);
+        context.lineTo(curve.endX, curve.endY);
+        context.stroke();
+      });
+      context.setLineDash([]);
+      geometry.forEach(({ node, x, y }) => {
+        context.fillStyle =
+          node.status === "ERROR"
+            ? error
+            : node.kind === "CLIENT"
+              ? client
+              : internal;
+        context.fillRect(x, y, treeNodeWidth, treeNodeHeight);
+      });
+      context.resetTransform();
+    };
+    draw();
+    const resizeObserver =
+      typeof ResizeObserver === "undefined"
+        ? undefined
+        : new ResizeObserver(draw);
+    resizeObserver?.observe(canvas);
+    const themeObserver =
+      typeof MutationObserver === "undefined"
+        ? undefined
+        : new MutationObserver(() => {
+            refreshPalette();
+            draw();
+          });
+    themeObserver?.observe(canvas.closest(".wsr-bi") ?? canvas, {
+      attributeFilter: ["class", "data-theme", "style"],
+      attributes: true,
+      subtree: true,
+    });
+    return () => {
+      resizeObserver?.disconnect();
+      themeObserver?.disconnect();
+    };
+  }, [curves, geometry]);
+
+  if (trace.status !== "READY" || selected === undefined)
+    return <InvalidTrace trace={trace} />;
   const lensReceipt =
     lens === "none"
       ? "Focus receipt · exact PARENT_EDGE identity; choose a lens to inspect."
       : `${lens === "ancestors" ? "Ancestors" : "Descendants"} receipt · ${lensIds.size} exact Span ${lensIds.size === 1 ? "identity" : "identities"} · recorded PARENT_EDGE only.`;
-  const duration = trace.durationNano ?? "0";
-  const parentGeometry = geometry.flatMap((child) => {
-    if (child.node.parentId === undefined) return [];
-    const parent = byId.get(child.node.parentId);
-    if (parent === undefined) return [];
-    return [{ child, parent, path: edgePath(parent, child) }];
-  });
-  const coalescedParentGeometry = parentGeometry.length > 128;
+  const moveCameraFromMinimap = (event: React.PointerEvent<HTMLElement>) => {
+    const bounds = event.currentTarget.getBoundingClientRect();
+    if (bounds.width <= 0 || bounds.height <= 0) return;
+    const centerX =
+      ((event.clientX - bounds.left) / bounds.width) * treeWorldWidth;
+    const centerY =
+      ((event.clientY - bounds.top) / bounds.height) * treeWorldHeight;
+    setCamera((current) =>
+      normalizedTreeCamera({
+        ...current,
+        x: centerX - current.width / 2,
+        y: centerY - current.height / 2,
+      }),
+    );
+  };
+  const selectCanvasNode = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    const bounds = event.currentTarget.getBoundingClientRect();
+    if (bounds.width <= 0 || bounds.height <= 0) return;
+    const projection = treeCanvasProjection(
+      bounds.width,
+      bounds.height,
+      camera,
+    );
+    const x =
+      camera.x +
+      (event.clientX - bounds.left - projection.offsetX) / projection.scale;
+    const y =
+      camera.y +
+      (event.clientY - bounds.top - projection.offsetY) / projection.scale;
+    const hit = [...geometry]
+      .reverse()
+      .find(
+        (item) =>
+          x >= item.x &&
+          x <= item.x + treeNodeWidth &&
+          y >= item.y &&
+          y <= item.y + treeNodeHeight,
+      );
+    if (hit !== undefined) selectNode(hit.node.id);
+  };
   return (
     <section
       aria-label="Recorded trace tree"
       className="trace-view trace-tree-graph"
       data-lens={lens}
+      data-motion={reducedMotion ? "off" : "edge-flow"}
       data-testid="trace-tree"
       data-trace-renderer="tree"
     >
-      <section className="trace-tree-context">
-        <div>
-          <strong>{trace.nodes[0]?.label ?? trace.traceId}</strong>
-          <code>{`trace ${trace.traceId} · ${trace.nodes.length} exact Spans · ${trace.parentEdges.length} PARENT_EDGE · ${trace.links.length} LINK`}</code>
+      <header className="trace-summary trace-summary-dense trace-tree-context">
+        <div className="trace-summary-identity">
+          <Typography as="strong" variant="sectionTitle">
+            {trace.nodes[0]?.label ?? trace.traceId}
+          </Typography>
+          <Typography as="code" variant="code">
+            {trace.traceId}
+          </Typography>
         </div>
-        <div className="trace-tree-toolbar">
-          <button onClick={() => setLens("none")} type="button">
-            Fit tree
-          </button>
-          <button
-            aria-pressed={playing}
-            onClick={() => setPlaying((value) => !value)}
-            type="button"
-          >
-            {playing ? "Motion: Live" : "Motion: Still"}
-          </button>
+        <div className="trace-summary-metrics">
+          {[
+            ["Exact spans", trace.nodes.length],
+            ["PARENT_EDGE", trace.parentEdges.length],
+            ["LINK", trace.links.length],
+          ].map(([label, value]) => (
+            <span className="trace-summary-stat" key={label}>
+              <Typography as="small" variant="caption">
+                {label}
+              </Typography>
+              <Typography
+                as="strong"
+                className="numeric-exact"
+                variant="sectionTitle"
+              >
+                {value}
+              </Typography>
+            </span>
+          ))}
         </div>
-      </section>
+      </header>
       {viewNavigation}
       <div className="trace-workbench">
         <section className="trace-tree-canvas-shell">
-          <header className="trace-timeline-head">
-            <strong>Span call tree</strong>
-            <span>
-              Click a Span or exact relationship · deterministic geometry
-            </span>
+          <header className="trace-tree-canvas-head">
+            <div>
+              <Typography as="h2" variant="sectionTitle">
+                Span call tree
+              </Typography>
+              <Typography as="p" variant="caption">
+                Click a Span or exact relationship · deterministic geometry
+              </Typography>
+            </div>
+            <ButtonGroup
+              aria-label="Tree camera controls"
+              className="trace-tree-actions"
+              role="group"
+            >
+              <IconButton
+                appearance="ghost"
+                aria-label="Fit tree"
+                onClick={() => setCamera(treeFitCamera)}
+                type="button"
+              >
+                <svg aria-hidden="true" viewBox="0 0 16 16">
+                  <path d="M2.5 6V2.5H6M10 2.5h3.5V6M13.5 10v3.5H10M6 13.5H2.5V10" />
+                </svg>
+              </IconButton>
+              <IconButton
+                appearance="ghost"
+                aria-label="Zoom out"
+                disabled={camera.width === treeWorldWidth}
+                onClick={() =>
+                  setCamera((current) => zoomTreeCamera(current, 1.25))
+                }
+                type="button"
+              >
+                <svg aria-hidden="true" viewBox="0 0 16 16">
+                  <path d="M3 8h10" />
+                </svg>
+              </IconButton>
+              <IconButton
+                appearance="ghost"
+                aria-label="Zoom in"
+                disabled={camera.width <= 392}
+                onClick={() =>
+                  setCamera((current) => zoomTreeCamera(current, 0.8))
+                }
+                type="button"
+              >
+                <svg aria-hidden="true" viewBox="0 0 16 16">
+                  <path d="M3 8h10M8 3v10" />
+                </svg>
+              </IconButton>
+            </ButtonGroup>
           </header>
-          {narrow ? (
+          <ul aria-label="Trace tree legend" className="trace-tree-legend">
+            {[
+              ["internal", "INTERNAL"],
+              ["client", "CLIENT"],
+              ["error", "ERROR"],
+              ["parent", "PARENT_EDGE"],
+              ["link", "LINK"],
+              ["flow", "Request flow"],
+            ].map(([kind, label]) => (
+              <li key={kind}>
+                <i aria-hidden="true" data-legend-kind={kind} />
+                <span>{label}</span>
+              </li>
+            ))}
+          </ul>
+          <div className="trace-tree-canvas" data-narrow={narrow}>
+            <canvas
+              aria-label="Recorded span call tree graph"
+              className="trace-tree-canvas-surface"
+              data-camera-view={formatTreeCamera(camera)}
+              data-edge-flow-count={reducedMotion ? 0 : curves.length}
+              data-edge-routing="orthogonal"
+              data-link-count={linkCurves.length}
+              data-layout="call-graph"
+              data-node-shape="flat-left-rounded-right"
+              data-parent-edge-count={parentCurves.length}
+              data-resolution-mode="device-pixel-ratio"
+              data-render-detail={
+                coalescedParentGeometry ? "summary" : "complete"
+              }
+              data-testid="trace-tree-canvas"
+              height={treeWorldHeight}
+              onPointerDown={selectCanvasNode}
+              onWheel={(event) => {
+                event.preventDefault();
+                setCamera((current) =>
+                  zoomTreeCamera(current, event.deltaY > 0 ? 1.25 : 0.8),
+                );
+              }}
+              ref={canvasRef}
+              role="img"
+              width={treeWorldWidth}
+            />
             <div
               aria-label="Recorded trace call tree"
               className="trace-tree-outline"
@@ -1426,176 +1927,59 @@ export const TraceTree = memo(function TraceTree({
               {trace.nodes.map((node) => (
                 <TreeOutlineRow
                   key={node.id}
+                  layout={byId.get(node.id)}
                   node={node}
                   onSelect={selectNode}
+                  showLinks={false}
                   trace={trace}
                 />
               ))}
             </div>
-          ) : (
-            <div
-              aria-label="Recorded trace call tree"
-              className="trace-tree-canvas"
-              role="tree"
+            <aside
+              aria-label="Tree minimap navigation"
+              className="trace-camera-map"
+              onPointerCancel={() => {
+                minimapDragging.current = false;
+              }}
+              onPointerDown={(event) => {
+                minimapDragging.current = true;
+                event.currentTarget.setPointerCapture?.(event.pointerId);
+                moveCameraFromMinimap(event);
+              }}
+              onPointerMove={(event) => {
+                if (minimapDragging.current) moveCameraFromMinimap(event);
+              }}
+              onPointerUp={(event) => {
+                if (minimapDragging.current) moveCameraFromMinimap(event);
+                minimapDragging.current = false;
+                event.currentTarget.releasePointerCapture?.(event.pointerId);
+              }}
+              role="region"
             >
-              {[0, 1, 2].map((depth) => (
+              <Typography as="strong" variant="caption">
+                Tree minimap
+              </Typography>
+              <div className="trace-camera-map-viewport">
+                <canvas
+                  aria-hidden="true"
+                  height={80}
+                  ref={minimapRef}
+                  width={140}
+                />
                 <span
                   aria-hidden="true"
-                  className={`trace-depth-label trace-depth-${depth}`}
-                  key={depth}
-                >
-                  {`Depth ${depth}${depth === 0 ? " · root" : depth === 1 ? " · calls" : " · operations"}`}
-                </span>
-              ))}
-              <i
-                aria-hidden="true"
-                className="trace-depth-divider trace-depth-divider-1"
-              />
-              <i
-                aria-hidden="true"
-                className="trace-depth-divider trace-depth-divider-2"
-              />
-              <svg
-                aria-label="Recorded span call tree graph"
-                className="trace-tree-svg"
-                role="img"
-                viewBox="0 0 980 560"
-              >
-                <defs>
-                  <marker
-                    id="trace-parent-arrow"
-                    markerHeight="7"
-                    markerWidth="7"
-                    orient="auto"
-                    refX="7"
-                    refY="4"
-                    viewBox="0 0 8 8"
-                  >
-                    <path d="M0 0L8 4L0 8Z" />
-                  </marker>
-                  <marker
-                    id="trace-link-arrow"
-                    markerHeight="7"
-                    markerWidth="7"
-                    orient="auto"
-                    refX="7"
-                    refY="4"
-                    viewBox="0 0 8 8"
-                  >
-                    <path d="M0 0L8 4L0 8Z" />
-                  </marker>
-                </defs>
-                {coalescedParentGeometry
-                  ? [
-                      {
-                        key: "default",
-                        items: parentGeometry.filter(
-                          ({ child, parent }) =>
-                            lens === "none" ||
-                            (lensIds.has(parent.node.id) &&
-                              lensIds.has(child.node.id)),
-                        ),
-                        className: lens === "none" ? "" : " is-focused",
-                      },
-                      {
-                        key: "muted",
-                        items:
-                          lens === "none"
-                            ? []
-                            : parentGeometry.filter(
-                                ({ child, parent }) =>
-                                  !(
-                                    lensIds.has(parent.node.id) &&
-                                    lensIds.has(child.node.id)
-                                  ),
-                              ),
-                        className: " is-muted",
-                      },
-                    ].flatMap(({ key, items, className }) =>
-                      items.length === 0
-                        ? []
-                        : [
-                            <path
-                              className={`trace-tree-edge${className}`}
-                              d={items.map(({ path }) => path).join(" ")}
-                              data-relationship="PARENT_EDGE"
-                              data-relationship-count={items.length}
-                              key={`parent-coalesced-${key}`}
-                            />,
-                          ],
-                    )
-                  : parentGeometry.map(({ child, parent, path }) => {
-                      const focused =
-                        lens !== "none" &&
-                        lensIds.has(parent.node.id) &&
-                        lensIds.has(child.node.id);
-                      return (
-                        <path
-                          className={`trace-tree-edge${focused ? " is-focused" : lens === "none" ? "" : " is-muted"}`}
-                          d={path}
-                          data-relationship="PARENT_EDGE"
-                          data-relationship-count="1"
-                          data-source={parent.node.id}
-                          data-target={child.node.id}
-                          key={`parent-${child.node.id}`}
-                        />
-                      );
-                    })}
-                {trace.links.map((link) => {
-                  const from = byId.get(link.from.span_id);
-                  const to = byId.get(link.to.span_id);
-                  const d =
-                    from === undefined
-                      ? ""
-                      : to === undefined
-                        ? `M${from.x + 95} ${from.y + 70} C${from.x + 150} ${from.y + 115} 900 ${from.y + 115} 950 ${from.y + 80}`
-                        : edgePath(from, to);
-                  return (
-                    <path
-                      className={`trace-tree-edge trace-tree-link${lens === "none" ? "" : " is-muted"}`}
-                      d={d}
-                      data-relationship="LINK"
-                      data-source={link.from.span_id}
-                      data-target={link.to.span_id}
-                      key={`link-${link.id}`}
-                    />
-                  );
-                })}
-                {geometry.map(({ node, x, y }) => (
-                  <TreeNodeGlyph
-                    key={node.id}
-                    current={
-                      position >= percentage(node.startOffsetNano, duration) &&
-                      position <=
-                        percentage(node.startOffsetNano, duration) +
-                          percentage(node.durationNano, duration)
-                    }
-                    lensHit={lens === "none" || lensIds.has(node.id)}
-                    node={node}
-                    onSelect={selectNode}
-                    playing={playing}
-                    selected={selected.id === node.id}
-                    summary={coalescedParentGeometry}
-                    traceDurationNano={duration}
-                    x={x}
-                    y={y}
-                  />
-                ))}
-              </svg>
-              <aside
-                aria-label="Semantic camera map"
-                className="trace-camera-map"
-                role="region"
-              >
-                <strong>Semantic camera map</strong>
-                <div>
-                  {geometry.map(({ node }) => (
-                    <i key={node.id} />
-                  ))}
-                </div>
-              </aside>
-            </div>
-          )}
+                  data-camera-width={camera.width}
+                  data-testid="trace-tree-minimap-viewport"
+                  style={{
+                    height: `${(camera.height / treeWorldHeight) * 100}%`,
+                    insetInlineStart: `${(camera.x / treeWorldWidth) * 100}%`,
+                    insetBlockStart: `${(camera.y / treeWorldHeight) * 100}%`,
+                    width: `${(camera.width / treeWorldWidth) * 100}%`,
+                  }}
+                />
+              </div>
+            </aside>
+          </div>
           <RecordedLinks trace={trace} />
         </section>
         <SpanPassport node={selected} trace={trace}>
@@ -1613,14 +1997,6 @@ export const TraceTree = memo(function TraceTree({
           </div>
         </SpanPassport>
       </div>
-      <TraceMotion
-        durationNano={duration}
-        onPlayingChange={setPlaying}
-        onPositionChange={setPosition}
-        playing={playing}
-        position={position}
-        reducedMotion={false}
-      />
     </section>
   );
 });

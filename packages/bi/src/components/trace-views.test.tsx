@@ -498,7 +498,7 @@ describe("recorded Trace business panels", () => {
     expect(denseOverviewSpans[39]).toHaveAttribute("stroke-width", "0.5");
   });
 
-  it("renders a call tree, keeping recorded LINK edges distinct", () => {
+  it("renders a zoomable call tree with navigable minimap and directional edges", async () => {
     render(<TraceTree trace={trace} />);
 
     const region = screen.getByRole("region", {
@@ -506,30 +506,100 @@ describe("recorded Trace business panels", () => {
     });
     expect(screen.getByTestId("trace-tree")).toBe(region);
     expect(region).toHaveAttribute("data-trace-renderer", "tree");
+    expect(region).toHaveAttribute("data-motion", "edge-flow");
     expect(screen.getAllByTestId("trace-tree-node")).toHaveLength(2);
     const tree = screen.getByRole("tree", { name: "Recorded trace call tree" });
     expect(tree).toHaveTextContent("workflow.run");
     expect(tree).toHaveTextContent("tool.execute");
-    expect(screen.getByText("Recorded LINK → trace-2:remote")).toBeVisible();
-    expect(
-      screen.getByRole("img", { name: "Recorded span call tree graph" }),
-    ).toBeVisible();
-    expect(
-      region.querySelectorAll('[data-relationship="PARENT_EDGE"]'),
-    ).toHaveLength(1);
-    expect(region.querySelectorAll('[data-relationship="LINK"]')).toHaveLength(
-      1,
+    const recordedLinks = screen.getByRole("list", {
+      name: "Recorded span links",
+    });
+    expect(recordedLinks).toHaveTextContent("Recorded LINK → trace-2:remote");
+    expect(recordedLinks).toHaveClass("trace-sr-only");
+    const graph = screen.getByRole("img", {
+      name: "Recorded span call tree graph",
+    });
+    expect(graph).toBeVisible();
+    expect(graph.tagName.toLowerCase()).toBe("canvas");
+    expect(graph).toHaveAttribute("data-camera-view", "0 0 980 560");
+    expect(graph).toHaveAttribute("data-layout", "call-graph");
+    expect(graph).toHaveAttribute("data-edge-routing", "orthogonal");
+    expect(graph).toHaveAttribute("data-resolution-mode", "device-pixel-ratio");
+    expect(graph).toHaveAttribute("data-node-shape", "flat-left-rounded-right");
+    expect(graph).toHaveAttribute("data-parent-edge-count", "1");
+    expect(graph).toHaveAttribute("data-link-count", "1");
+    const canvasHeader = region.querySelector(".trace-tree-canvas-head");
+    expect(canvasHeader?.querySelector("h2")).toHaveTextContent(
+      "Span call tree",
     );
+    expect(canvasHeader?.querySelector("p")).toHaveTextContent(
+      "Click a Span or exact relationship · deterministic geometry",
+    );
+    const cameraControls = screen.getByRole("group", {
+      name: "Tree camera controls",
+    });
+    for (const button of cameraControls.querySelectorAll("button"))
+      expect(button).toHaveAttribute("data-icon-button", "true");
+    const context = region.querySelector(".trace-tree-context")!;
+    expect(context.querySelector(".trace-summary-identity")).toHaveTextContent(
+      "workflow.runtrace-1",
+    );
+    expect(context.querySelectorAll(".trace-summary-stat")).toHaveLength(3);
+    expect(context).toHaveTextContent("Exact spans2");
+    expect(context).toHaveTextContent("PARENT_EDGE1");
+    expect(context).toHaveTextContent("LINK1");
     expect(
-      screen.getByRole("region", { name: "Semantic camera map" }),
-    ).toBeVisible();
+      screen.getByRole("list", { name: "Trace tree legend" }),
+    ).toHaveTextContent("INTERNALCLIENTERRORPARENT_EDGELINKRequest flow");
+    const minimap = screen.getByRole("region", {
+      name: "Tree minimap navigation",
+    });
+    expect(minimap).toBeVisible();
     expect(screen.getByRole("button", { name: "Fit tree" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Zoom out" })).toBeVisible();
+    await userEvent.click(screen.getByRole("button", { name: "Zoom in" }));
+    expect(graph).toHaveAttribute("data-camera-view", "98 56 784 448");
+    expect(screen.getByTestId("trace-tree-minimap-viewport")).toHaveAttribute(
+      "data-camera-width",
+      "784",
+    );
+    Object.defineProperty(minimap, "getBoundingClientRect", {
+      configurable: true,
+      value: () => ({
+        bottom: 80,
+        height: 80,
+        left: 0,
+        right: 140,
+        top: 0,
+        width: 140,
+        x: 0,
+        y: 0,
+        toJSON: () => ({}),
+      }),
+    });
+    fireEvent.pointerDown(minimap, {
+      clientX: 35,
+      clientY: 40,
+      pointerId: 1,
+    });
+    expect(graph).toHaveAttribute("data-camera-view", "0 56 784 448");
+    fireEvent.pointerMove(minimap, {
+      clientX: 105,
+      clientY: 40,
+      pointerId: 1,
+    });
+    expect(graph).toHaveAttribute("data-camera-view", "196 56 784 448");
+    fireEvent.pointerUp(minimap, { pointerId: 1 });
+    await userEvent.click(screen.getByRole("button", { name: "Fit tree" }));
+    expect(graph).toHaveAttribute("data-camera-view", "0 0 980 560");
+    expect(graph).toHaveAttribute("data-edge-flow-count", "2");
     expect(screen.getByRole("button", { name: "Ancestors" })).toBeVisible();
     expect(screen.getByRole("button", { name: "Descendants" })).toBeVisible();
     expect(screen.getByText(/Focus receipt/)).toBeVisible();
     expect(
-      screen.getByRole("slider", { name: "Recorded time position" }),
-    ).toBeVisible();
+      screen.queryByRole("slider", { name: "Recorded time position" }),
+    ).toBeNull();
+    expect(region.querySelector(".trace-motion")).toBeNull();
     expect(
       screen.getByRole("region", { name: "Span passport" }),
     ).toHaveTextContent("root");
@@ -542,6 +612,74 @@ describe("recorded Trace business panels", () => {
     ).not.toBeNull();
     expect(passport.querySelector(".trace-passport-sigil")).toBeVisible();
     expect(screen.queryByText(/service map|architecture/i)).toBeNull();
+  });
+
+  it("disables call-edge flow animation when reduced motion is requested", () => {
+    render(<TraceTree reducedMotion trace={trace} />);
+
+    const region = screen.getByRole("region", {
+      name: "Recorded trace tree",
+    });
+    expect(region).toHaveAttribute("data-motion", "off");
+    expect(screen.getByTestId("trace-tree-canvas")).toHaveAttribute(
+      "data-edge-flow-count",
+      "0",
+    );
+  });
+
+  it("derives columns from calls and orders sequential siblings by recorded start", () => {
+    const early = {
+      ...trace.nodes[1]!,
+      id: "early",
+      endpoint: { trace_id: "trace-1", span_id: "early" },
+      label: "early.call",
+      startTimeUnixNano: "1010",
+      endTimeUnixNano: "1020",
+      startOffsetNano: "10",
+      durationNano: "10",
+      depth: 99,
+    };
+    const late = {
+      ...early,
+      id: "late",
+      endpoint: { trace_id: "trace-1", span_id: "late" },
+      label: "late.call",
+      startTimeUnixNano: "1060",
+      endTimeUnixNano: "1070",
+      startOffsetNano: "60",
+    };
+    render(
+      <TraceTree
+        trace={{
+          ...trace,
+          nodes: [trace.nodes[0]!, late, early],
+          parentEdges: [],
+          links: [],
+        }}
+      />,
+    );
+
+    const nodes = screen.getAllByTestId("trace-tree-node");
+    const rootNode = nodes.find(
+      (node) => node.getAttribute("data-trace-node-id") === "root",
+    )!;
+    const earlyNode = nodes.find(
+      (node) => node.getAttribute("data-trace-node-id") === "early",
+    )!;
+    const lateNode = nodes.find(
+      (node) => node.getAttribute("data-trace-node-id") === "late",
+    )!;
+    expect(Number(rootNode.getAttribute("data-tree-x"))).toBeLessThan(
+      Number(earlyNode.getAttribute("data-tree-x")),
+    );
+    expect(earlyNode).toHaveAttribute("data-tree-x", "390");
+    expect(earlyNode).toHaveAttribute(
+      "data-tree-x",
+      lateNode.getAttribute("data-tree-x"),
+    );
+    expect(Number(earlyNode.getAttribute("data-tree-y"))).toBeLessThan(
+      Number(lateNode.getAttribute("data-tree-y")),
+    );
   });
 
   it("coalesces large parent-edge geometry without losing the exact relationship count", () => {
@@ -572,11 +710,15 @@ describe("recorded Trace business panels", () => {
     const edges = container.querySelectorAll(
       '[data-relationship="PARENT_EDGE"]',
     );
-    expect(edges).toHaveLength(1);
-    expect(edges[0]).toHaveAttribute("data-relationship-count", "129");
+    expect(edges).toHaveLength(0);
+    expect(screen.getByTestId("trace-tree-canvas")).toHaveAttribute(
+      "data-parent-edge-count",
+      "129",
+    );
     expect(
       container.querySelectorAll('[data-render-detail="summary"]'),
-    ).toHaveLength(130);
+    ).toHaveLength(1);
+    expect(screen.getAllByTestId("trace-tree-node")).toHaveLength(130);
   });
 
   it("disables finite recorded-time motion when reduced motion is requested", () => {

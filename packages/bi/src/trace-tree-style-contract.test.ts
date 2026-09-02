@@ -2,6 +2,10 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const css = readFileSync("packages/bi/src/shared.css", "utf8");
+const traceViews = readFileSync(
+  "packages/bi/src/components/trace-views.tsx",
+  "utf8",
+);
 
 describe("frozen Trace Tree visual grammar", () => {
   it("consumes the shared semantic type, shape, and surface tokens", () => {
@@ -30,6 +34,45 @@ describe("frozen Trace Tree visual grammar", () => {
   it("highlights waterfall action icons on hover and keyboard focus", () => {
     expect(css).toMatch(
       /\.trace-waterfall-actions\s+\.wsr-button\[data-icon-button="true"\]:is\(:hover,\s*:focus-visible\)\s*\{[^}]*background:\s*var\(--interaction-selection\);[^}]*color:\s*var\(--interaction-accent\)/s,
+    );
+  });
+
+  it("anchors the tree minimap in the lower-left corner", () => {
+    const minimapRule = css.match(/\.trace-camera-map\s*\{([^}]*)\}/s)?.[1];
+    expect(minimapRule).toBeDefined();
+    expect(minimapRule).toMatch(/inset-inline-start:\s*var\(--space-grid\)/);
+    expect(minimapRule).not.toContain("inset-inline-end");
+    expect(minimapRule).toMatch(/inset-block-end:\s*var\(--space-grid\)/);
+  });
+
+  it("exposes theme overrides for tree nodes, edges, and Passport accents", () => {
+    for (const token of [
+      "--wsr-tree-node-surface",
+      "--wsr-tree-node-border",
+      "--wsr-tree-internal-color",
+      "--wsr-tree-client-color",
+      "--wsr-tree-error-color",
+      "--wsr-tree-selected-color",
+      "--wsr-tree-parent-edge-color",
+      "--wsr-tree-link-edge-color",
+    ]) {
+      expect(css).toContain(`${token}:`);
+      expect(traceViews).toContain(`"${token}"`);
+    }
+    expect(css).toMatch(
+      /\.trace-passport-sigil\s*\{[^}]*var\(--wsr-tree-internal-color\)/s,
+    );
+    expect(css).toMatch(
+      /\.trace-passport-sigil\.trace-kind-client\s*\{[^}]*var\(--wsr-tree-client-color\)/s,
+    );
+    expect(css).toMatch(
+      /\.trace-link-receipt\s*\{[^}]*var\(--wsr-tree-link-edge-color\)/s,
+    );
+  });
+
+  it("uses one typography and spacing contract for link and focus receipts", () => {
+    expect(css).toMatch(
+      /\.trace-link-receipt,\s*\.wsr-bi \.trace-focus-receipt\s*\{[^}]*margin-block:\s*var\(--space-grid\);[^}]*color:\s*var\(--content-secondary\);[^}]*font-family:\s*var\(--type-code-family\);[^}]*font-size:\s*var\(--type-caption-size\);[^}]*line-height:\s*1\.5;[^}]*text-align:\s*start/s,
     );
   });
 
