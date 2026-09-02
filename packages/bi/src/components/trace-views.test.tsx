@@ -729,6 +729,10 @@ describe("recorded Trace business panels", () => {
     expect(
       container.querySelectorAll('[data-render-detail="summary"]'),
     ).toHaveLength(1);
+    expect(screen.getByTestId("trace-tree-canvas")).toHaveAttribute(
+      "data-geometry-detail",
+      "batched",
+    );
     expect(screen.getAllByTestId("trace-tree-node")).toHaveLength(130);
   });
 

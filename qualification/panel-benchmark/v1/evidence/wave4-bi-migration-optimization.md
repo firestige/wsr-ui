@@ -73,3 +73,14 @@ duration and measured long task; first-paint P95 continues to use 30 samples,
 while frame P95 uses all frames from the dedicated window. Thus sample sizes,
 three-run independence, budgets, fixtures, and 21 browser traces remain intact
 without treating 30 duplicated long windows as independent first-paint data.
+
+The first corrected-protocol result completed in about eight minutes. Every
+interaction window passed with zero long tasks, but one of 90 Tree upper-bound
+first-paint samples contained a 57 ms task. The result is retained at
+`results/full-2026-09-02T10-12-16-298Z/result.json` (SHA-256
+`4a181401a82f572ad5a901567f4a488caaccdaf0a8da6aac09f9a3b79c76da30`).
+For the 200-node summary renderer, recorded edges are now emitted as two
+batched Canvas paths and nodes use bounded summary geometry; exact labels and
+relationships remain in the accessible tree and lossless IR. The focused
+upper-bound microbenchmark returned to zero long tasks before the next fixed
+rerun.

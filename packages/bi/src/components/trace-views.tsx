@@ -1536,7 +1536,27 @@ export const TraceTree = memo(function TraceTree({
         (projection.offsetY - camera.y * projection.scale) * pixelRatio,
       );
 
-      curves.forEach(drawCurve);
+      if (coalescedParentGeometry) {
+        for (const kind of ["parent", "link"] as const) {
+          const matching = curves.filter((curve) => curve.kind === kind);
+          if (matching.length === 0) continue;
+          context.save();
+          context.strokeStyle = kind === "link" ? linkEdge : parentEdge;
+          context.lineWidth = 2;
+          context.setLineDash(kind === "link" ? [7, 6] : []);
+          context.beginPath();
+          for (const curve of matching) {
+            context.moveTo(curve.startX, curve.startY);
+            context.lineTo(curve.middleX, curve.startY);
+            context.lineTo(curve.middleX, curve.endY);
+            context.lineTo(curve.endX, curve.endY);
+          }
+          context.stroke();
+          context.restore();
+        }
+      } else {
+        curves.forEach(drawCurve);
+      }
       if (!reducedMotion) {
         edgeFlowCurves.forEach((curve, index) => {
           const point = pointOnTreeCurve(
@@ -1566,6 +1586,14 @@ export const TraceTree = memo(function TraceTree({
               ? selectedColor
               : border;
         context.lineWidth = selectedRef.current === node.id ? 2.5 : 1.2;
+        if (coalescedParentGeometry) {
+          context.fillRect(x, y, treeNodeWidth, treeNodeHeight);
+          context.strokeRect(x, y, treeNodeWidth, treeNodeHeight);
+          context.fillStyle = node.kind === "CLIENT" ? series2 : series1;
+          context.fillRect(x, y, 4, treeNodeHeight);
+          context.restore();
+          return;
+        }
         const rightRadius = 9;
         context.beginPath();
         context.moveTo(x, y);
@@ -1920,6 +1948,9 @@ export const TraceTree = memo(function TraceTree({
               data-camera-view={formatTreeCamera(camera)}
               data-edge-flow-count={reducedMotion ? 0 : edgeFlowCurves.length}
               data-edge-routing="orthogonal"
+              data-geometry-detail={
+                coalescedParentGeometry ? "batched" : "complete"
+              }
               data-link-count={linkCurves.length}
               data-layout="call-graph"
               data-node-shape="flat-left-rounded-right"
