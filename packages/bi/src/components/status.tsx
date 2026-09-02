@@ -25,22 +25,26 @@ export function MetricTruthLabel({
   state,
   withholdingReason,
   reading,
+  detail = "full",
 }: {
   state: TruthState;
   withholdingReason?: WithholdingReason;
   reading?: string;
+  detail?: "full" | "label";
 }) {
   const truth = metricTruth[state];
   return (
     <div className="status-stack" data-state={state}>
       <span className={`status-label status-${truth.tone}`}>
-        <span aria-hidden="true">{truth.marker}</span>
-        {truth.label}
+        <span aria-hidden="true" className="status-label-marker">
+          {truth.marker}
+        </span>
+        <span className="status-label-text">{truth.label}</span>
       </span>
-      {withholdingReason === undefined ? null : (
+      {detail === "label" || withholdingReason === undefined ? null : (
         <span className="status-reason">Reason: {withholdingReason}</span>
       )}
-      {reading === undefined ? null : (
+      {detail === "label" || reading === undefined ? null : (
         <span className="status-reading">{reading}</span>
       )}
     </div>

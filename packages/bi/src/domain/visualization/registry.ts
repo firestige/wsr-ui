@@ -1,4 +1,4 @@
-import type { ExactValue, MetricSlice } from "../evolution/types";
+import type { ExactValue, MetricResult, MetricSlice } from "../evolution/types";
 
 export type VisualizerId =
   "numeric-card@1" | "badge@1" | "ratio-bar@1" | "table@1";
@@ -84,4 +84,12 @@ export function compatibleVisualizerIds(slice: MetricSlice): VisualizerId[] {
     ids.push("ratio-bar@1");
   ids.push("table@1");
   return ids;
+}
+
+export function selectDefaultVisualizer(result: MetricResult): VisualizerId {
+  if (result.slices.length !== 1) return "table@1";
+  const value = result.slices[0]?.value;
+  if (value?.kind === "BOOLEAN") return "badge@1";
+  if (value?.kind === "RATIO" && value.unit === "ratio") return "ratio-bar@1";
+  return "numeric-card@1";
 }

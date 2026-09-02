@@ -3,5 +3,6 @@ dist/
 coverage/
 playwright-report/
 test-results/
+qualification/panel-benchmark/v1/results/
 .vite/
 *.tsbuildinfo

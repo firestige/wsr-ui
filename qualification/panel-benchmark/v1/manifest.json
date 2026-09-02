@@ -1,0 +1,160 @@
+{
+  "schemaVersion": "panel-benchmark@1",
+  "authority": {
+    "issue": "https://github.com/firestige/workflow-self-recursive/issues/172",
+    "providerRepository": "https://github.com/firestige/wsr-ui",
+    "baselineCommit": "19148027762b6b951ca0e977f6aeae50aa0f746e",
+    "cardinalitySources": [
+      "packages/bi/src/domain/visualization/registry.ts",
+      "packages/bi/src/domain/trace/trace-view.ts",
+      "workflow-self-recursive@f373c82dd709421e1c1ccfdd7a03b91118b9b6ea:docs/systems/evolution/evolution-system.md"
+    ]
+  },
+  "runner": {
+    "baseImage": "node:24.12.0-bookworm-slim@sha256:7326fb2dbdce998edd72140946851be64ef4a643e8715e138ca467e8e9d92c99",
+    "platform": "linux/arm64/v8",
+    "playwright": {
+      "packageVersion": "1.62.1",
+      "packageIntegrity": "sha512-wPYSwEBJY9GHraISXqyqtx0na0LpO3XEX7jNDhntbex7tzUS7kLnZsOlFruFJB4Hi/rhDMjXGqHewDZ68nYZVw==",
+      "browser": "chromium",
+      "browserRevision": "1234",
+      "browserVersion": "151.0.7922.34"
+    },
+    "viewport": { "width": 1280, "height": 800 },
+    "deviceScaleFactor": 1,
+    "parallelWorkloads": 0
+  },
+  "protocol": {
+    "warmupSamples": 1,
+    "measuredSamplesPerRun": 30,
+    "independentRuns": 3,
+    "percentileAlgorithm": "nearest-rank",
+    "firstPaint": "data-ready to the second requestAnimationFrame after renderer-ready",
+    "interactiveWindowsPerRun": 1,
+    "interactiveDurationMsPerRun": 5000,
+    "rendererReady": "geometry fonts ready and SVG attributes committed or Canvas draw completed",
+    "retain": [
+      "raw-samples",
+      "browser-traces",
+      "environment-metadata",
+      "failures"
+    ]
+  },
+  "budgets": {
+    "firstPaintP95Ms": 100,
+    "interactiveFrameP95Ms": 16.7,
+    "longTaskThresholdMs": 50,
+    "maximumLongTasks": 0
+  },
+  "chartPanels": [
+    {
+      "id": "metric-ratio-bar@1",
+      "rendererReadySelector": "svg[role=\"img\"]",
+      "source": "packages/bi/src/components/result-visualizer.tsx",
+      "initialRenderer": "svg",
+      "dataContract": "MetricResult with exactly one RATIO slice in the inclusive [0,1] domain",
+      "typicalFixture": {
+        "id": "metric-ratio-bar.typical@1",
+        "source": "recorded preview distribution",
+        "sliceCount": 1,
+        "value": "3/4"
+      },
+      "upperBoundFixture": {
+        "id": "metric-ratio-bar.upper-bound@1",
+        "source": "ratio-bar@1 ONE_SLICE registry binding",
+        "sliceCount": 1,
+        "value": "9999/10000"
+      },
+      "applicableInteractions": ["resize"]
+    },
+    {
+      "id": "recorded-trace-waterfall@1",
+      "rendererReadySelector": "[data-testid=\"trace-waterfall\"] [data-testid=\"trace-waterfall-row\"]",
+      "source": "packages/bi/src/components/trace-views.tsx",
+      "initialRenderer": "semantic HTML and CSS shared timeline",
+      "dataContract": "lossless wsr.trace-view@1 IR compiled from one traces/read page",
+      "typicalFixture": {
+        "id": "recorded-trace-waterfall.typical@1",
+        "source": "recorded product fixture",
+        "nodeCount": 15,
+        "linkCount": 1
+      },
+      "upperBoundFixture": {
+        "id": "recorded-trace-waterfall.upper-bound@1",
+        "source": "load-recorded-trace product request cap",
+        "nodeCount": 200,
+        "linkCount": 1
+      },
+      "applicableInteractions": ["resize", "select-node", "zoom-transition"]
+    },
+    {
+      "id": "recorded-trace-tree@1",
+      "rendererReadySelector": "[data-testid=\"trace-tree\"] [data-testid=\"trace-tree-node\"]",
+      "source": "packages/bi/src/components/trace-views.tsx",
+      "initialRenderer": "semantic HTML call tree",
+      "dataContract": "lossless wsr.trace-view@1 IR compiled from one traces/read page",
+      "typicalFixture": {
+        "id": "recorded-trace-tree.typical@1",
+        "source": "recorded product fixture",
+        "nodeCount": 15,
+        "depthCount": 4
+      },
+      "upperBoundFixture": {
+        "id": "recorded-trace-tree.upper-bound@1",
+        "source": "load-recorded-trace product request cap",
+        "nodeCount": 200,
+        "depthCount": 10
+      },
+      "applicableInteractions": ["resize", "select-node"]
+    }
+  ],
+  "productScenarios": [
+    {
+      "id": "single-metric@1",
+      "fixture": "one AVAILABLE metric-ratio-bar@1 Panel"
+    },
+    {
+      "id": "compare@1",
+      "fixture": "before and after metric-ratio-bar@1 Panels with one slice per side"
+    },
+    {
+      "id": "metric-set@1",
+      "fixture": "exactly 12 metric coordinates; only the selected chart Panel is mounted"
+    },
+    {
+      "id": "unavailable@1",
+      "fixture": "one UNAVAILABLE metric with withholding reason",
+      "checks": ["first-paint", "accessibility"],
+      "chartInteractionBudget": "not-applicable"
+    }
+  ],
+  "absentChartTypes": [
+    {
+      "type": "dense-time-series",
+      "reason": "No such product chart or stable input contract exists at the frozen baseline."
+    },
+    {
+      "type": "matrix-or-heatmap",
+      "reason": "No such product chart or stable input contract exists at the frozen baseline."
+    }
+  ],
+  "commands": {
+    "validateManifest": "jq -e '.schemaVersion == \"panel-benchmark@1\" and (.chartPanels | length == 3) and (.absentChartTypes | length == 2)' qualification/panel-benchmark/v1/manifest.json",
+    "fullBenchmark": "npm run benchmark:full -- --manifest qualification/panel-benchmark/v1/manifest.json",
+    "lightweightRegression": "npm run benchmark:smoke -- --manifest qualification/panel-benchmark/v1/manifest.json"
+  },
+  "resultIdentityRequired": [
+    "providerCommit",
+    "packageCoordinate",
+    "packageVersion",
+    "packageIntegrity",
+    "manifestSha256",
+    "runnerImageDigest",
+    "cpuArchitecture",
+    "browserVersion",
+    "browserRevision",
+    "runIndex",
+    "rawSamples",
+    "browserTrace"
+  ]
+}

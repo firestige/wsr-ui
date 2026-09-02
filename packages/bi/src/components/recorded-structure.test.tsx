@@ -43,9 +43,34 @@ const structure: RecordedStructureViewModel = {
 };
 
 describe("recorded-structure foundations", () => {
-  it("renders supplied depth siblings together, LINK separately and orphan lane", () => {
+  it("defers exact relation and node lists behind a native disclosure", async () => {
+    const user = userEvent.setup();
     render(
       <RecordedStructureFoundation model={structure} onSelect={vi.fn()} />,
+    );
+
+    expect(
+      screen.queryByRole("button", { name: /recorded parent relation/i }),
+    ).not.toBeInTheDocument();
+    await user.click(
+      screen.getByText("Recorded structure exact details", {
+        selector: "summary",
+      }),
+    );
+    expect(
+      screen.getByRole("button", { name: /recorded parent relation/i }),
+    ).toBeVisible();
+  });
+
+  it("renders supplied depth siblings together, LINK separately and orphan lane", async () => {
+    const user = userEvent.setup();
+    render(
+      <RecordedStructureFoundation model={structure} onSelect={vi.fn()} />,
+    );
+    await user.click(
+      screen.getByText("Recorded structure exact details", {
+        selector: "summary",
+      }),
     );
 
     const depth = screen.getByRole("group", { name: "Recorded depth 1" });
@@ -76,6 +101,11 @@ describe("recorded-structure foundations", () => {
     const select = vi.fn();
     const { rerender } = render(
       <RecordedStructureFoundation model={structure} onSelect={select} />,
+    );
+    await user.click(
+      screen.getByText("Recorded structure exact details", {
+        selector: "summary",
+      }),
     );
     const before = screen
       .getAllByRole("button")

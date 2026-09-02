@@ -1,13 +1,17 @@
 import { scaleLinear } from "d3";
 
+import { METRIC_COPY } from "../domain/catalog/metric-copy";
 import type { MetricResult, MetricSlice } from "../domain/evolution/types";
+import { isMetricResult } from "../domain/evolution/validation";
 import {
   compatibleVisualizerIds,
+  selectDefaultVisualizer,
   type VisualizerId,
 } from "../domain/visualization/registry";
 import { presentExactValue } from "../domain/visualization/presentation";
 import { MetricResultFrame } from "./metric-result";
-import { ScopedError } from "./status";
+import { Button, IconButton } from "./design-system";
+import { MetricTruthLabel, ScopedError } from "./status";
 
 function PanelActions({
   onExplain,
@@ -190,6 +194,199 @@ function BooleanBadge({ slice }: { slice: MetricSlice }) {
   );
 }
 
+function DashboardResultTable({
+  coordinate,
+  slices,
+}: {
+  coordinate: string;
+  slices: MetricSlice[];
+}) {
+  return (
+    <div className="bounded-table">
+      <table
+        aria-label={`Dashboard result preview: ${coordinate}`}
+        className="visual-data-table dashboard-result-table"
+      >
+        <thead>
+          <tr>
+            <th scope="col">Slice</th>
+            <th scope="col">State</th>
+            <th scope="col">Exact value</th>
+          </tr>
+        </thead>
+        <tbody>
+          {slices.map((slice) => (
+            <tr key={JSON.stringify(slice.slice_key)}>
+              <td className="numeric-exact">
+                {JSON.stringify(slice.slice_key)}
+              </td>
+              <td>{slice.state}</td>
+              <td className="numeric-exact">
+                {slice.value === undefined
+                  ? slice.withholding_reason
+                  : presentExactValue(slice.value).exact}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+export function DashboardMetricPanel({
+  result,
+  visualizer,
+  size,
+  onEvidence,
+}: {
+  result: MetricResult;
+  visualizer?: VisualizerId;
+  size: "SMALL" | "MEDIUM" | "WIDE";
+  onEvidence?: (trigger: HTMLButtonElement) => void;
+}) {
+  if (!isMetricResult(result))
+    return (
+      <section className="panel-card" data-presentation="dashboard">
+        <ScopedError
+          announce="assertive"
+          detail="The supplied value does not satisfy the formal Metric Result 2.0.0 contract."
+          retryable={false}
+          title="Metric Result incompatible"
+        />
+      </section>
+    );
+  const coordinate = `${result.metric_id}@${result.metric_version}`;
+  const title = Object.hasOwn(METRIC_COPY, coordinate)
+    ? METRIC_COPY[coordinate as keyof typeof METRIC_COPY].definition
+    : coordinate;
+  const resolvedVisualizer = visualizer ?? selectDefaultVisualizer(result);
+  const slice = result.slices[0];
+  if (resolvedVisualizer === "table@1" || result.slices.length !== 1)
+    return (
+      <article
+        aria-label={title}
+        className="dashboard-metric-panel"
+        data-metric-coordinate={coordinate}
+        data-panel-size={size}
+        data-presentation="dashboard"
+        data-visualizer={resolvedVisualizer}
+      >
+        <header className="dashboard-panel-head">
+          <h3>{title}</h3>
+        </header>
+        <DashboardResultTable coordinate={coordinate} slices={result.slices} />
+        {onEvidence === undefined ? null : (
+          <footer className="dashboard-panel-actions">
+            <Button
+              onClick={(event) => onEvidence(event.currentTarget)}
+              type="button"
+            >
+              View evidence
+            </Button>
+          </footer>
+        )}
+      </article>
+    );
+  if (slice === undefined) return null;
+  const presented =
+    slice.value === undefined ? undefined : presentExactValue(slice.value);
+  const ratioPercent =
+    slice.value?.kind === "RATIO" && ratioInUnitDomain(slice.value.value)
+      ? Number(
+          (BigInt(slice.value.value.split("/")[0]!) * 10_000n) /
+            BigInt(slice.value.value.split("/")[1] ?? "1"),
+        ) / 100
+      : undefined;
+  return (
+    <article
+      aria-label={title}
+      className="dashboard-metric-panel"
+      data-metric-coordinate={coordinate}
+      data-panel-size={size}
+      data-presentation="dashboard"
+      data-scrollable={
+        resolvedVisualizer === "numeric-card@1" ? "false" : undefined
+      }
+      data-visualizer={resolvedVisualizer}
+    >
+      <header className="dashboard-panel-head">
+        <h3 className="dashboard-panel-title">{title}</h3>
+        <MetricTruthLabel
+          detail="label"
+          reading={slice.reading}
+          state={slice.state}
+          withholdingReason={slice.withholding_reason}
+        />
+      </header>
+      {slice.value === undefined ? (
+        slice.coverage === null ? null : (
+          <p className="dashboard-panel-meta">
+            {slice.coverage.state === "NO_POPULATION"
+              ? "No applicable population"
+              : slice.coverage.state.toLowerCase().replaceAll("_", " ")}{" "}
+            · {slice.coverage.numerator} / {slice.coverage.denominator}
+          </p>
+        )
+      ) : resolvedVisualizer === "badge@1" ? (
+        <BooleanBadge slice={slice} />
+      ) : (
+        <div className="metric-value">
+          <span className="metric-number">{presented?.display}</span>
+          {resolvedVisualizer === "ratio-bar@1" ||
+          resolvedVisualizer === "numeric-card@1" ? null : (
+            <span className="numeric-exact">
+              Exact value: {presented?.exact}
+            </span>
+          )}
+        </div>
+      )}
+      {resolvedVisualizer === "ratio-bar@1" && ratioPercent !== undefined ? (
+        <div
+          aria-label={`${title}: ${presented?.display}; exact ${presented?.exact}`}
+          className="dashboard-ratio"
+          role="img"
+        >
+          <i style={{ width: `${ratioPercent}%` }} />
+        </div>
+      ) : null}
+      {size === "SMALL" ||
+      resolvedVisualizer === "numeric-card@1" ||
+      slice.numerator === undefined ||
+      slice.denominator === undefined ? null : (
+        <p className="dashboard-panel-meta">
+          {slice.numerator} / {slice.denominator} exact
+        </p>
+      )}
+      {onEvidence === undefined ? null : resolvedVisualizer ===
+        "numeric-card@1" ? (
+        <footer className="dashboard-panel-actions">
+          <IconButton
+            appearance="ghost"
+            aria-label="View evidence"
+            onClick={(event) => onEvidence(event.currentTarget)}
+            type="button"
+          >
+            <span
+              aria-hidden="true"
+              className="dashboard-evidence-icon icon-[tabler--file-search]"
+            />
+          </IconButton>
+        </footer>
+      ) : size === "SMALL" ? null : (
+        <footer className="dashboard-panel-actions">
+          <Button
+            onClick={(event) => onEvidence(event.currentTarget)}
+            type="button"
+          >
+            View evidence
+          </Button>
+        </footer>
+      )}
+    </article>
+  );
+}
+
 export function MetricPanel({
   result,
   visualizer,
@@ -198,17 +395,29 @@ export function MetricPanel({
   focusEvidenceAction = false,
 }: {
   result: MetricResult;
-  visualizer: VisualizerId;
+  visualizer?: VisualizerId;
   onExplain?: (trigger: HTMLButtonElement) => void;
   onEvidence?: (trigger: HTMLButtonElement) => void;
   focusEvidenceAction?: boolean;
 }) {
+  if (!isMetricResult(result))
+    return (
+      <section className="panel-card">
+        <ScopedError
+          announce="assertive"
+          detail="The supplied value does not satisfy the formal Metric Result 2.0.0 contract."
+          retryable={false}
+          title="Metric Result incompatible"
+        />
+      </section>
+    );
+  const resolvedVisualizer = visualizer ?? selectDefaultVisualizer(result);
   const coordinate = `${result.metric_id}@${result.metric_version}`;
   const compatible = result.slices.every((slice) =>
     slice.value === undefined
       ? true
-      : compatibleVisualizerIds(slice).includes(visualizer) &&
-        (visualizer !== "ratio-bar@1" ||
+      : compatibleVisualizerIds(slice).includes(resolvedVisualizer) &&
+        (resolvedVisualizer !== "ratio-bar@1" ||
           (slice.value.kind === "RATIO" &&
             ratioInUnitDomain(slice.value.value))),
   );
@@ -217,7 +426,7 @@ export function MetricPanel({
       <section className="panel-card">
         <ScopedError
           announce="polite"
-          detail={`${visualizer} cannot consume the published Result shape without inventing a domain or value.`}
+          detail={`${resolvedVisualizer} cannot consume the published Result shape without inventing a domain or value.`}
           retryable={false}
           title="Visualizer binding incompatible"
         />
@@ -233,7 +442,7 @@ export function MetricPanel({
         />
       </section>
     );
-  if (visualizer === "table@1")
+  if (resolvedVisualizer === "table@1")
     return (
       <section className="panel-card">
         <ResultTable coordinate={coordinate} slices={result.slices} />
@@ -253,9 +462,9 @@ export function MetricPanel({
       onExplain={onExplain}
       focusEvidenceAction={focusEvidenceAction}
       visualization={
-        visualizer === "ratio-bar@1" ? (
+        resolvedVisualizer === "ratio-bar@1" ? (
           <RatioBar slice={slice} />
-        ) : visualizer === "badge@1" ? (
+        ) : resolvedVisualizer === "badge@1" ? (
           <BooleanBadge slice={slice} />
         ) : undefined
       }

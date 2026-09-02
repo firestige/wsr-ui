@@ -21,6 +21,11 @@ npm run docker:smoke
 The app is TypeScript/TSX throughout. Vite is the only application development/build path. The
 `/preview` SPA route is a component/token catalog. The product workspace is rooted at `/evaluate`.
 
+Run `npm run dev:test` for the persistent component test SPA. Its shell lives under
+`packages/bi/src/test-harness`; the active scenario and fixture can be replaced between component tasks.
+Stable Playwright and agent selectors follow the
+[automation selector convention](docs/automation-selectors.md).
+
 ## Runtime boundary
 
 `Dockerfile` builds `packages/bi/dist` and copies it into Nginx. The runtime image contains no BI

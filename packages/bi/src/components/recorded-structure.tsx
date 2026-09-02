@@ -1,5 +1,5 @@
 import { scalePoint } from "d3";
-import { useId } from "react";
+import { memo, useId, useState } from "react";
 
 export type RecordedDetailState = "AVAILABLE" | "UNRESOLVED";
 
@@ -29,7 +29,11 @@ const detailStateLabels: Record<RecordedDetailState, string> = {
   UNRESOLVED: "Unresolved recorded endpoint",
 };
 
-function RecordedGraph({ model }: { model: RecordedStructureViewModel }) {
+const RecordedGraph = memo(function RecordedGraph({
+  model,
+}: {
+  model: RecordedStructureViewModel;
+}) {
   const width = 960;
   const rowHeight = 120;
   const positions = new Map<string, { x: number; y: number }>();
@@ -96,6 +100,17 @@ function RecordedGraph({ model }: { model: RecordedStructureViewModel }) {
       </svg>
     </div>
   );
+}, recordedGraphEqual);
+
+function recordedGraphEqual(
+  previous: { model: RecordedStructureViewModel },
+  next: { model: RecordedStructureViewModel },
+) {
+  return (
+    previous.model.depthGroups === next.model.depthGroups &&
+    previous.model.parentEdges === next.model.parentEdges &&
+    previous.model.links === next.model.links
+  );
 }
 
 function NodeButton({
@@ -130,6 +145,11 @@ export function RecordedStructureFoundation({
   model: RecordedStructureViewModel;
   onSelect: (id: string) => void;
 }) {
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const nodeCount = model.depthGroups.reduce(
+    (total, group) => total + group.nodes.length,
+    0,
+  );
   return (
     <section className="recorded-structure">
       <header>
@@ -139,41 +159,99 @@ export function RecordedStructureFoundation({
         </p>
       </header>
       <RecordedGraph model={model} />
-      <section className="recorded-parent-edges">
-        <h3 className="text-label">PARENT_EDGE — recorded structure</h3>
-        {model.parentEdges.length === 0 ? (
-          <p className="text-body">No recorded parent relations.</p>
-        ) : (
-          <ul>
-            {model.parentEdges.map((edge) => (
-              <li key={edge.id}>
-                <button
-                  aria-label={`Recorded parent relation ${edge.sourceId} to ${edge.targetId}`}
-                  className="recorded-relation"
-                  onClick={() => onSelect(edge.id)}
-                  type="button"
+      <p className="status-reading">
+        {nodeCount} nodes · {model.parentEdges.length} parent relations ·{" "}
+        {model.links.length} links · {model.orphans.length} orphan endpoints
+        {model.selectedId === undefined
+          ? null
+          : ` · Selected: ${model.selectedId}`}
+      </p>
+      <details
+        className="recorded-exact-details"
+        onToggle={(event) => setDetailsOpen(event.currentTarget.open)}
+      >
+        <summary>Recorded structure exact details</summary>
+        {detailsOpen ? (
+          <>
+            <section className="recorded-parent-edges">
+              <h3 className="text-label">PARENT_EDGE — recorded structure</h3>
+              {model.parentEdges.length === 0 ? (
+                <p className="text-body">No recorded parent relations.</p>
+              ) : (
+                <ul>
+                  {model.parentEdges.map((edge) => (
+                    <li key={edge.id}>
+                      <button
+                        aria-label={`Recorded parent relation ${edge.sourceId} to ${edge.targetId}`}
+                        className="recorded-relation"
+                        onClick={() => onSelect(edge.id)}
+                        type="button"
+                      >
+                        <code className="text-code">
+                          {edge.sourceId} → {edge.targetId}
+                        </code>
+                        <span>PARENT_EDGE</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+            <div className="recorded-depths">
+              {model.depthGroups.map((group) => (
+                <div
+                  aria-label={`Recorded depth ${group.depth}`}
+                  className="recorded-group"
+                  key={group.depth}
+                  role="group"
                 >
-                  <code className="text-code">
-                    {edge.sourceId} → {edge.targetId}
-                  </code>
-                  <span>PARENT_EDGE</span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-      <div className="recorded-depths">
-        {model.depthGroups.map((group) => (
-          <div
-            aria-label={`Recorded depth ${group.depth}`}
-            className="recorded-group"
-            key={group.depth}
-            role="group"
-          >
-            <h3 className="text-label">Depth {group.depth}</h3>
-            <div className="recorded-siblings">
-              {group.nodes.map((node) => (
+                  <h3 className="text-label">Depth {group.depth}</h3>
+                  <div className="recorded-siblings">
+                    {group.nodes.map((node) => (
+                      <NodeButton
+                        key={node.id}
+                        node={node}
+                        onSelect={onSelect}
+                        selected={model.selectedId === node.id}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <section className="recorded-links">
+              <h3 className="text-label">
+                LINK — independent recorded relation
+              </h3>
+              {model.links.length === 0 ? (
+                <p className="text-body">No recorded LINK relations.</p>
+              ) : (
+                <ul>
+                  {model.links.map((link) => (
+                    <li key={link.id}>
+                      <button
+                        aria-label={`Independent LINK ${link.sourceId} to ${link.targetId}`}
+                        className="recorded-relation"
+                        onClick={() => onSelect(link.id)}
+                        type="button"
+                      >
+                        <code className="text-code">
+                          {link.sourceId} ⇢ {link.targetId}
+                        </code>
+                        <span>LINK · {detailStateLabels[link.state]}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+            <div
+              aria-label="Orphan endpoints"
+              className="orphan-lane"
+              role="group"
+            >
+              <h3 className="text-label">Orphan endpoints</h3>
+              {model.orphans.map((node) => (
                 <NodeButton
                   key={node.id}
                   node={node}
@@ -182,44 +260,9 @@ export function RecordedStructureFoundation({
                 />
               ))}
             </div>
-          </div>
-        ))}
-      </div>
-      <section className="recorded-links">
-        <h3 className="text-label">LINK — independent recorded relation</h3>
-        {model.links.length === 0 ? (
-          <p className="text-body">No recorded LINK relations.</p>
-        ) : (
-          <ul>
-            {model.links.map((link) => (
-              <li key={link.id}>
-                <button
-                  aria-label={`Independent LINK ${link.sourceId} to ${link.targetId}`}
-                  className="recorded-relation"
-                  onClick={() => onSelect(link.id)}
-                  type="button"
-                >
-                  <code className="text-code">
-                    {link.sourceId} ⇢ {link.targetId}
-                  </code>
-                  <span>LINK · {detailStateLabels[link.state]}</span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-      <div aria-label="Orphan endpoints" className="orphan-lane" role="group">
-        <h3 className="text-label">Orphan endpoints</h3>
-        {model.orphans.map((node) => (
-          <NodeButton
-            key={node.id}
-            node={node}
-            onSelect={onSelect}
-            selected={model.selectedId === node.id}
-          />
-        ))}
-      </div>
+          </>
+        ) : null}
+      </details>
     </section>
   );
 }

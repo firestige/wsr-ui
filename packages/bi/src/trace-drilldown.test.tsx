@@ -1,4 +1,5 @@
 import { act, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 import type { EvaluationRoute } from "./domain/navigation/evaluation-route";
@@ -92,6 +93,12 @@ describe("Trace drill-down request ownership", () => {
     await act(async () =>
       resolveC({ ok: true, value: page(traceC, "current") }),
     );
+    const user = userEvent.setup();
+    await user.click(
+      await screen.findByText("Recorded structure exact details", {
+        selector: "summary",
+      }),
+    );
     expect(
       await screen.findByRole("button", { name: /current/ }),
     ).toBeVisible();
@@ -151,6 +158,12 @@ describe("Trace drill-down request ownership", () => {
     expect(
       screen.getByRole("button", { name: "Start Live reading" }),
     ).toBeDisabled();
+    const user = userEvent.setup();
+    await user.click(
+      screen.getByText("Recorded structure exact details", {
+        selector: "summary",
+      }),
+    );
     expect(
       screen.getAllByRole("button", { name: /Recorded parent relation/ }),
     ).toHaveLength(2);

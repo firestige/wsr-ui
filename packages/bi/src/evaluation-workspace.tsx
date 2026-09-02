@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 import { MetricExplanationView, ReceiptView } from "./components/details";
 import { CompareResultFrame } from "./components/compare-result";
@@ -94,71 +95,6 @@ function errorPresentation(error: EvolutionResult & { ok: false }): {
       retryable: false,
     };
   return { detail: error.error.reason, retryable: false };
-}
-
-function SingleResults({
-  response,
-  layout,
-  onExplain,
-  onEvidence,
-  focusedCoordinate,
-}: {
-  response: SingleResponse;
-  layout: DashboardLayout;
-  onExplain: (
-    coordinate: keyof typeof METRIC_COPY,
-    trigger: HTMLButtonElement,
-  ) => void;
-  onEvidence: (
-    coordinate: keyof typeof METRIC_COPY,
-    trigger: HTMLButtonElement,
-  ) => void;
-  focusedCoordinate?: string;
-}) {
-  return (
-    <section aria-label="Metric Results" className="evaluation-results">
-      {layout.panels.map((panel) => {
-        const result = response.result.metric_results.find(
-          (metric) =>
-            `${metric.metric_id}@${metric.metric_version}` ===
-            panel.metric_coordinate,
-        );
-        return (
-          <section
-            aria-current={
-              focusedCoordinate === panel.metric_coordinate ? "true" : undefined
-            }
-            className="dashboard-panel"
-            data-size={panel.size}
-            key={panel.panel_id}
-          >
-            {result === undefined ? (
-              <ScopedError
-                announce="polite"
-                detail={panel.metric_coordinate}
-                retryable={false}
-                title="Metric Result missing"
-              />
-            ) : (
-              <MetricPanel
-                focusEvidenceAction={
-                  focusedCoordinate === panel.metric_coordinate
-                }
-                onEvidence={(trigger) =>
-                  onEvidence(panel.metric_coordinate, trigger)
-                }
-                onExplain={(trigger) =>
-                  onExplain(panel.metric_coordinate, trigger)
-                }
-                result={result}
-                visualizer={panel.visualizer}
-              />
-            )}
-          </section>
-        );
-      })}
-    </section>
-  );
 }
 
 const utf8Encoder = new TextEncoder();
@@ -283,6 +219,7 @@ function CompareResults({
             "RATIO_TO_PERCENT",
             "STABLE_AUTHORITATIVE_SORT",
           ],
+          grid: { x: 0, y: 0, w: 3, h: 2 },
         },
       });
   }
@@ -384,6 +321,9 @@ export function EvaluationWorkspace({
       ? { choice: "default-overview@1" }
       : { choice: "local@1", local };
   });
+  const [dashboardTarget, setDashboardTarget] = useState<HTMLElement | null>(
+    null,
+  );
   const detailInvoker = useRef<HTMLButtonElement>(null);
   const requestGeneration = useRef(0);
   const desktopInspector = useDesktopInspector();
@@ -535,26 +475,81 @@ export function EvaluationWorkspace({
               </select>
             </label>
           ) : null}
+          {state.tag === "RESULT" && state.response.mode === "SINGLE" ? (
+            <DashboardComposer
+              focusedMetricCoordinate={route.focus?.metric}
+              layout={activeLayout}
+              onApply={(layout) => {
+                try {
+                  window.localStorage.setItem(
+                    LOCAL_LAYOUT_KEY,
+                    JSON.stringify(layout),
+                  );
+                } catch {
+                  // The in-memory local layout remains usable when storage is denied.
+                }
+                setLayoutState({ choice: "local@1", local: layout });
+              }}
+              renderPanel={(panel) => {
+                if (state.tag !== "RESULT" || state.response.mode !== "SINGLE")
+                  return null;
+                const result = state.response.result.metric_results.find(
+                  (metric) =>
+                    `${metric.metric_id}@${metric.metric_version}` ===
+                    panel.metric_coordinate,
+                );
+                return result === undefined ? (
+                  <ScopedError
+                    announce="polite"
+                    detail={panel.metric_coordinate}
+                    retryable={false}
+                    title="Metric Result missing"
+                  />
+                ) : (
+                  <MetricPanel
+                    focusEvidenceAction={
+                      route.focus?.metric === panel.metric_coordinate
+                    }
+                    onEvidence={(trigger) => {
+                      if (route.tag === "SINGLE")
+                        onNavigate?.({
+                          tag: "EVIDENCE",
+                          selection: {
+                            tag: "SINGLE",
+                            taskIds: route.taskIds,
+                          },
+                          metric: panel.metric_coordinate,
+                          side: "single",
+                          scope: "result",
+                        });
+                      detailInvoker.current = trigger;
+                    }}
+                    onExplain={(trigger) => {
+                      detailInvoker.current = trigger;
+                      setDetail({
+                        kind: "explanation",
+                        coordinate: panel.metric_coordinate,
+                      });
+                    }}
+                    result={result}
+                    visualizer={panel.visualizer}
+                  />
+                );
+              }}
+              results={state.response.result.metric_results}
+            >
+              {({ actions, dashboard }) => (
+                <>
+                  {actions}
+                  {dashboardTarget === null
+                    ? null
+                    : createPortal(dashboard, dashboardTarget)}
+                </>
+              )}
+            </DashboardComposer>
+          ) : null}
         </div>
       </header>
-
-      {state.tag === "RESULT" && state.response.mode === "SINGLE" ? (
-        <DashboardComposer
-          layout={activeLayout}
-          onApply={(layout) => {
-            try {
-              window.localStorage.setItem(
-                LOCAL_LAYOUT_KEY,
-                JSON.stringify(layout),
-              );
-            } catch {
-              // The in-memory local layout remains usable when storage is denied.
-            }
-            setLayoutState({ choice: "local@1", local: layout });
-          }}
-          results={state.response.result.metric_results}
-        />
-      ) : null}
 
       <div id="evaluation-results">
         {state.tag === "LOADING" ? (
@@ -570,24 +565,10 @@ export function EvaluationWorkspace({
             title="Evaluation request failed"
           />
         ) : state.response.mode === "SINGLE" ? (
-          <SingleResults
-            focusedCoordinate={route.focus?.metric}
-            layout={activeLayout}
-            onEvidence={(coordinate) => {
-              if (route.tag === "SINGLE")
-                onNavigate?.({
-                  tag: "EVIDENCE",
-                  selection: { tag: "SINGLE", taskIds: route.taskIds },
-                  metric: coordinate,
-                  side: "single",
-                  scope: "result",
-                });
-            }}
-            onExplain={(coordinate, trigger) => {
-              detailInvoker.current = trigger;
-              setDetail({ kind: "explanation", coordinate });
-            }}
-            response={state.response}
+          <section
+            aria-label="Metric Results"
+            className="evaluation-results"
+            ref={setDashboardTarget}
           />
         ) : (
           <CompareResults
