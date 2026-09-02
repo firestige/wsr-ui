@@ -36,8 +36,10 @@ export function MetricTruthLabel({
   return (
     <div className="status-stack" data-state={state}>
       <span className={`status-label status-${truth.tone}`}>
-        <span aria-hidden="true">{truth.marker}</span>
-        {truth.label}
+        <span aria-hidden="true" className="status-label-marker">
+          {truth.marker}
+        </span>
+        <span className="status-label-text">{truth.label}</span>
       </span>
       {detail === "label" || withholdingReason === undefined ? null : (
         <span className="status-reason">Reason: {withholdingReason}</span>

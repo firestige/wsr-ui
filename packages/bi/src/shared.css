@@ -1,3 +1,5 @@
+@reference "./styles.css";
+
 .wsr-bi {
   color-scheme: light;
   --wsr-surface-panel: oklch(1 0 0);
@@ -80,6 +82,9 @@
   --type-numeric-size: 1.5rem;
   --layout-table-max-height: 32rem;
   --layout-visual-preview-height: 6rem;
+  --dashboard-grid-column-width: 10rem;
+  --dashboard-grid-gap: 0px;
+  --dashboard-grid-inline-padding: 0px;
   --motion-finite-duration: 320ms;
   --wsr-container-border-style: solid;
   box-sizing: border-box;
@@ -158,6 +163,144 @@
   outline-offset: 2px;
 }
 
+.wsr-bi .dashboard-grid-shell {
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.wsr-bi .dashboard-grid-shell[data-editing="true"] {
+  border-radius: var(--shape-panel);
+  background-color: var(--surface-inset);
+  background-image:
+    linear-gradient(to right, var(--border-default) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--border-default) 1px, transparent 1px);
+  background-position: var(--dashboard-grid-inline-padding) 0;
+  background-size: calc(
+      var(--dashboard-grid-column-width) + var(--dashboard-grid-gap)
+    )
+    176px;
+}
+
+.wsr-bi .dashboard-grid {
+  position: relative;
+  transition: height var(--motion-finite-duration) ease;
+}
+
+.wsr-bi .dashboard-grid > .react-grid-item {
+  min-width: 0;
+  transition:
+    transform 180ms ease,
+    width 180ms ease,
+    height 180ms ease;
+}
+
+.wsr-bi .dashboard-grid > .react-grid-item > .dashboard-metric-panel {
+  height: 100%;
+  overflow: auto;
+}
+
+.wsr-bi
+  .dashboard-grid-shell[data-editing="true"]
+  .dashboard-grid
+  > .react-grid-item:not(.react-grid-placeholder) {
+  cursor: grab;
+  outline: 1px dashed var(--interaction-accent);
+  outline-offset: 2px;
+}
+
+.wsr-bi .dashboard-grid > .react-grid-item.react-draggable-dragging {
+  z-index: 3;
+  cursor: grabbing;
+  transition: none;
+}
+
+.wsr-bi .dashboard-grid > .react-grid-placeholder {
+  z-index: 2;
+  border-radius: var(--shape-panel);
+  background: var(--interaction-selection);
+  outline: 2px solid var(--interaction-accent);
+  opacity: 0.72;
+}
+
+.wsr-bi .dashboard-grid .react-resizable-handle {
+  position: absolute;
+  right: 0.25rem;
+  bottom: 0.25rem;
+  width: 1.25rem;
+  height: 1.25rem;
+  cursor: se-resize;
+}
+
+.wsr-bi .dashboard-grid-shell[data-editing="false"] .react-resizable-handle {
+  display: none;
+}
+
+.wsr-bi .dashboard-grid .react-resizable-handle::after {
+  position: absolute;
+  right: 0.1875rem;
+  bottom: 0.1875rem;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-right: 2px solid var(--interaction-accent);
+  border-bottom: 2px solid var(--interaction-accent);
+  content: "";
+}
+
+.wsr-bi .dashboard-import-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.wsr-bi .dashboard-actions {
+  justify-content: end;
+}
+
+.wsr-bi .dashboard-actions .wsr-button[data-appearance="ghost"],
+.wsr-bi .dashboard-widget-delete.wsr-button {
+  border: 0;
+}
+
+.wsr-bi .dashboard-action-error {
+  max-width: 16rem;
+  color: var(--status-error);
+  font-size: var(--type-caption-size);
+}
+
+.wsr-bi .dashboard-widget-delete {
+  position: absolute;
+  inset-block-start: var(--space-tight);
+  inset-inline-end: var(--space-tight);
+  z-index: 4;
+  border: 0;
+  background: color-mix(in oklch, var(--surface-raised) 88%, transparent);
+  color: var(--content-secondary);
+}
+
+.wsr-bi .dashboard-widget-delete.wsr-button:is(:hover, :focus-visible) {
+  border: 0;
+  background: var(--status-error-surface);
+  color: var(--status-error);
+}
+
+.wsr-bi .dashboard-remove-icon {
+  @apply icon-[tabler--x];
+  display: inline-block;
+  width: 1rem;
+  height: 1rem;
+}
+
+.wsr-bi .dashboard-confirm-icon {
+  @apply icon-[tabler--check];
+  display: inline-block;
+  width: 1rem;
+  height: 1rem;
+}
+
 .wsr-bi .panel-card,
 .wsr-bi .metric-frame,
 .wsr-bi .dashboard-metric-panel,
@@ -173,8 +316,17 @@
 }
 
 .wsr-bi .dashboard-metric-panel {
+  container-name: dashboard-panel;
+  container-type: inline-size;
   gap: var(--space-cluster);
   padding: var(--space-cluster);
+}
+
+.wsr-bi
+  .dashboard-grid
+  > .react-grid-item
+  > .dashboard-metric-panel[data-visualizer="numeric-card@1"] {
+  overflow: hidden;
 }
 
 .wsr-bi .dashboard-panel-head {
@@ -198,6 +350,19 @@
 .wsr-bi .dashboard-panel-head h3 {
   font-size: var(--type-label-size);
   line-height: 1.35;
+}
+
+.wsr-bi
+  .dashboard-metric-panel[data-visualizer="numeric-card@1"]
+  .dashboard-panel-title {
+  font-size: var(--type-caption-size);
+}
+
+.wsr-bi .dashboard-evidence-icon {
+  @apply icon-[tabler--file-search];
+  display: inline-block;
+  width: 1rem;
+  height: 1rem;
 }
 
 .wsr-bi .dashboard-panel-meta {
@@ -281,6 +446,20 @@
 .wsr-bi .status-available {
   background: var(--status-available-surface);
   color: var(--status-available);
+}
+
+@container dashboard-panel (max-width: 12rem) {
+  .dashboard-panel-head .status-available {
+    justify-content: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    padding: 0;
+    border-radius: 50%;
+  }
+
+  .dashboard-panel-head .status-available .status-label-text {
+    display: none;
+  }
 }
 
 .wsr-bi .status-attention {

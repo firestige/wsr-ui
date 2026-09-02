@@ -10,7 +10,7 @@ import {
 } from "../domain/visualization/registry";
 import { presentExactValue } from "../domain/visualization/presentation";
 import { MetricResultFrame } from "./metric-result";
-import { Button } from "./design-system";
+import { Button, IconButton } from "./design-system";
 import { MetricTruthLabel, ScopedError } from "./status";
 
 function PanelActions({
@@ -305,10 +305,13 @@ export function DashboardMetricPanel({
       data-metric-coordinate={coordinate}
       data-panel-size={size}
       data-presentation="dashboard"
+      data-scrollable={
+        resolvedVisualizer === "numeric-card@1" ? "false" : undefined
+      }
       data-visualizer={resolvedVisualizer}
     >
       <header className="dashboard-panel-head">
-        <h3>{title}</h3>
+        <h3 className="dashboard-panel-title">{title}</h3>
         <MetricTruthLabel
           detail="label"
           reading={slice.reading}
@@ -330,7 +333,8 @@ export function DashboardMetricPanel({
       ) : (
         <div className="metric-value">
           <span className="metric-number">{presented?.display}</span>
-          {resolvedVisualizer === "ratio-bar@1" ? null : (
+          {resolvedVisualizer === "ratio-bar@1" ||
+          resolvedVisualizer === "numeric-card@1" ? null : (
             <span className="numeric-exact">
               Exact value: {presented?.exact}
             </span>
@@ -346,13 +350,30 @@ export function DashboardMetricPanel({
           <i style={{ width: `${ratioPercent}%` }} />
         </div>
       ) : null}
-      {slice.numerator === undefined ||
+      {size === "SMALL" ||
+      resolvedVisualizer === "numeric-card@1" ||
+      slice.numerator === undefined ||
       slice.denominator === undefined ? null : (
         <p className="dashboard-panel-meta">
           {slice.numerator} / {slice.denominator} exact
         </p>
       )}
-      {size === "SMALL" || onEvidence === undefined ? null : (
+      {onEvidence === undefined ? null : resolvedVisualizer ===
+        "numeric-card@1" ? (
+        <footer className="dashboard-panel-actions">
+          <IconButton
+            appearance="ghost"
+            aria-label="View evidence"
+            onClick={(event) => onEvidence(event.currentTarget)}
+            type="button"
+          >
+            <span
+              aria-hidden="true"
+              className="dashboard-evidence-icon icon-[tabler--file-search]"
+            />
+          </IconButton>
+        </footer>
+      ) : size === "SMALL" ? null : (
         <footer className="dashboard-panel-actions">
           <Button
             onClick={(event) => onEvidence(event.currentTarget)}

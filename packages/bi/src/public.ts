@@ -59,6 +59,7 @@ export {
   DashboardMetricPanel,
   MetricPanel,
 } from "./components/result-visualizer";
+export { DashboardGrid } from "./components/dashboard-grid";
 export {
   SpanPassport,
   TraceStatistics,
