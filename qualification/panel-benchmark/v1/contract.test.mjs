@@ -22,6 +22,10 @@ test("Wave 2 performance targets the reusable metric, waterfall, and tree panels
       "recorded-trace-tree@1",
     ],
   );
+  assert.equal(manifest.protocol.measuredSamplesPerRun, 30);
+  assert.equal(manifest.protocol.interactiveWindowsPerRun, 1);
+  assert.equal(manifest.protocol.interactiveDurationMsPerRun, 5000);
+  assert.equal("interactiveDurationMsPerSample" in manifest.protocol, false);
   assert.equal(
     JSON.stringify(manifest).includes("recorded-trace-graph@1"),
     false,
@@ -75,21 +79,30 @@ test("a run fails closed on any applicable budget violation", () => {
     longTasks: [],
   }));
 
-  const result = evaluateRun(samples, {
+  const interaction = { frameDurations: [10, 12], longTasks: [] };
+  const budgets = {
     firstPaintP95Ms: 100,
     interactiveFrameP95Ms: 16.7,
     maximumLongTasks: 0,
-  });
+  };
+  const result = evaluateRun(samples, interaction, budgets);
 
   assert.equal(result.firstPaintP95Ms, 30);
   assert.equal(result.passed, true);
   samples[29].firstPaintMs = 101;
+  assert.equal(evaluateRun(samples, interaction, budgets).passed, false);
+  samples[29].firstPaintMs = 30;
   assert.equal(
-    evaluateRun(samples, {
-      firstPaintP95Ms: 100,
-      interactiveFrameP95Ms: 16.7,
-      maximumLongTasks: 0,
-    }).passed,
+    evaluateRun(samples, { frameDurations: [17], longTasks: [] }, budgets)
+      .passed,
+    false,
+  );
+  assert.equal(
+    evaluateRun(
+      samples,
+      { frameDurations: [10], longTasks: [{ measuredDuration: 50 }] },
+      budgets,
+    ).passed,
     false,
   );
 });
@@ -103,6 +116,11 @@ test("complete result requires 3 independent 30-sample runs and retained evidenc
       longTasks: [],
     })),
     browserTrace: "trace-1.zip",
+    interactionSample: {
+      durationMs: 5000,
+      frameDurations: [16],
+      longTasks: [],
+    },
     environment: {
       platform: "linux/arm64/v8",
       browserVersion: "151.0.7922.34",
@@ -112,7 +130,9 @@ test("complete result requires 3 independent 30-sample runs and retained evidenc
     runs: [run, { ...run, runIndex: 2 }, { ...run, runIndex: 3 }],
   };
 
-  assert.doesNotThrow(() => validateCompleteResult(complete));
+  assert.doesNotThrow(() =>
+    validateCompleteResult(complete, { interactive: true }),
+  );
   assert.throws(
     () => validateCompleteResult({ runs: complete.runs.slice(0, 2) }),
     /exactly 3 independent runs/i,
@@ -127,5 +147,18 @@ test("complete result requires 3 independent 30-sample runs and retained evidenc
         ],
       }),
     /browser trace/i,
+  );
+  assert.throws(
+    () =>
+      validateCompleteResult(
+        {
+          runs: complete.runs.map((entry) => ({
+            ...entry,
+            interactionSample: undefined,
+          })),
+        },
+        { interactive: true },
+      ),
+    /interaction sample/i,
   );
 });

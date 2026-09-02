@@ -21,17 +21,15 @@ export function nearestRank(values, percentile) {
   return sorted[Math.ceil(percentile * sorted.length) - 1];
 }
 
-export function evaluateRun(samples, budgets) {
+export function evaluateRun(samples, interactionSample, budgets) {
   if (samples.length !== 30) {
     throw new Error("A full run requires exactly 30 measured samples");
   }
   const firstPaint = samples.map((sample) => sample.firstPaintMs);
-  const frames = samples
-    .map((sample) => sample.frameP95Ms)
-    .filter((value) => value !== null && value !== undefined);
+  const frames = interactionSample?.frameDurations ?? [];
   const longTaskCount = samples.reduce(
     (total, sample) => total + sample.longTasks.length,
-    0,
+    interactionSample?.longTasks.length ?? 0,
   );
   const result = {
     firstPaintP50Ms: nearestRank(firstPaint, 0.5),
@@ -50,7 +48,7 @@ export function evaluateRun(samples, budgets) {
   };
 }
 
-export function validateCompleteResult(result) {
+export function validateCompleteResult(result, { interactive = false } = {}) {
   if (!Array.isArray(result.runs) || result.runs.length !== 3) {
     throw new Error("A complete result requires exactly 3 independent runs");
   }
@@ -65,6 +63,16 @@ export function validateCompleteResult(result) {
     }
     if (!run.environment?.platform || !run.environment?.browserVersion) {
       throw new Error("Every run must retain environment metadata");
+    }
+    if (
+      interactive &&
+      (!run.interactionSample ||
+        !Array.isArray(run.interactionSample.frameDurations) ||
+        run.interactionSample.frameDurations.length === 0)
+    ) {
+      throw new Error(
+        "Every interactive run must retain an interaction sample",
+      );
     }
   }
   if (indexes.size !== 3) {

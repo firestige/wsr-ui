@@ -35,7 +35,7 @@ const isFull = mode === "full";
 const runCount = isFull ? manifest.protocol.independentRuns : 1;
 const sampleCount = isFull ? manifest.protocol.measuredSamplesPerRun : 3;
 const interactionDurationMs = isFull
-  ? manifest.protocol.interactiveDurationMsPerSample
+  ? manifest.protocol.interactiveDurationMsPerRun
   : Number(argument("interaction-duration", "250"));
 
 if (
@@ -108,7 +108,7 @@ function smokeEvaluation(samples) {
   };
 }
 
-async function measureSample(browser, target) {
+async function measureSample(browser, target, interactionMs = 0) {
   const page = await browser.newPage({
     deviceScaleFactor: manifest.runner.deviceScaleFactor,
     viewport: manifest.runner.viewport,
@@ -132,12 +132,13 @@ async function measureSample(browser, target) {
     ) {
       throw new Error(`${target.panel} did not satisfy renderer readiness`);
     }
-    const frameDurations = target.interactive
-      ? await page.evaluate(
-          (duration) => window.__wsrBenchmark.runInteraction(duration),
-          interactionDurationMs,
-        )
-      : [];
+    const frameDurations =
+      interactionMs > 0
+        ? await page.evaluate(
+            (duration) => window.__wsrBenchmark.runInteraction(duration),
+            interactionMs,
+          )
+        : [];
     const raw = await page.evaluate(() => ({
       dataReady: window.__wsrBenchmark.dataReady,
       firstPaintMs: window.__wsrBenchmark.firstPaintMs,
@@ -230,19 +231,31 @@ try {
       for (let sampleIndex = 1; sampleIndex <= sampleCount; sampleIndex += 1) {
         rawSamples.push({
           sampleIndex,
-          ...(await measureSample(context, target)),
+          ...(await measureSample(
+            context,
+            target,
+            isFull ? 0 : target.interactive ? interactionDurationMs : 0,
+          )),
         });
       }
+      const interactionSample =
+        isFull && target.interactive
+          ? {
+              durationMs: interactionDurationMs,
+              ...(await measureSample(context, target, interactionDurationMs)),
+            }
+          : undefined;
       const traceName = `${target.panel}.${target.fixture}.run-${runIndex}.zip`;
       await context.tracing.stop({ path: resolve(resultRoot, traceName) });
       await context.close();
       const evaluation = isFull
-        ? evaluateRun(rawSamples, manifest.budgets)
+        ? evaluateRun(rawSamples, interactionSample, manifest.budgets)
         : smokeEvaluation(rawSamples);
       targetResult.runs.push({
         runIndex,
         warmupSamples: 1,
         rawSamples,
+        interactionSample,
         browserTrace: traceName,
         environment: {
           platform: `${platform()}/${arch()}`,
@@ -256,7 +269,8 @@ try {
         evaluation,
       });
     }
-    if (isFull) validateCompleteResult(targetResult);
+    if (isFull)
+      validateCompleteResult(targetResult, { interactive: target.interactive });
     results.push(targetResult);
   }
 } finally {
@@ -266,7 +280,12 @@ try {
 
 const result = {
   schemaVersion: "panel-benchmark-result@1",
-  qualifying: isFull,
+  protocolComplete: isFull,
+  qualifying:
+    isFull &&
+    results.every((target) =>
+      target.runs.every((run) => run.evaluation.passed),
+    ),
   benchmark: manifest.schemaVersion,
   manifestSha256: createHash("sha256").update(manifestBytes).digest("hex"),
   providerCommit:
@@ -281,7 +300,7 @@ await writeFile(
   `${JSON.stringify(result, null, 2)}\n`,
 );
 process.stdout.write(
-  `${JSON.stringify({ result: resolve(resultRoot, "result.json"), qualifying: isFull }, null, 2)}\n`,
+  `${JSON.stringify({ result: resolve(resultRoot, "result.json"), qualifying: result.qualifying }, null, 2)}\n`,
 );
 
 if (

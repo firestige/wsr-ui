@@ -30,7 +30,8 @@
     "independentRuns": 3,
     "percentileAlgorithm": "nearest-rank",
     "firstPaint": "data-ready to the second requestAnimationFrame after renderer-ready",
-    "interactiveDurationMsPerSample": 5000,
+    "interactiveWindowsPerRun": 1,
+    "interactiveDurationMsPerRun": 5000,
     "rendererReady": "geometry fonts ready and SVG attributes committed or Canvas draw completed",
     "retain": [
       "raw-samples",

@@ -58,3 +58,18 @@ The summary renderer now retains the complete deterministic node/edge geometry
 and bounds concurrent motion to the first 24 focused edges in stable trace
 order. A component test fixes that behavior, and the 200-span Tree
 microbenchmark returned to zero long tasks before the final qualifying rerun.
+
+The original runner applied the five-second interaction window to every warm-up
+and every first-paint sample. Four interactive targets therefore spent at least
+31 minutes in duplicated interaction windows:
+`4 × 3 × (1 + 30) × 5 seconds`. Human review rejected that execution model
+before the next run completed. The incomplete run was terminated and is not a
+qualification result.
+
+The corrected protocol keeps 30 independent first-paint samples in each of
+three runs, then records one separate five-second interaction window per
+interactive target and run. The interaction record retains every frame
+duration and measured long task; first-paint P95 continues to use 30 samples,
+while frame P95 uses all frames from the dedicated window. Thus sample sizes,
+three-run independence, budgets, fixtures, and 21 browser traces remain intact
+without treating 30 duplicated long windows as independent first-paint data.
