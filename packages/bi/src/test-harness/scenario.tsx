@@ -1,3 +1,7 @@
+import { TraceStatistics } from "../public";
+
+import { statisticsTrace } from "./statistics-fixture";
+
 export function ActiveScenario() {
-  return <p data-testid="empty-test-scenario">No active component scenario.</p>;
+  return <TraceStatistics trace={statisticsTrace} />;
 }

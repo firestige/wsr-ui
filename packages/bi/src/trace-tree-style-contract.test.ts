@@ -9,10 +9,8 @@ const traceViews = readFileSync(
 
 describe("frozen Trace Tree visual grammar", () => {
   it("consumes the shared semantic type, shape, and surface tokens", () => {
-    expect(css).toMatch(
-      /--type-heading-size:\s*var\(--wsr-type-section-title,/,
-    );
-    expect(css).toMatch(/--type-body-size:\s*var\(--wsr-type-body,/);
+    expect(css).toMatch(/--type-heading-size:\s*var\(--wsr-type-h2,/);
+    expect(css).toMatch(/--type-body-size:\s*var\(--wsr-type-body1,/);
     expect(css).toMatch(/--type-caption-size:\s*var\(--wsr-type-caption,/);
     expect(css).toMatch(/--shape-panel:\s*var\(--wsr-shape-panel,/);
     expect(css).toMatch(/--surface-panel:\s*var\(--wsr-surface-panel,/);
@@ -45,28 +43,27 @@ describe("frozen Trace Tree visual grammar", () => {
     expect(minimapRule).toMatch(/inset-block-end:\s*var\(--space-grid\)/);
   });
 
-  it("exposes theme overrides for tree nodes, edges, and Passport accents", () => {
+  it("uses shared semantic palette tokens for tree and Passport accents", () => {
+    expect(css).not.toMatch(/--wsr-tree-/);
+    expect(traceViews).not.toMatch(/--wsr-tree-/);
     for (const token of [
-      "--wsr-tree-node-surface",
-      "--wsr-tree-node-border",
-      "--wsr-tree-internal-color",
-      "--wsr-tree-client-color",
-      "--wsr-tree-error-color",
-      "--wsr-tree-selected-color",
-      "--wsr-tree-parent-edge-color",
-      "--wsr-tree-link-edge-color",
-    ]) {
-      expect(css).toContain(`${token}:`);
+      "--surface-raised",
+      "--border-strong",
+      "--data-series-1",
+      "--data-series-2",
+      "--status-error",
+      "--interaction-accent",
+      "--status-warning",
+    ])
       expect(traceViews).toContain(`"${token}"`);
-    }
     expect(css).toMatch(
-      /\.trace-passport-sigil\s*\{[^}]*var\(--wsr-tree-internal-color\)/s,
+      /\.trace-passport-sigil\s*\{[^}]*var\(--data-series-1\)/s,
     );
     expect(css).toMatch(
-      /\.trace-passport-sigil\.trace-kind-client\s*\{[^}]*var\(--wsr-tree-client-color\)/s,
+      /\.trace-passport-sigil\.trace-kind-client\s*\{[^}]*var\(--data-series-2\)/s,
     );
     expect(css).toMatch(
-      /\.trace-link-receipt\s*\{[^}]*var\(--wsr-tree-link-edge-color\)/s,
+      /\.trace-link-receipt\s*\{[^}]*var\(--status-warning\)/s,
     );
   });
 
@@ -105,12 +102,10 @@ describe("frozen Trace Tree visual grammar", () => {
     expect(indentRule).toMatch(/background:\s*color-mix\([\s\S]*?24%/);
   });
 
-  it("exposes a four-color waterfall sequence with light and dark defaults", () => {
-    expect(css).toMatch(/--wsr-waterfall-color-0:/);
-    expect(css).toMatch(/--wsr-waterfall-color-3:/);
-    expect(css).toMatch(
-      /\.wsr-bi\[data-theme="dark"\]\s*\{[^}]*--wsr-waterfall-color-0:[^}]*--wsr-waterfall-color-3:/s,
-    );
+  it("uses the shared six-color data palette for waterfall marks and indents", () => {
+    expect(css).not.toMatch(/--wsr-(?:waterfall-color|trace-indent)-/);
+    expect(css).toMatch(/--data-series-1:/);
+    expect(css).toMatch(/--data-series-6:/);
     expect(css).toMatch(
       /\.trace-timeline-bar\s*\{[^}]*var\(--trace-waterfall-color\)/s,
     );

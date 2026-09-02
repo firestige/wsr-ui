@@ -106,7 +106,10 @@ describe("recorded Trace business panels", () => {
     expect(
       screen.getByText("Errors").closest(".trace-summary-stat"),
     ).toHaveAttribute("data-tone", "success");
-    expect(screen.getByText("trace-1", { selector: "code" })).toBeVisible();
+    expect(screen.getByText("trace-1")).toHaveAttribute(
+      "data-variant",
+      "caption",
+    );
     expect(screen.queryByText(/shared recorded-time domain/i)).toBeNull();
     expect(
       screen.getByRole("region", { name: "Recorded trace minimap" }),
@@ -461,11 +464,11 @@ describe("recorded Trace business panels", () => {
 
       expect(minimapSpan).toHaveAttribute(
         "data-color-index",
-        String(node.depth % 4),
+        String(node.depth % 6),
       );
       expect(waterfallBar).toHaveAttribute(
         "data-color-index",
-        String(node.depth % 4),
+        String(node.depth % 6),
       );
 
       expect(minimapSpan).toHaveClass(`trace-kind-${node.kind.toLowerCase()}`);
@@ -531,6 +534,10 @@ describe("recorded Trace business panels", () => {
     const canvasHeader = region.querySelector(".trace-tree-canvas-head");
     expect(canvasHeader?.querySelector("h2")).toHaveTextContent(
       "Span call tree",
+    );
+    expect(canvasHeader?.querySelector("h2")).toHaveAttribute(
+      "data-variant",
+      "subtitle1",
     );
     expect(canvasHeader?.querySelector("p")).toHaveTextContent(
       "Click a Span or exact relationship · deterministic geometry",
@@ -747,17 +754,62 @@ describe("recorded Trace business panels", () => {
     expect(region).toHaveTextContent("Recorded spans2");
     expect(region).toHaveTextContent("Recorded links1");
     expect(region).toHaveTextContent("ERROR spans0");
-    expect(region).toHaveTextContent("Maximum recorded duration100 ns");
+    expect(region).toHaveTextContent("Maximum recorded duration<1 ms");
+    expect(region).not.toHaveTextContent(/\b(?:ns|μs)\b/);
     expect(region).toHaveTextContent("Recorded status inventory");
     expect(region).toHaveTextContent("Recorded kind inventory");
+    expect(region).toHaveTextContent("Recorded duration by kind");
     expect(region).toHaveTextContent("Recorded duration distribution");
     expect(region).not.toHaveTextContent(/critical path|service map/i);
+    const intro = region.querySelector(":scope > .trace-statistics-intro");
+    expect(intro?.querySelector("h2")).toHaveTextContent("Trace Statistics");
+    expect(
+      intro?.querySelector(":scope > .trace-statistics-summary"),
+    ).not.toBeNull();
+    expect(
+      region.querySelector(":scope > .trace-statistics-summary"),
+    ).toBeNull();
+    expect(
+      screen.getByRole("img", {
+        name: "Recorded status inventory donut chart",
+      }),
+    ).toHaveAttribute("data-chart-type", "donut");
+    expect(
+      screen.getByRole("img", {
+        name: "Recorded kind inventory pie chart",
+      }),
+    ).toHaveAttribute("data-chart-type", "pie");
+    expect(
+      screen.getByRole("img", {
+        name: "Recorded duration by kind horizontal bar chart",
+      }),
+    ).toHaveAttribute("data-chart-type", "horizontal-bar");
+    expect(
+      screen.getByRole("img", {
+        name: "Recorded duration distribution vertical bar chart",
+      }),
+    ).toHaveAttribute("data-chart-type", "vertical-bar");
+    expect(
+      region.querySelectorAll(
+        '.trace-duration-breakdowns [role="img"][data-chart-type="donut"]',
+      ),
+    ).toHaveLength(1);
     expect(
       region.querySelector(':scope > nav[aria-label="Renderer navigation"]'),
     ).not.toBeNull();
     expect(
-      screen.getByRole("heading", { name: "Trace statistics" }),
-    ).toHaveAttribute("data-variant", "sectionTitle");
+      screen.getByRole("heading", { name: "Trace Statistics" }),
+    ).toHaveAttribute("data-variant", "h2");
+    for (const name of [
+      "Recorded status inventory",
+      "Recorded kind inventory",
+      "Recorded duration by kind",
+      "Recorded duration distribution",
+    ])
+      expect(screen.getByRole("heading", { name })).toHaveAttribute(
+        "data-variant",
+        "subtitle1",
+      );
     expect(
       screen.getByText(
         "Exact inventory and recorded-time aggregates only; no inferred causality.",
@@ -765,12 +817,193 @@ describe("recorded Trace business panels", () => {
     ).toHaveAttribute("data-variant", "caption");
     expect(screen.getByText("Recorded spans")).toHaveAttribute(
       "data-variant",
-      "label",
+      "caption",
     );
     expect(screen.getByText("2", { selector: "dd" })).toHaveAttribute(
       "data-variant",
-      "value",
+      "h2",
     );
+  });
+
+  it("uses semantic status colors, separated kind colors, and exact cumulative duration rows", () => {
+    const categoryTrace: TraceView = {
+      ...trace,
+      nodes: [
+        { ...trace.nodes[0]!, durationNano: "100", status: "OK" },
+        {
+          ...trace.nodes[1]!,
+          durationNano: "40",
+          fields: [{ field: "wsr.statistics.topic", value: "Execution" }],
+          status: "ERROR",
+        },
+        {
+          ...trace.nodes[1]!,
+          id: "unset-child",
+          endpoint: { trace_id: "trace-1", span_id: "unset-child" },
+          label: "category.unset",
+          durationNano: "60",
+          fields: [{ field: "wsr.statistics.topic", value: "Cleanup" }],
+          status: "UNSET",
+        },
+      ],
+    };
+
+    render(<TraceStatistics trace={categoryTrace} />);
+
+    const statusChart = screen.getByRole("img", {
+      name: "Recorded status inventory donut chart",
+    });
+    expect(
+      statusChart.querySelector('[data-category="status-ok"]'),
+    ).not.toBeNull();
+    expect(
+      statusChart.querySelector('[data-category="status-error"]'),
+    ).not.toBeNull();
+    expect(
+      statusChart.querySelector('[data-category="status-unset"]'),
+    ).not.toBeNull();
+
+    const kindChart = screen.getByRole("img", {
+      name: "Recorded kind inventory pie chart",
+    });
+    expect(
+      kindChart.querySelector('[data-entry-label="INTERNAL"]'),
+    ).toHaveAttribute("data-color-index", "0");
+    expect(
+      kindChart.querySelector('[data-entry-label="CLIENT"]'),
+    ).toHaveAttribute("data-color-index", "3");
+    const durationByKindChart = screen.getByRole("img", {
+      name: "Recorded duration by kind horizontal bar chart",
+    });
+    expect(
+      durationByKindChart.querySelectorAll(".trace-statistics-kind-bar-row"),
+    ).toHaveLength(2);
+    expect(
+      durationByKindChart.querySelector('[data-entry-label="INTERNAL"]'),
+    ).toHaveAttribute("data-color-index", "0");
+    expect(
+      durationByKindChart.querySelector('[data-entry-label="CLIENT"]'),
+    ).toHaveAttribute("data-color-index", "3");
+
+    const durationChart = screen.getByRole("img", {
+      name: "Recorded duration distribution vertical bar chart",
+    });
+    expect(
+      durationChart.querySelectorAll(".trace-duration-column"),
+    ).toHaveLength(3);
+    expect(
+      [...durationChart.querySelectorAll("[data-topic]")].map((column) =>
+        column.getAttribute("data-topic"),
+      ),
+    ).toEqual(["Execution", "Cleanup"]);
+    const breakdowns = [
+      screen.getByRole("img", {
+        name: "Recorded duration Execution donut chart",
+      }),
+      screen.getByRole("img", {
+        name: "Recorded duration Cleanup donut chart",
+      }),
+    ];
+    expect(breakdowns).toHaveLength(2);
+    expect(
+      breakdowns.map(
+        (breakdown) =>
+          breakdown.querySelectorAll(".trace-statistics-donut-segment").length,
+      ),
+    ).toEqual([1, 1]);
+    expect(
+      durationChart.querySelectorAll(".trace-duration-column")[0],
+    ).toHaveTextContent("<1 msworkflow.run");
+    expect(durationChart).not.toHaveTextContent(/\b(?:ns|μs)\b/);
+  });
+
+  it("uses one three-line copy and metric typography contract across Trace views", () => {
+    const cases = [
+      [TraceWaterfall, ["Exact recorded timeline", "workflow.run", "trace-1"]],
+      [TraceTree, ["Exact recorded call graph", "workflow.run", "trace-1"]],
+      [
+        TraceStatistics,
+        [
+          "Exact recorded inventory",
+          "Trace Statistics",
+          "Exact inventory and recorded-time aggregates only; no inferred causality.",
+        ],
+      ],
+    ] as const;
+
+    for (const [Renderer, copy] of cases) {
+      const { container, unmount } = render(<Renderer trace={trace} />);
+      const header = container.querySelector(".trace-view-header")!;
+      const headerCopy = header.querySelector(".trace-view-header-copy")!;
+      expect(headerCopy).toHaveTextContent(copy.join(""));
+      expect(
+        [...headerCopy.children].map((item) =>
+          item.getAttribute("data-variant"),
+        ),
+      ).toEqual(["overline", "h2", "caption"]);
+      expect(header.querySelector(".trace-view-header-spacer")).not.toBeNull();
+      const metrics = header.querySelector(".trace-view-header-metrics")!;
+      expect(
+        [...metrics.querySelectorAll("dt, small")].every(
+          (item) => item.getAttribute("data-variant") === "caption",
+        ),
+      ).toBe(true);
+      expect(
+        [...metrics.querySelectorAll("dd, strong")].every(
+          (item) => item.getAttribute("data-variant") === "h2",
+        ),
+      ).toBe(true);
+      unmount();
+    }
+  });
+
+  it("cycles the theme color sequence when statistics outnumber its colors", () => {
+    render(
+      <TraceStatistics
+        trace={{
+          ...trace,
+          nodes: Array.from({ length: 8 }, (_, index) => ({
+            ...trace.nodes[index % trace.nodes.length]!,
+            id: `statistics-${index}`,
+            endpoint: {
+              trace_id: "trace-1",
+              span_id: `statistics-${index}`,
+            },
+            label: `statistics.${index}`,
+            fields:
+              index === 0
+                ? []
+                : [
+                    {
+                      field: "wsr.statistics.topic",
+                      value: `Topic ${index}`,
+                    },
+                  ],
+          })),
+        }}
+      />,
+    );
+
+    expect(
+      document.querySelectorAll(".trace-duration-column").length,
+    ).toBeLessThanOrEqual(5);
+    expect(
+      [
+        ...document.querySelectorAll(
+          ".trace-duration-breakdowns .trace-statistics-donut-segment",
+        ),
+      ].map((item) => item.getAttribute("data-color-index")),
+    ).toEqual(expect.arrayContaining(["0", "0", "1", "2", "3", "4", "5"]));
+    expect(
+      document.querySelectorAll(
+        '.trace-duration-breakdown[data-topic="Other"]',
+      ),
+    ).toHaveLength(1);
+    expect(
+      document.querySelectorAll(
+        ".trace-statistics-value.trace-statistics-color[data-color-index]",
+      ).length,
+    ).toBeGreaterThan(0);
   });
 
   it("places Host renderer navigation in the same top-level region for every Trace renderer", () => {

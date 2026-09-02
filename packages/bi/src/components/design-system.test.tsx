@@ -22,15 +22,30 @@ describe("Studio semantic design assets", () => {
       "segment",
     ]);
     expect(Object.keys(STUDIO_DESIGN_IR.typography)).toEqual([
-      "pageTitle",
-      "sectionTitle",
-      "body",
-      "label",
+      "h1",
+      "h2",
+      "subtitle1",
+      "body1",
+      "body2",
       "caption",
-      "eyebrow",
-      "code",
-      "value",
+      "overline",
     ]);
+    expect(
+      Object.fromEntries(
+        Object.entries(STUDIO_DESIGN_IR.typography).map(([variant, style]) => [
+          variant,
+          style.size,
+        ]),
+      ),
+    ).toEqual({
+      h1: "4xl",
+      h2: "xl",
+      subtitle1: "lg",
+      body1: "base",
+      body2: "sm",
+      caption: "xs",
+      overline: "2xs",
+    });
     expect(Object.keys(STUDIO_DESIGN_IR.inputs)).toEqual(["search"]);
     expect(Object.keys(STUDIO_DESIGN_IR.statuses)).toEqual([
       "available",
@@ -63,7 +78,7 @@ describe("Studio semantic design assets", () => {
   it("compiles semantic props to deterministic DOM attributes", () => {
     render(
       <Surface aria-label="panel" level="panel">
-        <Typography as="h2" variant="sectionTitle">
+        <Typography as="h2" variant="h2">
           Title
         </Typography>
         <ButtonGroup aria-label="actions">
@@ -79,7 +94,7 @@ describe("Studio semantic design assets", () => {
     );
     expect(screen.getByRole("heading", { name: "Title" })).toHaveAttribute(
       "data-variant",
-      "sectionTitle",
+      "h2",
     );
     expect(screen.getByRole("button", { name: "Run" })).toHaveAttribute(
       "data-appearance",
@@ -89,6 +104,32 @@ describe("Studio semantic design assets", () => {
       "data-tone",
       "primary",
     );
+  });
+
+  it("composes many text scenarios from a small variant and modifier vocabulary", () => {
+    render(
+      <Typography
+        as="blockquote"
+        family="mono"
+        italic
+        tone="secondary"
+        truncate
+        underline
+        variant="body1"
+        weight="medium"
+      >
+        Recorded quotation
+      </Typography>,
+    );
+
+    const quotation = screen.getByText("Recorded quotation");
+    expect(quotation).toHaveAttribute("data-variant", "body1");
+    expect(quotation).toHaveAttribute("data-family", "mono");
+    expect(quotation).toHaveAttribute("data-tone", "secondary");
+    expect(quotation).toHaveAttribute("data-weight", "medium");
+    expect(quotation).toHaveAttribute("data-italic", "true");
+    expect(quotation).toHaveAttribute("data-underline", "true");
+    expect(quotation).toHaveAttribute("data-truncate", "true");
   });
 
   it("keeps section and business-panel surfaces as distinct theme roles", () => {

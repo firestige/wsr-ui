@@ -37,24 +37,54 @@ describe("Wave 2 public reusable BI assets", () => {
       mode: "dark",
       density: "compact",
       containerBorderStyle: "dashed",
-      surfaces: {
-        section: "var(--host-section)",
-        panel: "var(--host-panel)",
-        raised: "var(--host-raised)",
-        inset: "var(--host-inset)",
+      palette: {
+        surface: {
+          section: "var(--host-section)",
+          panel: "var(--host-panel)",
+          raised: "var(--host-raised)",
+          inset: "var(--host-inset)",
+        },
+        content: {
+          primary: "var(--host-content-primary)",
+          secondary: "var(--host-content-secondary)",
+          muted: "var(--host-content-muted)",
+          inverse: "var(--host-content-inverse)",
+        },
+        border: {
+          default: "var(--host-border-default)",
+          strong: "var(--host-border-strong)",
+        },
+        interaction: {
+          accent: "var(--host-accent)",
+          selection: "var(--host-selection)",
+          disabled: "var(--host-disabled)",
+          focusRing: "var(--host-focus-ring)",
+        },
+        status: {
+          available: "var(--host-available)",
+          attention: "var(--host-attention)",
+          unavailable: "var(--host-unavailable)",
+          expired: "var(--host-expired)",
+          incompatible: "var(--host-incompatible)",
+          error: "var(--host-error)",
+        },
+        data: [
+          "var(--host-data-1)",
+          "var(--host-data-2)",
+          "var(--host-data-3)",
+        ],
       },
-      traceIndentGuides: [
-        "var(--host-depth-0)",
-        "var(--host-depth-1)",
-        "var(--host-depth-2)",
-        "var(--host-depth-3)",
-      ],
-      waterfallColors: [
-        "var(--host-waterfall-0)",
-        "var(--host-waterfall-1)",
-        "var(--host-waterfall-2)",
-        "var(--host-waterfall-3)",
-      ],
+      typography: {
+        fontFamily: "Host Sans",
+        codeFontFamily: "Host Mono",
+        h1: "1.5rem",
+        h2: "1rem",
+        subtitle1: "0.875rem",
+        body1: "0.875rem",
+        body2: "0.75rem",
+        caption: "0.6875rem",
+        overline: "0.6875rem",
+      },
     });
 
     render(
@@ -73,21 +103,31 @@ describe("Wave 2 public reusable BI assets", () => {
     expect(surface).toHaveStyle("--wsr-surface-panel: var(--host-panel)");
     expect(surface).toHaveStyle("--wsr-surface-raised: var(--host-raised)");
     expect(surface).toHaveStyle("--wsr-surface-inset: var(--host-inset)");
-    expect(surface).toHaveStyle("--wsr-trace-indent-0: var(--host-depth-0)");
-    expect(surface).toHaveStyle("--wsr-trace-indent-1: var(--host-depth-1)");
-    expect(surface).toHaveStyle("--wsr-trace-indent-2: var(--host-depth-2)");
-    expect(surface).toHaveStyle("--wsr-trace-indent-3: var(--host-depth-3)");
     expect(surface).toHaveStyle(
-      "--wsr-waterfall-color-0: var(--host-waterfall-0)",
+      "--content-primary: var(--host-content-primary)",
     );
-    expect(surface).toHaveStyle(
-      "--wsr-waterfall-color-1: var(--host-waterfall-1)",
+    expect(surface).toHaveStyle("--border-strong: var(--host-border-strong)");
+    expect(surface).toHaveStyle("--interaction-accent: var(--host-accent)");
+    expect(surface).toHaveStyle("--focus-ring: var(--host-focus-ring)");
+    expect(surface).toHaveStyle("--status-error: var(--host-error)");
+    expect(surface).toHaveStyle("--status-warning: var(--host-attention)");
+    expect(surface).toHaveStyle("--data-series-1: var(--host-data-1)");
+    expect(surface).toHaveStyle("--data-series-4: var(--host-data-1)");
+    expect(surface).toHaveStyle("--data-series-6: var(--host-data-3)");
+    expect(surface).toHaveStyle("--wsr-type-h1: 1.5rem");
+    expect(surface).toHaveStyle("--wsr-font-family: Host Sans");
+    expect(surface).toHaveStyle("--wsr-code-font-family: Host Mono");
+    expect(surface).toHaveStyle("--wsr-type-h2: 1rem");
+    expect(surface).toHaveStyle("--wsr-type-subtitle1: 0.875rem");
+    expect(surface).toHaveStyle("--wsr-type-body1: 0.875rem");
+    expect(surface).toHaveStyle("--wsr-type-body2: 0.75rem");
+    expect(surface).toHaveStyle("--wsr-type-caption: 0.6875rem");
+    expect(surface).toHaveStyle("--wsr-type-overline: 0.6875rem");
+    expect(surface?.getAttribute("style")).not.toMatch(
+      /--wsr-type-(?:page-title|section-title|body|label|micro|code|value):/,
     );
-    expect(surface).toHaveStyle(
-      "--wsr-waterfall-color-2: var(--host-waterfall-2)",
-    );
-    expect(surface).toHaveStyle(
-      "--wsr-waterfall-color-3: var(--host-waterfall-3)",
+    expect(surface?.getAttribute("style")).not.toMatch(
+      /--wsr-(?:tree|waterfall|statistics|trace-indent)-/,
     );
     expect(
       screen.getByRole("region", { name: "Evaluation metrics" }),
