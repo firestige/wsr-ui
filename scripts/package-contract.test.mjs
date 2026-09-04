@@ -6,7 +6,12 @@ import test from "node:test";
 
 import { inspectPackageArtifact } from "./package-contract.mjs";
 
-async function artifactFixture(indexSource) {
+const expectedRepository = {
+  type: "git",
+  url: "https://github.com/firestige/wsr-ui",
+};
+
+async function artifactFixture(indexSource, repository = expectedRepository) {
   const root = await mkdtemp(join(tmpdir(), "wsr-bi-package-contract-"));
   await mkdir(join(root, "dist"));
   await writeFile(
@@ -14,6 +19,7 @@ async function artifactFixture(indexSource) {
     JSON.stringify({
       name: "wsr-ui-core",
       version: "0.1.0-rc.0",
+      ...(repository === null ? {} : { repository }),
       exports: {
         ".": { types: "./dist/index.d.ts", import: "./dist/index.js" },
         "./styles.css": "./dist/styles.css",
@@ -45,6 +51,26 @@ test("accepts an external-React artifact with complete public files", async (t) 
     "dist/styles.css",
   ]);
   assert.match(result.integrity, /^sha512-/);
+});
+
+test("fails closed when npm provenance cannot bind the package to this repository", async (t) => {
+  const root = await artifactFixture(
+    'import { createElement } from "react";\nexport { createElement };\n',
+    null,
+  );
+  t.after(() => rm(root, { force: true, recursive: true }));
+
+  await assert.rejects(inspectPackageArtifact(root), /repository identity/i);
+});
+
+test("fails closed when npm provenance names a different repository", async (t) => {
+  const root = await artifactFixture(
+    'import { createElement } from "react";\nexport { createElement };\n',
+    { type: "git", url: "https://github.com/firestige/not-wsr-ui" },
+  );
+  t.after(() => rm(root, { force: true, recursive: true }));
+
+  await assert.rejects(inspectPackageArtifact(root), /repository identity/i);
 });
 
 test("fails closed when the package contains a bundled React runtime", async (t) => {

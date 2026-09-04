@@ -5,6 +5,7 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const requiredFiles = ["dist/index.d.ts", "dist/index.js", "dist/styles.css"];
+const expectedRepositoryUrl = "https://github.com/firestige/wsr-ui";
 
 async function listFiles(root, relative = "") {
   const entries = await readdir(resolve(root, relative), {
@@ -24,6 +25,11 @@ export async function inspectPackageArtifact(packageRoot) {
   const metadata = JSON.parse(
     await readFile(resolve(root, "package.json"), "utf8"),
   );
+  if (metadata.repository?.url !== expectedRepositoryUrl) {
+    throw new Error(
+      `Package repository identity must be ${expectedRepositoryUrl}`,
+    );
+  }
   const files = await listFiles(root, "dist");
   for (const required of requiredFiles) {
     if (!files.includes(required)) {
