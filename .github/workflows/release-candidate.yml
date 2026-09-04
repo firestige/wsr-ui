@@ -1,0 +1,166 @@
+name: UI release candidate
+
+on:
+  push:
+    branches:
+      - release/next
+  workflow_dispatch:
+    inputs:
+      candidate_tag:
+        description: RC tag whose base equals the stable package version, for example 0.1.0-rc.2
+        required: true
+        type: string
+      authority_ref:
+        description: Immutable superproject revision that pins this UI candidate
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ui-release-candidate
+  cancel-in-progress: false
+
+jobs:
+  qualify-and-publish-prerelease:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Resolve immutable release request
+        id: request
+        env:
+          DISPATCH_CANDIDATE_TAG: ${{ inputs.candidate_tag }}
+          DISPATCH_AUTHORITY_REF: ${{ inputs.authority_ref }}
+        run: |
+          if test "$GITHUB_EVENT_NAME" = push; then
+            test "$GITHUB_REF_NAME" = release/next
+            CANDIDATE_TAG="$(jq -er .candidate_tag release/request.json)"
+            AUTHORITY_REF="$(jq -er .authority_ref release/request.json)"
+          else
+            test "$GITHUB_EVENT_NAME" = workflow_dispatch
+            CANDIDATE_TAG="$DISPATCH_CANDIDATE_TAG"
+            AUTHORITY_REF="$DISPATCH_AUTHORITY_REF"
+          fi
+          echo "$AUTHORITY_REF" | grep -Eq '^[0-9a-f]{40}$'
+          echo "candidate_tag=$CANDIDATE_TAG" >> "$GITHUB_OUTPUT"
+          echo "authority_ref=$AUTHORITY_REF" >> "$GITHUB_OUTPUT"
+
+      - name: Check out frozen superproject authority
+        uses: actions/checkout@v6
+        with:
+          repository: firestige/workflow-self-recursive
+          ref: ${{ steps.request.outputs.authority_ref }}
+          fetch-depth: 0
+          path: authority
+
+      - name: Verify exact UI pin
+        id: authority
+        env:
+          AUTHORITY_REF: ${{ steps.request.outputs.authority_ref }}
+        run: |
+          test "$(git -C authority rev-parse HEAD)" = "$AUTHORITY_REF"
+          CANDIDATE_COMMIT="$(git -C authority ls-tree HEAD wsr-ui | awk '{print $3}')"
+          echo "$CANDIDATE_COMMIT" | grep -Eq '^[0-9a-f]{40}$'
+          echo "candidate_commit=$CANDIDATE_COMMIT" >> "$GITHUB_OUTPUT"
+
+      - name: Check out exact UI product candidate
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ steps.authority.outputs.candidate_commit }}
+          fetch-depth: 0
+          path: ui-product
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          cache: npm
+
+      - name: Install exact dependencies
+        working-directory: ui-product
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Run complete component qualification
+        working-directory: ui-product
+        run: |
+          npm run format:check
+          npm run lint
+          npm run typecheck
+          npm test
+          npm run package:verify
+          npm run react18:verify
+          npm run deps:check
+          npx playwright install --with-deps chromium
+          npm run browser
+          npm run docker:smoke
+
+      - name: Build exact candidate assets
+        working-directory: ui-product
+        env:
+          CANDIDATE_TAG: ${{ steps.request.outputs.candidate_tag }}
+          RELEASE_TARGET: ${{ steps.authority.outputs.candidate_commit }}
+        run: |
+          mkdir "$RUNNER_TEMP/package" "$RUNNER_TEMP/local-release"
+          npm pack --silent --workspace wsr-ui-core --pack-destination "$RUNNER_TEMP/package"
+          PACKAGE_ARCHIVE="$(find "$RUNNER_TEMP/package" -maxdepth 1 -name 'wsr-ui-core-*.tgz' -type f)"
+          test -n "$PACKAGE_ARCHIVE"
+          node release/cli/release.mjs build "$RUNNER_TEMP/local-release" "$RELEASE_TARGET" "$CANDIDATE_TAG" "$PACKAGE_ARCHIVE"
+          node release/cli/release.mjs verify "$RUNNER_TEMP/local-release"
+
+      - name: Resolve resumable candidate state
+        id: candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_TAG: ${{ steps.request.outputs.candidate_tag }}
+          RELEASE_TARGET: ${{ steps.authority.outputs.candidate_commit }}
+        run: |
+          if gh release view "$CANDIDATE_TAG" >/dev/null 2>&1; then
+            test "$(gh release view "$CANDIDATE_TAG" --json isPrerelease --jq .isPrerelease)" = true
+            test "$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$CANDIDATE_TAG" --jq .object.sha)" = "$RELEASE_TARGET"
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            ! gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$CANDIDATE_TAG" >/dev/null 2>&1
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Mint short-lived release App token after qualification
+        id: release-app
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.WSR_RELEASE_APP_ID }}
+          private-key: ${{ secrets.WSR_RELEASE_APP_PRIVATE_KEY }}
+          owner: firestige
+          repositories: wsr-ui
+          permission-contents: write
+
+      - name: Create or exactly resume immutable candidate
+        env:
+          GH_TOKEN: ${{ steps.release-app.outputs.token }}
+          CANDIDATE_TAG: ${{ steps.request.outputs.candidate_tag }}
+          RC_EXISTS: ${{ steps.candidate.outputs.exists }}
+          RELEASE_TARGET: ${{ steps.authority.outputs.candidate_commit }}
+        run: |
+          if test "$RC_EXISTS" != true; then
+            gh release create "$CANDIDATE_TAG" "$RUNNER_TEMP/local-release/"* \
+              --prerelease --target "$RELEASE_TARGET" --title "wsr-ui-core $CANDIDATE_TAG" \
+              --notes-file "$RUNNER_TEMP/local-release/release-notes.md"
+          fi
+          mkdir "$RUNNER_TEMP/remote-release"
+          gh release download "$CANDIDATE_TAG" --dir "$RUNNER_TEMP/remote-release"
+          node release/cli/release.mjs verify "$RUNNER_TEMP/remote-release"
+          for FILE in "$RUNNER_TEMP/local-release/"*; do
+            cmp "$FILE" "$RUNNER_TEMP/remote-release/$(basename "$FILE")"
+          done
+          if test -f "$RUNNER_TEMP/remote-release/release-qualification.json"; then
+            node release/cli/release.mjs verify "$RUNNER_TEMP/remote-release" --qualified
+          else
+            node release/cli/release.mjs qualify "$RUNNER_TEMP/remote-release"
+            gh release upload "$CANDIDATE_TAG" "$RUNNER_TEMP/remote-release/release-qualification.json"
+          fi
+          mkdir "$RUNNER_TEMP/final-remote-release"
+          gh release download "$CANDIDATE_TAG" --dir "$RUNNER_TEMP/final-remote-release"
+          node release/cli/release.mjs verify "$RUNNER_TEMP/final-remote-release" --qualified
