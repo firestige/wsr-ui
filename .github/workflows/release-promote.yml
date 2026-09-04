@@ -1,0 +1,96 @@
+name: Promote qualified UI candidate
+
+on:
+  workflow_dispatch:
+    inputs:
+      candidate_tag:
+        description: Qualified UI candidate tag, for example 0.1.0-rc.2
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: ui-release-promotion
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Resolve candidate commit
+        id: candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_TAG: ${{ inputs.candidate_tag }}
+        run: |
+          test "$(gh release view "$CANDIDATE_TAG" --json isPrerelease --jq .isPrerelease)" = true
+          echo "sha=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$CANDIDATE_TAG" --jq .object.sha)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ steps.candidate.outputs.sha }}
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+
+      - name: Download and verify exact qualified bytes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_TAG: ${{ inputs.candidate_tag }}
+        run: |
+          mkdir "$RUNNER_TEMP/qualified-release"
+          gh release download "$CANDIDATE_TAG" --dir "$RUNNER_TEMP/qualified-release"
+          node release/cli/release.mjs verify "$RUNNER_TEMP/qualified-release" --qualified
+
+      - name: Enforce final coordinate eligibility
+        id: final
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_TAG: ${{ inputs.candidate_tag }}
+        run: |
+          test "$(git rev-parse HEAD)" = "${{ steps.candidate.outputs.sha }}"
+          FINAL_VERSION="$(jq -er .package.version "$RUNNER_TEMP/qualified-release/release-metadata.json")"
+          PACKAGE_NAME="$(jq -er .package.name "$RUNNER_TEMP/qualified-release/release-metadata.json")"
+          PACKAGE_ASSET="$(jq -er .package.asset "$RUNNER_TEMP/qualified-release/release-metadata.json")"
+          test "$CANDIDATE_TAG" != "$FINAL_VERSION"
+          test "${CANDIDATE_TAG%%-rc.*}" = "$FINAL_VERSION"
+          ! npm view "$PACKAGE_NAME@$FINAL_VERSION" version >/dev/null 2>&1
+          ! gh release view "$FINAL_VERSION" >/dev/null 2>&1
+          ! git ls-remote --exit-code --tags origin "refs/tags/$FINAL_VERSION" >/dev/null 2>&1
+          echo "version=$FINAL_VERSION" >> "$GITHUB_OUTPUT"
+          echo "package_archive=$RUNNER_TEMP/qualified-release/$PACKAGE_ASSET" >> "$GITHUB_OUTPUT"
+
+      - name: Publish exact qualified npm package
+        env:
+          PACKAGE_ARCHIVE: ${{ steps.final.outputs.package_archive }}
+        run: |
+          node -e 'const [major,minor]=process.argv[1].split(".").map(Number); if(major<11||(major===11&&minor<5)) process.exit(1)' "$(npm --version)"
+          npm publish "$PACKAGE_ARCHIVE" --provenance --access public
+
+      - name: Mint short-lived release App token for final GitHub declaration
+        id: release-app
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.WSR_RELEASE_APP_ID }}
+          private-key: ${{ secrets.WSR_RELEASE_APP_PRIVATE_KEY }}
+          owner: firestige
+          repositories: wsr-ui
+          permission-contents: write
+
+      - name: Create stable GitHub Release as the last operation
+        env:
+          GH_TOKEN: ${{ steps.release-app.outputs.token }}
+          FINAL_VERSION: ${{ steps.final.outputs.version }}
+        run: |
+          gh release create "$FINAL_VERSION" "$RUNNER_TEMP/qualified-release/"* \
+            --target "${{ steps.candidate.outputs.sha }}" \
+            --title "wsr-ui-core $FINAL_VERSION" \
+            --notes "Promoted from qualified candidate ${{ inputs.candidate_tag }}."

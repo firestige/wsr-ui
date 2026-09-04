@@ -291,7 +291,7 @@ const result = {
   providerCommit:
     process.env.WSR_BENCHMARK_PROVIDER_COMMIT ?? "working-tree-smoke",
   packageCoordinate: "wsr-ui-core",
-  packageVersion: "0.1.0-rc.1",
+  packageVersion: "0.1.0",
   createdAt: new Date().toISOString(),
   results,
 };

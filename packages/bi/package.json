@@ -1,6 +1,6 @@
 {
   "name": "wsr-ui-core",
-  "version": "0.1.0-rc.1",
+  "version": "0.1.0",
   "description": "Host-neutral WSR business-intelligence panels and domain projections",
   "license": "Apache-2.0",
   "type": "module",
