@@ -110,6 +110,34 @@ test("candidate and promotion workflows preserve the rc/GA authority boundary", 
   );
 });
 
+test("promotion resolves its candidate before checkout with explicit repository context", async () => {
+  const promote = await readFile(
+    new URL("../.github/workflows/release-promote.yml", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(
+    promote,
+    /gh release view "\$CANDIDATE_TAG" --repo "\$GITHUB_REPOSITORY" --json isPrerelease/,
+  );
+});
+
+test("release workflows mint App tokens with the Node 24 action", async () => {
+  const candidate = await readFile(
+    new URL("../.github/workflows/release-candidate.yml", import.meta.url),
+    "utf8",
+  );
+  const promote = await readFile(
+    new URL("../.github/workflows/release-promote.yml", import.meta.url),
+    "utf8",
+  );
+
+  for (const workflow of [candidate, promote]) {
+    assert.match(workflow, /actions\/create-github-app-token@v3/);
+    assert.doesNotMatch(workflow, /actions\/create-github-app-token@v2/);
+  }
+});
+
 test("the publishable package declares the stable bytes that promotion will publish", async () => {
   const manifest = JSON.parse(
     await readFile(
