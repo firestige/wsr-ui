@@ -4,16 +4,6 @@ on:
   push:
     branches:
       - release/next
-  workflow_dispatch:
-    inputs:
-      candidate_tag:
-        description: RC tag whose base equals the stable package version, for example 0.1.0-rc.2
-        required: true
-        type: string
-      authority_ref:
-        description: Immutable superproject revision that pins this UI candidate
-        required: true
-        type: string
 
 permissions:
   contents: read
@@ -33,19 +23,10 @@ jobs:
 
       - name: Resolve immutable release request
         id: request
-        env:
-          DISPATCH_CANDIDATE_TAG: ${{ inputs.candidate_tag }}
-          DISPATCH_AUTHORITY_REF: ${{ inputs.authority_ref }}
         run: |
-          if test "$GITHUB_EVENT_NAME" = push; then
-            test "$GITHUB_REF_NAME" = release/next
-            CANDIDATE_TAG="$(jq -er .candidate_tag release/request.json)"
-            AUTHORITY_REF="$(jq -er .authority_ref release/request.json)"
-          else
-            test "$GITHUB_EVENT_NAME" = workflow_dispatch
-            CANDIDATE_TAG="$DISPATCH_CANDIDATE_TAG"
-            AUTHORITY_REF="$DISPATCH_AUTHORITY_REF"
-          fi
+          test "$GITHUB_REF_NAME" = release/next
+          CANDIDATE_TAG="$(jq -er .candidate_tag release/request.json)"
+          AUTHORITY_REF="$(jq -er .authority_ref release/request.json)"
           echo "$AUTHORITY_REF" | grep -Eq '^[0-9a-f]{40}$'
           echo "candidate_tag=$CANDIDATE_TAG" >> "$GITHUB_OUTPUT"
           echo "authority_ref=$AUTHORITY_REF" >> "$GITHUB_OUTPUT"
@@ -131,7 +112,7 @@ jobs:
         id: release-app
         uses: actions/create-github-app-token@v3
         with:
-          app-id: ${{ vars.WSR_RELEASE_APP_ID }}
+          client-id: ${{ vars.WSR_RELEASE_CLIENT_ID }}
           private-key: ${{ secrets.WSR_RELEASE_APP_PRIVATE_KEY }}
           owner: firestige
           repositories: wsr-ui
