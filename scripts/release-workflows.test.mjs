@@ -136,7 +136,10 @@ test("release workflows mint App tokens with the Node 24 action", async () => {
   for (const workflow of [candidate, promote]) {
     assert.match(workflow, /actions\/create-github-app-token@v3/);
     assert.doesNotMatch(workflow, /actions\/create-github-app-token@v2/);
-    assert.match(workflow, /client-id: \$\{\{ vars\.WSR_RELEASE_CLIENT_ID \}\}/);
+    assert.match(
+      workflow,
+      /client-id: \$\{\{ vars\.WSR_RELEASE_CLIENT_ID \}\}/,
+    );
     assert.doesNotMatch(workflow, /app-id:/);
   }
 });
