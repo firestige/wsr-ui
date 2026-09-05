@@ -79,7 +79,7 @@ jobs:
         id: release-app
         uses: actions/create-github-app-token@v3
         with:
-          app-id: ${{ vars.WSR_RELEASE_APP_ID }}
+          client-id: ${{ vars.WSR_RELEASE_CLIENT_ID }}
           private-key: ${{ secrets.WSR_RELEASE_APP_PRIVATE_KEY }}
           owner: firestige
           repositories: wsr-ui
